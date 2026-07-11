@@ -429,7 +429,7 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
   const risk = route.risk || { score: 0, level: 'Not scored', recommendation: 'Review route manually.' };
   const driver = record.driver || {};
   const logo = settings.logoDataUrl ? `<img class="logo-img" src="${escapeHtml(settings.logoDataUrl)}" alt="Company logo">` : '<div class="logo-mark">P2P</div>';
-  const fullReportUrl = `/api/routes/${escapeHtml(record.id)}/report`;
+  const fullReportUrl = `/driver/route/${escapeHtml(record.id)}/route-pack`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -923,6 +923,18 @@ async function sendDriverRoutePage(req, res) {
 
 app.get('/driver/route/:id', sendDriverRoutePage);
 app.get('/driver-route/:id', sendDriverRoutePage);
+
+app.get('/driver/route/:id/route-pack', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const result = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
+    if (!result.rows.length) return res.status(404).send('Route report not found.');
+    res.type('html').send(buildRouteReportHtml(apiRoute(result.rows[0])));
+  } catch (error) {
+    res.status(500).send(error.message || 'Route report failed.');
+  }
+});
+
 
 app.post('/driver/route/:id/complete', async (req, res) => {
   try {
