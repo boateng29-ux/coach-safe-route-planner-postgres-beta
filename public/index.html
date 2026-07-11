@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQb7BCHj8EKpD1PpfO5GdK8LAzE+zAM=" crossorigin="" />
   <link rel="stylesheet" href="/vendor/leaflet-local.css?v=11" />
-  <link rel="stylesheet" href="/styles.css?v=11" />
+  <link rel="stylesheet" href="/styles.css?v=13" />
 </head>
 <body class="locked">
   <div id="loginScreen" class="login-screen">
@@ -15,13 +15,17 @@
       <div class="logo-mark login-logo">P2P</div>
       <p class="eyebrow">Operator access</p>
       <h1>Coach Safe Route Planner</h1>
-      <p class="subtitle">Local MVP login screen for route planners, transport managers and operations staff.</p>
+      <p class="subtitle">Secure beta login for route planners, transport managers and operations staff.</p>
       <label>
-        Demo PIN
-        <input id="loginPin" type="password" inputmode="numeric" placeholder="Enter PIN" autocomplete="off" />
+        Email
+        <input id="loginEmail" type="email" value="admin@point2point.site" placeholder="admin@point2point.site" autocomplete="username" />
       </label>
-      <button id="loginButton" class="primary" type="button">Open operator platform</button>
-      <p id="loginMessage" class="login-message">Demo PIN: <strong>1234</strong></p>
+      <label>
+        Password
+        <input id="loginPassword" type="password" placeholder="Enter password" autocomplete="current-password" />
+      </label>
+      <button id="loginButton" class="primary" type="button">Sign in</button>
+      <p id="loginMessage" class="login-message">Default beta admin: <strong>admin@point2point.site</strong>. Set <strong>ADMIN_PASSWORD</strong> in Render.</p>
     </div>
   </div>
 
@@ -36,7 +40,13 @@
         <p class="subtitle">Plan, approve, assign and share coach-safe routes with vehicle profiles, driver links, route status and issue reporting.</p>
       </div>
     </div>
-    <div class="status-card" id="providerStatus">Checking provider…</div>
+    <div class="topbar-actions">
+      <div class="status-card" id="providerStatus">Checking provider…</div>
+      <div class="status-card auth-card">
+        <strong id="currentUserBadge">Not signed in</strong>
+        <button id="logoutButton" class="secondary small-button" type="button">Logout</button>
+      </div>
+    </div>
   </header>
 
   <nav class="workspace-tabs">
@@ -175,7 +185,7 @@
       <span>03</span>
       <div>
         <h2>Local admin dashboard</h2>
-        <p>Operator platform features with local MVP login, route assignment and dashboard data stored in <code>data/db.json</code>.</p>
+        <p>Operator platform features with secure beta login, route assignment and PostgreSQL database storage.</p>
       </div>
     </div>
 
@@ -183,7 +193,7 @@
       <article id="dashboardSummaryCard" class="panel admin-card dashboard-card">
         <h3>Operations summary</h3>
         <div id="dashboardStats" class="dashboard-stats">Loading dashboard…</div>
-        <p class="muted">Use the tabs above to manage routes, drivers, vehicles and route issues. This is a local MVP dashboard; full secure login can be connected later.</p>
+        <p class="muted">Use the tabs above to manage routes, drivers, vehicles and route issues. This is the online beta dashboard. Access is protected by email/password login and user roles.</p>
       </article>
 
       <article id="approvedRoutesCard" class="panel admin-card wide-card">
@@ -259,6 +269,6 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="/app.js?v=11"></script>
+  <script src="/app.js?v=13"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ import pg from 'pg';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { promises as fs } from 'fs';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,11 @@ const TOMTOM_TRAVEL_MODE = process.env.TOMTOM_TRAVEL_MODE || 'truck';
 // Set ENABLE_MOCK_MODE=true in .env only when you intentionally want demo routes without TomTom.
 const ENABLE_MOCK_MODE = String(process.env.ENABLE_MOCK_MODE || '').toLowerCase() === 'true';
 const HAS_LIVE_TOMTOM_KEY = Boolean(TOMTOM_API_KEY && TOMTOM_API_KEY !== 'put_your_tomtom_key_here');
+const JWT_SECRET = String(process.env.JWT_SECRET || 'change_this_to_a_long_random_secret').trim();
+const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || 'admin@point2point.site').trim().toLowerCase();
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || 'ChangeMe123!').trim();
+const AUTH_TOKEN_HOURS = Math.max(1, Number(process.env.AUTH_TOKEN_HOURS || 12));
+const RESET_ADMIN_PASSWORD = String(process.env.RESET_ADMIN_PASSWORD || '').toLowerCase() === 'true';
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -562,6 +568,97 @@ function toDbStatus(value = 'approved') {
   return ['DRAFT', 'APPROVED', 'ASSIGNED', 'COMPLETED'].includes(status) ? status : 'APPROVED';
 }
 
+
+function base64Url(input) {
+  return Buffer.from(input).toString('base64url');
+}
+
+function jsonBase64Url(value) {
+  return base64Url(JSON.stringify(value));
+}
+
+function safeEqual(a, b) {
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const iterations = 120000;
+  const hash = crypto.pbkdf2Sync(String(password || ''), salt, iterations, 64, 'sha512').toString('hex');
+  return `pbkdf2$${iterations}$${salt}$${hash}`;
+}
+
+function verifyPassword(password, storedHash = '') {
+  const parts = String(storedHash || '').split('$');
+  if (parts.length !== 4 || parts[0] !== 'pbkdf2') return false;
+  const iterations = Number(parts[1]);
+  const salt = parts[2];
+  const expected = parts[3];
+  if (!Number.isFinite(iterations) || !salt || !expected) return false;
+  const actual = crypto.pbkdf2Sync(String(password || ''), salt, iterations, 64, 'sha512').toString('hex');
+  return safeEqual(actual, expected);
+}
+
+function signToken(payload = {}) {
+  const tokenPayload = {
+    ...payload,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + (AUTH_TOKEN_HOURS * 60 * 60)
+  };
+  const body = jsonBase64Url(tokenPayload);
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(body).digest('base64url');
+  return `${body}.${signature}`;
+}
+
+function verifyToken(token = '') {
+  const [body, signature] = String(token || '').split('.');
+  if (!body || !signature) throw new Error('Missing token.');
+  const expected = crypto.createHmac('sha256', JWT_SECRET).update(body).digest('base64url');
+  if (!safeEqual(signature, expected)) throw new Error('Invalid token signature.');
+  const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+  if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) throw new Error('Session expired.');
+  return payload;
+}
+
+function publicUser(row = {}) {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: String(row.role || 'DISPATCHER').toLowerCase(),
+    companyId: row.companyId
+  };
+}
+
+async function getUserFromRequest(req) {
+  const header = String(req.headers.authorization || '');
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const payload = verifyToken(token);
+  const result = await dbRequired().query('SELECT * FROM "User" WHERE id=$1 AND "companyId"=$2', [payload.sub, payload.companyId]);
+  if (!result.rows.length) throw new Error('User not found.');
+  return publicUser(result.rows[0]);
+}
+
+async function requireAuth(req, res, next) {
+  try {
+    req.user = await getUserFromRequest(req);
+    return next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Please sign in again.' });
+  }
+}
+
+function isPublicApiRequest(req) {
+  if (req.path === '/auth/login') return true;
+  if (req.path === '/health') return true;
+  if (req.path === '/test-provider') return true;
+  if (req.path === '/presets' && req.method === 'GET') return true;
+  if (req.path === '/settings' && req.method === 'GET') return true;
+  return false;
+}
+
 async function ensureCompany() {
   if (cachedCompanyId) return cachedCompanyId;
   const db = dbRequired();
@@ -599,6 +696,26 @@ async function ensureSeedData(companyId) {
       'INSERT INTO "Driver" (id,"companyId",name,phone,email,"createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,NOW(),NOW())',
       [d.id, companyId, d.name, d.phone, d.email]
     );
+  }
+  const users = await db.query('SELECT COUNT(*)::int AS count FROM "User" WHERE "companyId"=$1', [companyId]);
+  if (!users.rows[0].count) {
+    await db.query(
+      'INSERT INTO "User" (id,"companyId",name,email,"passwordHash",role,"createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())',
+      [id('user'), companyId, 'Point 2 Point Admin', ADMIN_EMAIL, hashPassword(ADMIN_PASSWORD), 'ADMIN']
+    );
+    console.log(`Seeded default admin user: ${ADMIN_EMAIL}. Change ADMIN_PASSWORD in Render before inviting real users.`);
+  } else if (RESET_ADMIN_PASSWORD) {
+    const existing = await db.query('SELECT id FROM "User" WHERE email=$1 AND "companyId"=$2 LIMIT 1', [ADMIN_EMAIL, companyId]);
+    if (existing.rows.length) {
+      await db.query('UPDATE "User" SET "passwordHash"=$1, role=$2, "updatedAt"=NOW() WHERE id=$3 AND "companyId"=$4', [hashPassword(ADMIN_PASSWORD), 'ADMIN', existing.rows[0].id, companyId]);
+      console.log(`RESET_ADMIN_PASSWORD=true: updated admin password for ${ADMIN_EMAIL}. Set it back to false after login works.`);
+    } else {
+      await db.query(
+        'INSERT INTO "User" (id,"companyId",name,email,"passwordHash",role,"createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,NOW(),NOW())',
+        [id('user'), companyId, 'Point 2 Point Admin', ADMIN_EMAIL, hashPassword(ADMIN_PASSWORD), 'ADMIN']
+      );
+      console.log(`RESET_ADMIN_PASSWORD=true: created admin user ${ADMIN_EMAIL}. Set it back to false after login works.`);
+    }
   }
 }
 
@@ -681,6 +798,34 @@ const ROUTE_SELECT_SQL = `
   LEFT JOIN "Vehicle" v ON v.id = r."vehicleId"
 `;
 
+
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const password = String(req.body?.password || '');
+    if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
+    const result = await dbRequired().query('SELECT * FROM "User" WHERE email=$1 AND "companyId"=$2', [email, companyId]);
+    const user = result.rows[0];
+    if (!user || !verifyPassword(password, user.passwordHash)) return res.status(401).json({ error: 'Invalid email or password.' });
+    const safeUser = publicUser(user);
+    const token = signToken({ sub: safeUser.id, companyId: safeUser.companyId, role: safeUser.role, email: safeUser.email });
+    res.json({ ok: true, token, user: safeUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message || 'Login failed.' });
+  }
+});
+
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  res.json({ ok: true, user: req.user });
+});
+
+app.use('/api', (req, res, next) => {
+  if (isPublicApiRequest(req)) return next();
+  return requireAuth(req, res, next);
+});
 
 app.get('/api/settings', async (req, res) => {
   try {
@@ -931,7 +1076,7 @@ app.post('/api/routes', async (req, res) => {
     await dbRequired().query(
       `INSERT INTO "Route" (id,"companyId","vehicleId","driverId",title,"startAddress","destinationAddress","distanceMiles","durationMinutes","riskScore",status,"routeGeometry",guidance,warnings,"approvedNotes","createdAt","updatedAt")
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())`,
-     [recordId, companyId, vehicleId, driverId, `${route.origin.label} to ${route.destination.label}`, route.origin.label, route.destination.label, distanceMiles, durationMinutes, route.risk?.score || null, status, JSON.stringify(route), JSON.stringify(route.instructions || []), JSON.stringify(route.warnings || []), String(req.body.operatorNotes || '').trim().slice(0, 1000)]
+      [recordId, companyId, vehicleId, driverId, `${route.origin.label} to ${route.destination.label}`, route.origin.label, route.destination.label, distanceMiles, durationMinutes, route.risk?.score || null, status, JSON.stringify(route), JSON.stringify(route.instructions || []), JSON.stringify(route.warnings || []), String(req.body.operatorNotes || '').trim().slice(0, 1000)]
     );
     const full = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [recordId, companyId]);
     res.status(201).json(apiRoute(full.rows[0]));
@@ -1005,7 +1150,7 @@ await ensureCompany().catch((error) => {
   console.error('Database startup check failed:', error.message);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Coach Safe Route Planner PostgreSQL beta running at http://localhost:${PORT}`);
   if (HAS_LIVE_TOMTOM_KEY) {
     console.log(`Live TomTom provider enabled. Mode: ${TOMTOM_TRAVEL_MODE}. Key length: ${TOMTOM_API_KEY.length}`);

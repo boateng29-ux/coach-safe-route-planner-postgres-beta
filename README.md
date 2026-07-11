@@ -1,39 +1,57 @@
-# Coach Safe Route Planner — PostgreSQL Beta
+# Coach Safe Route Planner PostgreSQL Beta - Auth Upgrade
 
-This version stores vehicles, drivers, approved routes, company branding, and unsuitable-road reports in PostgreSQL instead of `data/db.json`.
+This version adds email/password login, token-based sessions, user-role foundation, and protected API routes.
 
-## Run locally
+## New environment variables
 
-1. Create `.env` from `.env.example` and add your TomTom key plus Render **External Database URL**.
-2. Install dependencies:
+Set these locally in `.env` and in Render Environment Variables:
 
-```powershell
-npm.cmd install
+```env
+TOMTOM_API_KEY=your_tomtom_key_here
+DATABASE_URL=your_render_database_url_here
+JWT_SECRET=replace_with_a_long_random_secret
+ADMIN_EMAIL=admin@point2point.site
+ADMIN_PASSWORD=replace_with_a_strong_admin_password
+AUTH_TOKEN_HOURS=12
+RESET_ADMIN_PASSWORD=false
+DEFAULT_COUNTRY_SET=GB
+TOMTOM_TRAVEL_MODE=truck
+ENABLE_MOCK_MODE=false
+NODE_ENV=production
 ```
 
-3. Apply database schema if you have not already done so:
+On first startup, if the `User` table is empty, the app creates one admin user using `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 
-```powershell
-npx.cmd prisma format
-npx.cmd prisma migrate dev --name add_beta_tables
-npx.cmd prisma generate
+## Deploy
+
+Build Command:
+
+```bash
+npm install --no-package-lock --registry=https://registry.npmjs.org/ && npx prisma generate
 ```
 
-4. Start the app:
+Start Command:
 
-```powershell
-npm.cmd start
+```bash
+npx prisma migrate deploy && npm start
 ```
 
-5. Open:
+## After deploying
+
+Open:
 
 ```text
-http://localhost:3000
-http://localhost:3000/api/health
+https://coach.point2point.site/api/health
 ```
 
-`/api/health` should show `databaseReady: true` and `providerReady: true`.
+Then sign in at:
 
-## Security reminder
+```text
+https://coach.point2point.site
+```
 
-Do not upload `.env` to GitHub. If keys or database passwords have appeared in screenshots or chat, rotate them before real beta use.
+Use the `ADMIN_EMAIL` and `ADMIN_PASSWORD` values you set in Render.
+
+## If you forget the admin password
+
+Set `RESET_ADMIN_PASSWORD=true` in Render, set a new `ADMIN_PASSWORD`, redeploy once, sign in, then set `RESET_ADMIN_PASSWORD=false` and redeploy again.

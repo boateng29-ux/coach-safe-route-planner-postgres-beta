@@ -1,54 +1,3 @@
-function showToast(message, type = 'info') {
-  let container = document.getElementById('toastContainer');
-
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'toastContainer';
-    container.style.position = 'fixed';
-    container.style.right = '20px';
-    container.style.bottom = '20px';
-    container.style.zIndex = '9999';
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.gap = '10px';
-    document.body.appendChild(container);
-  }
-
-  const toast = document.createElement('div');
-  toast.textContent = message;
-
-  const isSuccess = type === 'success';
-  const isError = type === 'error';
-
-  toast.style.padding = '14px 16px';
-  toast.style.borderRadius = '12px';
-  toast.style.maxWidth = '360px';
-  toast.style.fontWeight = '700';
-  toast.style.boxShadow = '0 12px 30px rgba(0,0,0,0.35)';
-  toast.style.border = isSuccess
-    ? '1px solid #2ecc71'
-    : isError
-      ? '1px solid #ff6b6b'
-      : '1px solid #e8c35a';
-
-  toast.style.background = isSuccess
-    ? '#12351f'
-    : isError
-      ? '#3b1111'
-      : '#2b2208';
-
-  toast.style.color = isSuccess
-    ? '#d8ffe5'
-    : isError
-      ? '#ffd4d4'
-      : '#ffe9a6';
-
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.remove();
-  }, 4500);
-}
 const form = document.getElementById('routeForm');
 const presetSelect = document.getElementById('presetSelect');
 const vehicleSelect = document.getElementById('vehicleSelect');
@@ -58,7 +7,7 @@ const warningsEl = document.getElementById('warnings');
 const instructionsEl = document.getElementById('instructions');
 const summaryBar = document.getElementById('summaryBar');
 const riskCard = document.getElementById('riskCard');
-const saveButton = document.getElementById('saveRoute');showToast('Approved route saved successfully. It is now available in Saved routes.', 'success');
+const saveButton = document.getElementById('saveRoute');
 const printButton = document.getElementById('printRoute');
 const exportButton = document.getElementById('exportInteractive');
 const openPdfButton = document.getElementById('openPdfReport');
@@ -72,9 +21,12 @@ const driverForm = document.getElementById('driverForm');
 const driverList = document.getElementById('driverList');
 const reportList = document.getElementById('reportList');
 const loginScreen = document.getElementById('loginScreen');
-const loginPin = document.getElementById('loginPin');
+const loginEmail = document.getElementById('loginEmail');
+const loginPassword = document.getElementById('loginPassword');
 const loginButton = document.getElementById('loginButton');
 const loginMessage = document.getElementById('loginMessage');
+const currentUserBadge = document.getElementById('currentUserBadge');
+const logoutButton = document.getElementById('logoutButton');
 const workspaceTabs = document.querySelectorAll('.workspace-tabs button');
 const viewPanels = document.querySelectorAll('.view-panel');
 const dashboardStats = document.getElementById('dashboardStats');
@@ -91,6 +43,23 @@ const brandInitials = document.getElementById('brandInitials');
 const brandCompany = document.getElementById('brandCompany');
 const brandTitle = document.getElementById('brandTitle');
 
+const toast = document.createElement('div');
+toast.id = 'appToast';
+toast.className = 'app-toast';
+toast.setAttribute('role', 'status');
+toast.setAttribute('aria-live', 'polite');
+document.body.appendChild(toast);
+let toastTimer;
+
+function showToast(message, type = 'success') {
+  clearTimeout(toastTimer);
+  toast.textContent = message;
+  toast.className = `app-toast ${type} show`;
+  toastTimer = setTimeout(() => {
+    toast.className = `app-toast ${type}`;
+  }, 4200);
+}
+
 let routeLayer;
 let markerLayer;
 let currentRoute = null;
@@ -102,6 +71,8 @@ let approvedRoutes = [];
 let reports = [];
 let settings = {};
 let pendingLogoDataUrl = '';
+let authToken = localStorage.getItem('p2pCoachAuthToken') || '';
+let currentUser = null;
 
 const map = L.map('map', {
   zoomControl: true,
@@ -127,7 +98,8 @@ window.addEventListener('load', refreshMapSeveralTimes);
 window.addEventListener('resize', refreshMapSeveralTimes);
 
 loginButton?.addEventListener('click', handleLogin);
-loginPin?.addEventListener('keydown', (event) => { if (event.key === 'Enter') handleLogin(); });
+loginPassword?.addEventListener('keydown', (event) => { if (event.key === 'Enter') handleLogin(); });
+logoutButton?.addEventListener('click', handleLogout);
 workspaceTabs.forEach((tab) => tab.addEventListener('click', () => switchView(tab.dataset.view, tab.dataset.focus || '')));
 
 function metresToMiles(m) {
@@ -162,13 +134,45 @@ function escapeHtml(value = '') {
 }
 
 async function api(path, options = {}) {
-  const res = await fetch(path, options);
+  const headers = { ...(options.headers || {}) };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  const res = await fetch(path, { ...options, headers });
   const isJson = res.headers.get('content-type')?.includes('application/json');
   const data = isJson ? await res.json() : await res.text();
+  if (res.status === 401) {
+    clearAuth();
+    lockApp();
+    throw new Error(data?.error || 'Please sign in again.');
+  }
   if (!res.ok) throw new Error(data?.error || data || 'Request failed.');
   return data;
 }
 
+function setCurrentUser(user) {
+  currentUser = user || null;
+  if (currentUserBadge) {
+    currentUserBadge.textContent = currentUser
+      ? `${currentUser.name || currentUser.email} • ${String(currentUser.role || '').toUpperCase()}`
+      : 'Not signed in';
+  }
+}
+
+function setAuth(token, user) {
+  authToken = token || '';
+  if (authToken) localStorage.setItem('p2pCoachAuthToken', authToken);
+  setCurrentUser(user);
+}
+
+function clearAuth() {
+  authToken = '';
+  localStorage.removeItem('p2pCoachAuthToken');
+  setCurrentUser(null);
+}
+
+function lockApp() {
+  document.body.classList.add('locked');
+  document.getElementById('appShell')?.setAttribute('aria-hidden', 'true');
+}
 
 function unlockApp() {
   document.body.classList.remove('locked');
@@ -176,16 +180,48 @@ function unlockApp() {
   refreshMapSeveralTimes();
 }
 
-function handleLogin() {
-  const pin = String(loginPin?.value || '').trim();
-  const expected = String(settings.demoPin || '1234');
-  if (pin === expected) {
-    sessionStorage.setItem('p2pCoachPlannerLoggedIn', 'true');
-    unlockApp();
-    switchView('planner');
+async function loadPrivateData() {
+  await loadVehicles();
+  await loadDrivers();
+  await loadApprovedRoutes();
+  await loadReports();
+  renderDashboardStats();
+}
+
+async function handleLogin() {
+  const email = String(loginEmail?.value || '').trim().toLowerCase();
+  const password = String(loginPassword?.value || '');
+  if (!email || !password) {
+    if (loginMessage) loginMessage.innerHTML = '<strong>Email and password are required.</strong>';
     return;
   }
-  if (loginMessage) loginMessage.innerHTML = '<strong>Incorrect PIN.</strong> Demo PIN: <strong>1234</strong>';
+  loginButton.disabled = true;
+  loginButton.textContent = 'Signing in…';
+  try {
+    const result = await api('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    setAuth(result.token, result.user);
+    unlockApp();
+    switchView('planner');
+    await loadPrivateData();
+    showToast('Signed in successfully.', 'success');
+    if (loginPassword) loginPassword.value = '';
+    if (loginMessage) loginMessage.textContent = '';
+  } catch (error) {
+    if (loginMessage) loginMessage.innerHTML = `<strong>${escapeHtml(error.message)}</strong>`;
+  } finally {
+    loginButton.disabled = false;
+    loginButton.textContent = 'Sign in';
+  }
+}
+
+function handleLogout() {
+  clearAuth();
+  lockApp();
+  showToast('Signed out.', 'info');
 }
 
 function switchView(view, focusId = '') {
@@ -251,7 +287,6 @@ function applyBranding() {
 async function loadSettings() {
   settings = await api('/api/settings');
   applyBranding();
-  if (sessionStorage.getItem('p2pCoachPlannerLoggedIn') === 'true') unlockApp();
 }
 
 async function updateSavedRoute(id, payload) {
@@ -754,8 +789,9 @@ saveButton.addEventListener('click', async () => {
     setLatestSavedRoute(saved);
     await loadApprovedRoutes();
     saveButton.textContent = 'Saved as approved route';
+    showToast('Approved route saved successfully. It is now available in Saved routes.', 'success');
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, 'error');
     saveButton.textContent = 'Save approved route';
   } finally {
     saveButton.disabled = false;
@@ -825,9 +861,9 @@ reportForm.addEventListener('submit', async (event) => {
     });
     reportForm.reset();
     await loadReports();
-    alert('Unsuitable road report saved.');
+    showToast('Unsuitable road report saved.', 'success');
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, 'error');
   }
 });
 
@@ -847,8 +883,9 @@ vehicleForm.addEventListener('submit', async (event) => {
     vehicleForm.lengthM.value = '12.2';
     vehicleForm.weightKg.value = '18000';
     await loadVehicles();
+    showToast('Vehicle saved to the database.', 'success');
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, 'error');
   }
 });
 
@@ -882,8 +919,9 @@ driverForm.addEventListener('submit', async (event) => {
     driverForm.reset();
     await loadDrivers();
     await loadApprovedRoutes();
+    showToast('Driver saved to the database.', 'success');
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, 'error');
   }
 });
 
@@ -1010,9 +1048,9 @@ settingsForm?.addEventListener('submit', async (event) => {
       body: JSON.stringify(payload)
     });
     applyBranding();
-    alert('Branding saved. New route reports and driver links will use this branding.');
+    showToast('Branding saved. New route reports and driver links will use this branding.', 'success');
   } catch (error) {
-    alert(error.message);
+    showToast(error.message, 'error');
   }
 });
 
@@ -1021,11 +1059,19 @@ async function boot() {
   openPdfButton.disabled = true;
   await loadSettings();
   await Promise.all([loadHealth(), loadPresets()]);
-  await loadVehicles();
-  await loadDrivers();
-  await loadApprovedRoutes();
-  await loadReports();
-  renderDashboardStats();
+  if (authToken) {
+    try {
+      const me = await api('/api/auth/me');
+      setCurrentUser(me.user);
+      unlockApp();
+      await loadPrivateData();
+    } catch {
+      clearAuth();
+      lockApp();
+    }
+  } else {
+    lockApp();
+  }
 }
 
 boot().catch((error) => {
