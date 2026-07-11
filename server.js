@@ -483,23 +483,23 @@ function metersText(m){m=Number(m||0);return m>=1609?((m/1609.344).toFixed(1)+' 
 function timeText(sec){sec=Math.max(0,Math.round(Number(sec||0)));const mins=Math.round(sec/60);const h=Math.floor(mins/60),m=mins%60;return h?(h+'h '+m+'m'):(m+'m')}
 function logEvent(msg){const box=document.getElementById('driverEventLog');if(!box)return;const p=document.createElement('p');p.textContent=new Date().toLocaleTimeString()+': '+msg;box.prepend(p)}
 function updateInstructionHighlight(idx){document.querySelectorAll('#instructionList li').forEach((el,i)=>{el.classList.toggle('instruction-current',i===idx);el.classList.toggle('instruction-passed',i<idx)})}
-function updateGuidance(progressM,offRouteM){const routeTotal=totalRouteM || routeMeasures[routeMeasures.length-1] || 0;let idx=instructions.findIndex((ins)=>Number(ins.distanceM||0)>progressM+20);if(idx<0)idx=Math.max(0,instructions.length-1);currentInstructionIndex=idx;const ins=instructions[idx]||{instruction:'Continue on approved route',distanceM:progressM};const distToNext=Math.max(0,Number(ins.distanceM||0)-progressM);const progressPct=routeTotal?Math.min(100,Math.max(0,(progressM/routeTotal)*100)):0;const remainingM=Math.max(0,routeTotal-progressM);const remainingS=routeTotal&&totalTravelS?totalTravelS*(remainingM/routeTotal):0;setText('navCurrentInstruction',ins.instruction);setText('navDistanceToNext',metersText(distToNext));setText('navProgressText',Math.round(progressPct)+'%');setText('navRemainingDistance',metersText(remainingM));setText('navEtaRemaining',timeText(remainingS));const fill=document.getElementById('navProgressFill');if(fill)fill.style.width=progressPct.toFixed(1)+'%';updateInstructionHighlight(idx);if(journeyStarted&&idx!==lastLoggedInstruction){lastLoggedInstruction=idx;logEvent('Next instruction: '+ins.instruction)}if(offRouteM>250)logEvent('Off-route warning: approx '+Math.round(offRouteM)+'m from approved route.')}
+function updateGuidance(progressM,offRouteM){const routeTotal=totalRouteM || routeMeasures[routeMeasures.length-1] || 0;let idx=instructions.findIndex((ins)=>Number(ins.distanceM||0)>progressM+20);if(idx<0)idx=Math.max(0,instructions.length-1);currentInstructionIndex=idx;const ins=instructions[idx]||{instruction:'Continue on approved route',distanceM:progressM};const distToNext=Math.max(0,Number(ins.distanceM||0)-progressM);const progressPct=routeTotal?Math.min(100,Math.max(0,(progressM/routeTotal)*100)):0;const remainingM=Math.max(0,routeTotal-progressM);const remainingS=routeTotal&&totalTravelS?totalTravelS*(remainingM/routeTotal):0;setText('navCurrentInstruction',ins.instruction);setText('navDistanceToNext',metersText(distToNext));setText('navProgressText',Math.round(progressPct)+'%');setText('navRemainingDistance',metersText(remainingM));setText('navEtaRemaining',timeText(remainingS));const fill=document.getElementById('navProgressFill');if(fill)fill.style.width=progressPct.toFixed(1)+'%';updateInstructionHighlight(idx);if(journeyStarted&&idx!==lastLoggedInstruction){lastLoggedInstruction=idx;logEvent('Next instruction: '+ins.instruction)}if(offRouteM>250){logEvent('Off-route warning: approx '+Math.round(offRouteM)+'m from approved route.');const now=Date.now();if(now-lastOffRouteSentAt>120000){lastOffRouteSentAt=now;postJourneyEvent('off_route_warning','Driver is approx '+Math.round(offRouteM)+'m from the approved route.',{distanceM:Math.round(offRouteM)})}}}
 
 function updateReportGpsFields(){if(!currentGps)return;document.getElementById('reportLat').value=currentGps.lat.toFixed(7);document.getElementById('reportLng').value=currentGps.lng.toFixed(7);document.getElementById('reportAccuracy').value=Math.round(currentGps.accuracy||0)}
 function onGps(pos){const lat=pos.coords.latitude,lng=pos.coords.longitude,acc=pos.coords.accuracy||0;currentGps={lat,lng,accuracy:acc,when:new Date()};const ll=[lat,lng];if(!driverMarker){driverMarker=L.marker(ll,{icon:gpsIcon,zIndexOffset:1000}).bindPopup('Your current position').addTo(map)}else{driverMarker.setLatLng(ll)}if(accuracyCircle){accuracyCircle.setLatLng(ll).setRadius(acc)}else{accuracyCircle=L.circle(ll,{radius:acc,weight:1,opacity:.45,fillOpacity:.08}).addTo(map)}setText('gpsStatus','Active');setText('gpsTracking','On');setText('gpsAccuracy',Math.round(acc)+'m');const dist=distanceFromRoute(ll,routePoints);const alert=document.getElementById('offRouteAlert');const progressM=nearestRouteProgressM(ll,routePoints);if(dist!==null&&Number.isFinite(dist)){setText('gpsDistance',Math.round(dist)+'m');if(dist>250){alert?.classList.add('show')}else{alert?.classList.remove('show')}updateGuidance(progressM,dist)}if(followDriver){map.setView(ll,Math.max(map.getZoom(),15),{animate:true})}updateReportGpsFields()}
 function onGpsError(err){setText('gpsStatus',err.message||'Location unavailable');toast('GPS error: '+(err.message||'location unavailable'),'error')}
-document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!navigator.geolocation){toast('This browser does not support GPS location.','error');return}followDriver=true;setText('gpsStatus','Requesting permission…');watchId=navigator.geolocation.watchPosition(onGps,onGpsError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});document.getElementById('startGpsBtn').disabled=true;document.getElementById('centerGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=false});
+document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!navigator.geolocation){toast('This browser does not support GPS location.','error');return}followDriver=true;setText('gpsStatus','Requesting permission…');watchId=navigator.geolocation.watchPosition(onGps,onGpsError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});document.getElementById('startGpsBtn').disabled=true;document.getElementById('centerGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=false;postJourneyEvent('gps_started','Driver started live GPS tracking.',{})});
 document.getElementById('centerGpsBtn')?.addEventListener('click',()=>{if(currentGps){followDriver=true;map.setView([currentGps.lat,currentGps.lng],16,{animate:true});toast('Map centred on your location.','success')}else{toast('Start GPS first.','error')}});
-document.getElementById('stopGpsBtn')?.addEventListener('click',()=>{if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}followDriver=false;setText('gpsTracking','Off');setText('gpsStatus','Stopped');document.getElementById('startGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=true});
+document.getElementById('stopGpsBtn')?.addEventListener('click',()=>{if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}followDriver=false;setText('gpsTracking','Off');setText('gpsStatus','Stopped');document.getElementById('startGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=true;postJourneyEvent('gps_stopped','Driver stopped live GPS tracking.',{})});
 document.getElementById('useGpsReportBtn')?.addEventListener('click',()=>{if(!currentGps){toast('Start GPS first, then tap this again.','error');return}updateReportGpsFields();document.getElementById('roadNameInput').value='GPS: '+currentGps.lat.toFixed(6)+', '+currentGps.lng.toFixed(6);toast('GPS position attached to report.','success')});
-document.getElementById('journeyStartBtn')?.addEventListener('click',()=>{journeyStarted=true;followDriver=true;document.getElementById('journeyStartBtn').textContent='Journey in progress';document.getElementById('journeyStartBtn').disabled=true;logEvent('Journey started.');if(!currentGps)toast('Start live GPS to enable automatic turn guidance.','error')});
+document.getElementById('journeyStartBtn')?.addEventListener('click',()=>{journeyStarted=true;followDriver=true;document.getElementById('journeyStartBtn').textContent='Journey in progress';document.getElementById('journeyStartBtn').disabled=true;logEvent('Journey started.');postJourneyEvent('journey_started','Driver tapped Start journey.',currentGps?{lat:currentGps.lat,lng:currentGps.lng,accuracyM:Math.round(currentGps.accuracy||0)}:{});if(!currentGps)toast('Start live GPS to enable automatic turn guidance.','error')});
 document.getElementById('nextInstructionBtn')?.addEventListener('click',()=>{const ins=instructions[currentInstructionIndex]||instructions[0];if(ins){toast(ins.instruction,'success');logEvent('Instruction viewed: '+ins.instruction)}else{toast('No guidance instruction available.','error')}});
 function rebuildInstructionList(){const list=document.getElementById('instructionList');if(!list)return;list.innerHTML='';const rows=instructions.length?instructions:[{instruction:'No guidance returned.'}];rows.forEach((ins,idx)=>{const li=document.createElement('li');const sp=document.createElement('span');sp.textContent=String(idx+1);li.appendChild(sp);li.appendChild(document.createTextNode(ins.instruction||'Continue'));list.appendChild(li)})}
 function applyReroute(newRoute){data=newRoute||data;routePoints=(data.points||[]);instructions=(data.instructions||[]).map((i,idx)=>({index:idx,instruction:i.instruction||'Continue',street:i.street||'',distanceM:Number(i.distanceM||0),travelTimeSeconds:Number(i.travelTimeSeconds||0)})).sort((a,b)=>a.distanceM-b.distanceM);totalRouteM=Number(data.summary?.lengthInMeters||0);totalTravelS=Number(data.summary?.travelTimeInSeconds||0);routeMeasures=buildRouteMeasures(routePoints);currentInstructionIndex=0;lastLoggedInstruction=-1;drawRouteOnMap();rebuildInstructionList();if(currentGps){const ll=[currentGps.lat,currentGps.lng];const dist=distanceFromRoute(ll,routePoints)||0;const progressM=nearestRouteProgressM(ll,routePoints);updateGuidance(progressM,dist)}else{updateGuidance(0,0)}fit()}
 document.getElementById('recalcBtn')?.addEventListener('click',async()=>{const btn=document.getElementById('recalcBtn');if(!currentGps){toast('Start live GPS first so the app can reroute from your current position.','error');return}btn.disabled=true;const oldText=btn.textContent;btn.textContent='Recalculating…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/reroute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:currentGps.lat,lng:currentGps.lng,accuracyM:currentGps.accuracy})});const payload=await r.json();if(!r.ok)throw new Error(payload.error||'Could not recalculate route.');applyReroute(payload.route);toast('Coach-safe route recalculated from your GPS position.','success');logEvent('Coach-safe reroute calculated from driver GPS.')}catch(err){toast(err.message,'error');logEvent('Reroute failed: '+err.message)}finally{btn.disabled=false;btn.textContent=oldText}});
 if(instructions.length){updateGuidance(0,0)}
 document.getElementById('completeBtn')?.addEventListener('click',async()=>{const btn=document.getElementById('completeBtn');btn.disabled=true;btn.textContent='Marking complete…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/complete',{method:'POST'});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not mark route completed.');document.getElementById('statusBadge').textContent='completed';toast('Route marked as completed.','success');logEvent('Journey completed.');btn.textContent='Completed';}catch(e){toast(e.message,'error');btn.disabled=false;btn.textContent='Mark completed';}});
-document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget;updateReportGpsFields();const payload=Object.fromEntries(new FormData(form));try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not save report.');form.reset();toast('Road report sent to operations.','success');}catch(err){toast(err.message,'error');}});
+document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget;updateReportGpsFields();const payload=Object.fromEntries(new FormData(form));try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not save report.');form.reset();toast('Road report sent to operations.','success');logEvent('Road report sent to operations.');}catch(err){toast(err.message,'error');}});
 </script>
 </body>
 </html>`;
@@ -715,8 +715,54 @@ async function ensureCompany() {
     );
   }
   cachedCompanyId = result.rows[0].id;
+  await ensureJourneyEventTable();
   await ensureSeedData(cachedCompanyId);
   return cachedCompanyId;
+}
+
+async function ensureJourneyEventTable() {
+  const db = dbRequired();
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS "JourneyEvent" (
+      id TEXT PRIMARY KEY,
+      "companyId" TEXT NOT NULL REFERENCES "Company"(id) ON DELETE CASCADE,
+      "routeId" TEXT NOT NULL REFERENCES "Route"(id) ON DELETE CASCADE,
+      "driverId" TEXT NULL REFERENCES "Driver"(id) ON DELETE SET NULL,
+      "eventType" TEXT NOT NULL,
+      message TEXT NOT NULL DEFAULT '',
+      metadata JSONB NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT NOW()
+    )
+  `);
+  await db.query('CREATE INDEX IF NOT EXISTS "JourneyEvent_company_route_created_idx" ON "JourneyEvent" ("companyId", "routeId", "createdAt" DESC)');
+  await db.query('CREATE INDEX IF NOT EXISTS "JourneyEvent_company_created_idx" ON "JourneyEvent" ("companyId", "createdAt" DESC)');
+}
+
+async function logJourneyEvent(companyId, routeId, eventType, message, metadata = {}) {
+  try {
+    if (!companyId || !routeId) return;
+    const route = await dbRequired().query('SELECT id,"driverId" FROM "Route" WHERE id=$1 AND "companyId"=$2', [routeId, companyId]);
+    if (!route.rows.length) return;
+    await dbRequired().query(
+      'INSERT INTO "JourneyEvent" (id,"companyId","routeId","driverId","eventType",message,metadata,"createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())',
+      [id('event'), companyId, routeId, route.rows[0].driverId || null, String(eventType || 'event').slice(0, 80), String(message || '').slice(0, 400), JSON.stringify(metadata || {})]
+    );
+  } catch (error) {
+    console.error('Journey event log failed:', error.message);
+  }
+}
+
+function apiJourneyEvent(row = {}) {
+  return {
+    id: row.id,
+    routeId: row.routeId || '',
+    driverId: row.driverId || '',
+    driverName: row.driverName || '',
+    eventType: row.eventType || 'event',
+    message: row.message || '',
+    metadata: row.metadata || {},
+    createdAt: row.createdAt
+  };
 }
 
 async function ensureSeedData(companyId) {
@@ -896,6 +942,43 @@ app.patch('/api/settings', async (req, res) => {
   }
 });
 
+app.get('/api/journey-events', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const limit = Math.min(250, Math.max(1, Number(req.query.limit || 100)));
+    const result = await dbRequired().query(
+      `SELECT e.*, d.name AS "driverName" FROM "JourneyEvent" e
+       LEFT JOIN "Driver" d ON d.id=e."driverId"
+       WHERE e."companyId"=$1
+       ORDER BY e."createdAt" DESC
+       LIMIT $2`,
+      [companyId, limit]
+    );
+    res.json(result.rows.map(apiJourneyEvent));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/routes/:id/events', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const routeExists = await dbRequired().query('SELECT id FROM "Route" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
+    if (!routeExists.rows.length) return res.status(404).json({ error: 'Route not found.' });
+    const result = await dbRequired().query(
+      `SELECT e.*, d.name AS "driverName" FROM "JourneyEvent" e
+       LEFT JOIN "Driver" d ON d.id=e."driverId"
+       WHERE e."companyId"=$1 AND e."routeId"=$2
+       ORDER BY e."createdAt" DESC
+       LIMIT 150`,
+      [companyId, req.params.id]
+    );
+    res.json(result.rows.map(apiJourneyEvent));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/routes/:id', async (req, res) => {
   try {
     const companyId = await ensureCompany();
@@ -942,7 +1025,9 @@ app.patch('/api/routes/:id', async (req, res) => {
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Route not found.' });
     const full = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
-    res.json(apiRoute(full.rows[0]));
+    const updatedRoute = apiRoute(full.rows[0]);
+    await logJourneyEvent(companyId, req.params.id, 'operator_route_updated', 'Operator updated route status / driver assignment.', { status: updatedRoute.status, driverId: updatedRoute.driverId || null });
+    res.json(updatedRoute);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -954,6 +1039,7 @@ async function sendDriverRoutePage(req, res) {
     const routeResult = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
     if (!routeResult.rows.length) return res.status(404).send('Driver route not found.');
     const settingsResult = await dbRequired().query('SELECT * FROM "Company" WHERE id=$1', [companyId]);
+    await logJourneyEvent(companyId, req.params.id, 'driver_route_opened', 'Driver opened the live route page.', { userAgent: req.headers['user-agent'] || '' });
     res.type('html').send(buildDriverRouteHtml(apiRoute(routeResult.rows[0]), companyToSettings(settingsResult.rows[0] || {})));
   } catch (error) {
     res.status(500).send(error.message || 'Driver route error.');
@@ -968,12 +1054,29 @@ app.get('/driver/route/:id/route-pack', async (req, res) => {
     const companyId = await ensureCompany();
     const result = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
     if (!result.rows.length) return res.status(404).send('Route report not found.');
+    await logJourneyEvent(companyId, req.params.id, 'driver_route_pack_opened', 'Driver opened the route pack.', { userAgent: req.headers['user-agent'] || '' });
     res.type('html').send(buildRouteReportHtml(apiRoute(result.rows[0])));
   } catch (error) {
     res.status(500).send(error.message || 'Route report failed.');
   }
 });
 
+
+
+app.post('/driver/route/:id/event', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const routeResult = await dbRequired().query('SELECT id FROM "Route" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
+    if (!routeResult.rows.length) return res.status(404).json({ error: 'Route not found.' });
+    const eventType = String(req.body?.eventType || 'driver_event').trim().slice(0, 80);
+    const message = String(req.body?.message || eventType).trim().slice(0, 400);
+    const metadata = req.body?.metadata && typeof req.body.metadata === 'object' ? req.body.metadata : {};
+    await logJourneyEvent(companyId, req.params.id, eventType, message, metadata);
+    res.status(201).json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Could not save journey event.' });
+  }
+});
 
 
 app.post('/driver/route/:id/reroute', async (req, res) => {
@@ -1014,6 +1117,7 @@ app.post('/driver/route/:id/reroute', async (req, res) => {
       ...(reroute.warnings || [])
     ];
     reroute.risk = calculateRisk(reroute, vehicle, options);
+    await logJourneyEvent(companyId, req.params.id, 'reroute_calculated', 'Driver recalculated a coach-safe route from live GPS.', { lat, lng, accuracyM: Number.isFinite(accuracyM) ? Math.round(accuracyM) : null });
     res.json({ ok: true, route: stripRouteForStorage(reroute) });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Could not recalculate coach-safe route.' });
@@ -1028,6 +1132,7 @@ app.post('/driver/route/:id/complete', async (req, res) => {
       ['COMPLETED', req.params.id, companyId]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Route not found.' });
+    await logJourneyEvent(companyId, req.params.id, 'route_completed', 'Driver marked the route as completed.', {});
     res.json({ ok: true, status: toApiStatus(result.rows[0].status) });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Could not mark route completed.' });
@@ -1058,6 +1163,7 @@ app.post('/driver/route/:id/report', async (req, res) => {
       'INSERT INTO "UnsuitableRoadReport" (id,"companyId","routeId","driverId","issueType",location,notes,"createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *',
       [report.id, companyId, req.params.id, routeResult.rows[0].driverId || null, report.issueType, report.roadName, report.notes]
     );
+    await logJourneyEvent(companyId, req.params.id, 'road_report_submitted', `Driver submitted road report: ${report.issueType}`, { reportId: result.rows[0].id, location: report.roadName, hasGps });
     res.status(201).json({ ok: true, report: apiReport(result.rows[0]) });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Could not save road report.' });
@@ -1228,6 +1334,7 @@ app.post('/api/routes', async (req, res) => {
       [recordId, companyId, vehicleId, driverId, `${route.origin.label} to ${route.destination.label}`, route.origin.label, route.destination.label, distanceMiles, durationMinutes, route.risk?.score || null, status, JSON.stringify(route), JSON.stringify(route.instructions || []), JSON.stringify(route.warnings || []), String(req.body.operatorNotes || '').trim().slice(0, 1000)]
     );
     const full = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [recordId, companyId]);
+    await logJourneyEvent(companyId, recordId, 'route_approved', 'Operator saved an approved route.', { status, driverId, vehicleId, riskScore: route.risk?.score || null });
     res.status(201).json(apiRoute(full.rows[0]));
   } catch (error) {
     res.status(500).json({ error: error.message });

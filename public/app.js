@@ -534,11 +534,16 @@ async function loadApprovedRoutes() {
         </label>
       </div>
       <span class="driver-link">Driver mobile view: ${escapeHtml(shareUrl)}</span>
+      <div class="journey-events-panel" data-events-for="${escapeHtml(r.id)}" hidden>
+        <strong>Journey events</strong>
+        <div class="journey-events-list muted">Click “View journey events” to load driver activity.</div>
+      </div>
       <div class="card-actions">
         <button class="secondary" data-action="save-route-management" data-id="${escapeHtml(r.id)}">Save status / driver</button>
         <button class="secondary" data-action="load-route" data-id="${escapeHtml(r.id)}">Load map</button>
         <button class="secondary" data-action="open-driver-view" data-id="${escapeHtml(r.id)}">Open driver link</button>
         <button class="secondary" data-action="copy-driver-link" data-id="${escapeHtml(r.id)}">Copy driver link</button>
+        <button class="secondary" data-action="view-events" data-id="${escapeHtml(r.id)}">View journey events</button>
         <button class="secondary" data-action="open-report" data-id="${escapeHtml(r.id)}">Open PDF report</button>
         <button class="secondary danger" data-action="delete-route" data-id="${escapeHtml(r.id)}">Delete</button>
       </div>
@@ -942,6 +947,34 @@ driverList.addEventListener('click', async (event) => {
   }
 });
 
+async function loadJourneyEventsForRoute(id, card) {
+  const panel = card?.querySelector(`[data-events-for="${CSS.escape(id)}"]`);
+  const list = panel?.querySelector('.journey-events-list');
+  if (!panel || !list) return;
+  panel.hidden = false;
+  list.textContent = 'Loading journey events…';
+  try {
+    const events = await api(`/api/routes/${encodeURIComponent(id)}/events`);
+    if (!events.length) {
+      list.innerHTML = '<p>No driver journey events recorded yet.</p>';
+      return;
+    }
+    list.innerHTML = events.map((ev) => {
+      const meta = ev.metadata || {};
+      const extra = meta.distanceM ? ` • ${escapeHtml(String(meta.distanceM))}m from route` : '';
+      return `<div class="journey-event-row"><strong>${escapeHtml(eventLabel(ev.eventType))}</strong><span>${escapeHtml(new Date(ev.createdAt).toLocaleString())}${extra}</span><p>${escapeHtml(ev.message || '')}</p></div>`;
+    }).join('');
+  } catch (error) {
+    list.innerHTML = `<p class="error-text">${escapeHtml(error.message || 'Could not load journey events.')}</p>`;
+  }
+}
+
+function eventLabel(type = '') {
+  return String(type || 'event')
+    .replaceAll('_', ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 approvedRoutesEl.addEventListener('click', async (event) => {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
@@ -975,6 +1008,19 @@ approvedRoutesEl.addEventListener('click', async (event) => {
       setTimeout(() => { button.textContent = 'Copy driver link'; }, 1400);
     } catch {
       prompt('Copy this driver link:', url);
+    }
+  }
+  if (action === 'view-events') {
+    const card = button.closest('.saved-item');
+    button.disabled = true;
+    const oldText = button.textContent;
+    button.textContent = 'Loading events…';
+    try {
+      await loadJourneyEventsForRoute(id, card);
+      button.textContent = 'Refresh events';
+    } finally {
+      button.disabled = false;
+      if (button.textContent === 'Loading events…') button.textContent = oldText;
     }
   }
   if (action === 'save-route-management') {

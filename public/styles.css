@@ -462,3 +462,25 @@ body:not(.locked) .app-shell { display: block; }
   border-color: rgba(255, 107, 107, 0.75);
   color: var(--danger);
 }
+
+.journey-events-panel {
+  border: 1px solid rgba(214, 173, 82, .28);
+  border-radius: .9rem;
+  background: rgba(0, 0, 0, .22);
+  padding: .85rem;
+  margin: .85rem 0;
+}
+.journey-events-panel > strong {
+  display: block;
+  color: var(--gold-2, #f1d58a);
+  margin-bottom: .55rem;
+}
+.journey-event-row {
+  border-top: 1px solid rgba(214, 173, 82, .18);
+  padding: .65rem 0;
+}
+.journey-event-row:first-child { border-top: 0; }
+.journey-event-row strong { display:block; color: var(--text, #f7f3e8); }
+.journey-event-row span { display:block; color: var(--muted, #b7aa8a); font-size: .85rem; margin-top: .15rem; }
+.journey-event-row p { margin: .3rem 0 0; color: var(--muted, #b7aa8a); }
+.error-text { color: #ffd4d4; }
