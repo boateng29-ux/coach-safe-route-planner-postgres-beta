@@ -931,7 +931,7 @@ app.post('/api/routes', async (req, res) => {
     await dbRequired().query(
       `INSERT INTO "Route" (id,"companyId","vehicleId","driverId",title,"startAddress","destinationAddress","distanceMiles","durationMinutes","riskScore",status,"routeGeometry",guidance,warnings,"approvedNotes","createdAt","updatedAt")
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW(),NOW())`,
-      [recordId, companyId, vehicleId, driverId, `${route.origin.label} to ${route.destination.label}`, route.origin.label, route.destination.label, distanceMiles, durationMinutes, route.risk?.score || null, status, route, route.instructions || [], route.warnings || [], String(req.body.operatorNotes || '').trim().slice(0, 1000)]
+     [recordId, companyId, vehicleId, driverId, `${route.origin.label} to ${route.destination.label}`, route.origin.label, route.destination.label, distanceMiles, durationMinutes, route.risk?.score || null, status, JSON.stringify(route), JSON.stringify(route.instructions || []), JSON.stringify(route.warnings || []), String(req.body.operatorNotes || '').trim().slice(0, 1000)]
     );
     const full = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [recordId, companyId]);
     res.status(201).json(apiRoute(full.rows[0]));
