@@ -245,7 +245,7 @@ function driverOptions(current = '') {
 }
 
 function driverRouteUrl(id) {
-  return `${window.location.origin}/driver-route/${encodeURIComponent(id)}`;
+  return `${window.location.origin}/driver/route/${encodeURIComponent(id)}`;
 }
 
 function renderDashboardStats() {
@@ -964,12 +964,13 @@ approvedRoutesEl.addEventListener('click', async (event) => {
     window.open(`/api/routes/${encodeURIComponent(id)}/report`, '_blank');
   }
   if (action === 'open-driver-view') {
-    window.open(`/driver-route/${encodeURIComponent(id)}`, '_blank');
+    window.open(`/driver/route/${encodeURIComponent(id)}`, '_blank');
   }
   if (action === 'copy-driver-link') {
     const url = driverRouteUrl(id);
     try {
       await navigator.clipboard.writeText(url);
+      showToast('Driver route link copied.', 'success');
       button.textContent = 'Copied link';
       setTimeout(() => { button.textContent = 'Copy driver link'; }, 1400);
     } catch {
@@ -985,8 +986,9 @@ approvedRoutesEl.addEventListener('click', async (event) => {
     try {
       const updated = await updateSavedRoute(id, { status, driverId });
       if (latestSavedRoute?.id === id) setLatestSavedRoute(updated);
+      showToast('Route status / driver assignment saved.', 'success');
     } catch (error) {
-      alert(error.message);
+      showToast(error.message, 'error');
     } finally {
       button.disabled = false;
     }

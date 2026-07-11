@@ -55,3 +55,16 @@ Use the `ADMIN_EMAIL` and `ADMIN_PASSWORD` values you set in Render.
 ## If you forget the admin password
 
 Set `RESET_ADMIN_PASSWORD=true` in Render, set a new `ADMIN_PASSWORD`, redeploy once, sign in, then set `RESET_ADMIN_PASSWORD=false` and redeploy again.
+
+## Driver mobile route page upgrade
+
+This version adds a driver-only route view:
+
+- `/driver/route/:routeId` mobile-friendly route page
+- Legacy `/driver-route/:routeId` still works
+- Driver can view map, safety warnings, vehicle details and guidance
+- Driver can mark route completed
+- Driver can submit unsuitable road reports directly from the route page
+- Operator saved route links now use `/driver/route/:routeId`
+
+Deploy using the same Render environment variables as the auth version.

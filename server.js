@@ -424,40 +424,46 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
       <strong>${escapeHtml(w.title || 'Route note')}</strong>
       <p>${escapeHtml(w.message || '')}</p>
     </article>`).join('') || '<p class="muted">No warnings returned.</p>';
-  const instructionItems = (route.instructions || []).map((i) => `<li>${escapeHtml(i.instruction || 'Continue')}</li>`).join('') || '<li>No guidance returned.</li>';
-  const vehicle = route.vehicle || {};
+  const instructionItems = (route.instructions || []).map((i, index) => `<li><span>${index + 1}</span>${escapeHtml(i.instruction || 'Continue')}</li>`).join('') || '<li><span>1</span>No guidance returned.</li>';
+  const vehicle = route.vehicle || record.vehicleRecord || {};
   const risk = route.risk || { score: 0, level: 'Not scored', recommendation: 'Review route manually.' };
+  const driver = record.driver || {};
   const logo = settings.logoDataUrl ? `<img class="logo-img" src="${escapeHtml(settings.logoDataUrl)}" alt="Company logo">` : '<div class="logo-mark">P2P</div>';
+  const fullReportUrl = `/api/routes/${escapeHtml(record.id)}/report`;
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Driver Route - ${escapeHtml(title)}</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   :root{--bg:#070707;--panel:#111;--gold:#d6ad52;--gold2:#f1d58a;--text:#f7f3e8;--muted:#b7aa8a;--line:rgba(214,173,82,.28);--danger:#ff6b6b;--warn:#ffd166;--notice:#9ed0ff;--good:#8ee6a8}
   *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:#070707;color:var(--text)}
-  header{position:sticky;top:0;z-index:1000;background:linear-gradient(135deg,#050505,#17120a);border-bottom:1px solid var(--line);padding:.8rem 1rem;display:flex;gap:.85rem;align-items:center}.logo-mark{width:44px;height:44px;border-radius:999px;background:linear-gradient(135deg,var(--gold2),var(--gold));display:grid;place-items:center;color:#151006;font-weight:900}.logo-img{max-width:54px;max-height:54px;border-radius:.7rem;object-fit:contain;background:#fff;padding:.15rem}.eyebrow{color:var(--gold2);text-transform:uppercase;letter-spacing:.12em;font-size:.68rem}h1{font-size:1.15rem;margin:.15rem 0}.muted{color:var(--muted)}
-  #driverMap{height:56vh;min-height:22rem;width:100%;background:#101418}.content{padding:1rem;display:grid;gap:1rem}.card{border:1px solid var(--line);border-radius:1rem;background:rgba(255,255,255,.045);padding:1rem}.stats{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}.stat{border:1px solid var(--line);border-radius:.8rem;padding:.75rem}.stat strong{display:block;color:var(--gold2)}.status{display:inline-block;padding:.28rem .55rem;border:1px solid var(--line);border-radius:999px;color:var(--gold2);font-weight:800;text-transform:capitalize}.warning{border:1px solid var(--line);border-radius:.75rem;padding:.75rem;margin-bottom:.65rem}.warning p{margin:.35rem 0 0;color:var(--muted)}.warning.high strong{color:var(--danger)}.warning.medium strong{color:var(--warn)}.warning.notice strong{color:var(--notice)}ol{padding-left:1.25rem;color:var(--muted)}li{margin-bottom:.5rem}.buttons{display:flex;gap:.6rem;flex-wrap:wrap}.button{border:0;border-radius:.7rem;padding:.75rem .9rem;font-weight:900;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#151006;text-decoration:none;display:inline-block}.coach-map-pin{display:inline-flex;width:1.15rem;height:1.15rem;border-radius:999px;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,.55)}.coach-map-pin.start{background:#2fd36b}.coach-map-pin.end{background:#ff6b6b}.coach-route-line{stroke-linecap:round;stroke-linejoin:round}
-  @media(min-width:900px){.content{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}#driverMap{height:64vh}}
-  @media print{@page{size:A4 portrait;margin:10mm}header{position:static}.buttons{display:none}.content{display:block}.card{break-inside:avoid;margin-bottom:1rem}#driverMap{height:6in}}
+  header{position:sticky;top:0;z-index:1000;background:linear-gradient(135deg,#050505,#17120a);border-bottom:1px solid var(--line);padding:.85rem 1rem;display:flex;gap:.85rem;align-items:center}.logo-mark{width:46px;height:46px;border-radius:999px;background:linear-gradient(135deg,var(--gold2),var(--gold));display:grid;place-items:center;color:#151006;font-weight:900;flex:0 0 auto}.logo-img{max-width:56px;max-height:56px;border-radius:.7rem;object-fit:contain;background:#fff;padding:.15rem}.eyebrow{color:var(--gold2);text-transform:uppercase;letter-spacing:.12em;font-size:.68rem}h1{font-size:1.15rem;margin:.15rem 0}.muted{color:var(--muted)}
+  #driverMap{height:55vh;min-height:23rem;width:100%;background:#101418}.content{padding:1rem;display:grid;gap:1rem}.card{border:1px solid var(--line);border-radius:1rem;background:rgba(255,255,255,.045);padding:1rem}.stats{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}.stat{border:1px solid var(--line);border-radius:.8rem;padding:.75rem}.stat strong{display:block;color:var(--gold2)}.status{display:inline-block;padding:.28rem .55rem;border:1px solid var(--line);border-radius:999px;color:var(--gold2);font-weight:800;text-transform:capitalize}.warning{border:1px solid var(--line);border-radius:.75rem;padding:.75rem;margin-bottom:.65rem}.warning p{margin:.35rem 0 0;color:var(--muted)}.warning.high strong{color:var(--danger)}.warning.medium strong{color:var(--warn)}.warning.notice strong{color:var(--notice)}ol{list-style:none;padding:0;margin:0;color:var(--muted)}li{display:grid;grid-template-columns:1.8rem 1fr;gap:.5rem;margin-bottom:.65rem}li span{display:grid;place-items:center;width:1.45rem;height:1.45rem;border-radius:999px;background:rgba(214,173,82,.18);color:var(--gold2);font-weight:900}.buttons{display:flex;gap:.6rem;flex-wrap:wrap}.button,button{border:0;border-radius:.7rem;padding:.78rem .95rem;font-weight:900;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#151006;text-decoration:none;display:inline-block;cursor:pointer}.secondary{background:rgba(255,255,255,.07);color:var(--gold2);border:1px solid var(--line)}.danger{background:#3b1111;color:#ffd4d4;border:1px solid #ff6b6b}.form-grid{display:grid;gap:.7rem}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:.75rem;background:#050505;color:var(--text);padding:.75rem;font:inherit}label{display:grid;gap:.35rem;color:var(--gold2);font-weight:800}.toast{position:fixed;right:1rem;bottom:1rem;z-index:2000;max-width:min(24rem,calc(100vw - 2rem));padding:.85rem 1rem;border-radius:.85rem;background:#12351f;color:#d8ffe5;border:1px solid #2ecc71;box-shadow:0 16px 38px rgba(0,0,0,.45);font-weight:800}.toast.error{background:#3b1111;color:#ffd4d4;border-color:#ff6b6b}.coach-map-pin{display:inline-flex;width:1.15rem;height:1.15rem;border-radius:999px;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,.55)}.coach-map-pin.start{background:#2fd36b}.coach-map-pin.end{background:#ff6b6b}.coach-route-line{stroke-linecap:round;stroke-linejoin:round}
+  @media(min-width:920px){.content{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}#driverMap{height:64vh}}
+  @media print{@page{size:A4 portrait;margin:10mm}header{position:static}.buttons,.form-grid,.toast{display:none!important}.content{display:block}.card{break-inside:avoid;margin-bottom:1rem}#driverMap{height:6in}}
 </style>
 </head>
 <body>
-<header>${logo}<div><div class="eyebrow">${escapeHtml(settings.companyName || 'Point 2 Point')} • Driver route</div><h1>${escapeHtml(title)}</h1><div class="muted">${escapeHtml(metresToMiles(route.summary?.lengthInMeters || 0))} miles • ${escapeHtml(secondsToText(route.summary?.travelTimeInSeconds || 0))} • <span class="status">${escapeHtml(record.status || 'approved')}</span></div></div></header>
+<header>${logo}<div><div class="eyebrow">${escapeHtml(settings.companyName || 'Point 2 Point')} • Driver route</div><h1>${escapeHtml(title)}</h1><div class="muted">${escapeHtml(metresToMiles(route.summary?.lengthInMeters || 0))} miles • ${escapeHtml(secondsToText(route.summary?.travelTimeInSeconds || 0))} • <span class="status" id="statusBadge">${escapeHtml(record.status || 'approved')}</span></div></div></header>
 <div id="driverMap"></div>
 <main class="content">
-  <section class="card"><h2>Driver summary</h2><div class="stats"><div class="stat"><strong>Driver</strong>${escapeHtml(record.driver?.name || 'Not assigned')}</div><div class="stat"><strong>Vehicle</strong>${escapeHtml(vehicle.name || 'Coach')}<br>${escapeHtml(vehicle.registration || '')}</div><div class="stat"><strong>Height</strong>${escapeHtml(vehicle.heightM)}m</div><div class="stat"><strong>Weight</strong>${Number(vehicle.weightKg || 0).toLocaleString()}kg</div></div><p class="muted"><strong>Operator notes:</strong> ${escapeHtml(record.operatorNotes || 'None')}</p><div class="buttons"><a class="button" href="/api/routes/${escapeHtml(record.id)}/report" target="_blank">Open full report</a><button class="button" onclick="window.print()">Print</button></div></section>
+  <section class="card"><h2>Driver summary</h2><div class="stats"><div class="stat"><strong>Driver</strong>${escapeHtml(driver.name || 'Not assigned')}</div><div class="stat"><strong>Vehicle</strong>${escapeHtml(vehicle.name || 'Coach')}<br>${escapeHtml(vehicle.registration || '')}</div><div class="stat"><strong>Height</strong>${escapeHtml(vehicle.heightM || '')}m</div><div class="stat"><strong>Weight</strong>${Number(vehicle.weightKg || 0).toLocaleString()}kg</div></div><p class="muted"><strong>Operator notes:</strong> ${escapeHtml(record.operatorNotes || 'None')}</p><div class="buttons"><a class="button" href="${fullReportUrl}" target="_blank">Open route pack</a><button class="secondary" onclick="window.print()">Print</button><button id="completeBtn" class="button" type="button">Mark completed</button></div></section>
   <section class="card"><h2>Risk score</h2><p style="font-size:2rem;font-weight:900;color:var(--gold2);margin:.2rem 0">${escapeHtml(risk.score)} / 100</p><strong>${escapeHtml(risk.level)} risk</strong><p class="muted">${escapeHtml(risk.recommendation)}</p></section>
   <section class="card"><h2>Safety review</h2>${warningCards}</section>
   <section class="card"><h2>Guidance preview</h2><ol>${instructionItems}</ol></section>
+  <section class="card wide"><h2>Report unsuitable road</h2><form id="driverReportForm" class="form-grid"><label>Road / location<input name="roadName" placeholder="Example: narrow hotel approach" /></label><label>Issue type<select name="issueType"><option>Unsuitable road</option><option>Low bridge concern</option><option>Narrow road</option><option>Weight restriction concern</option><option>Tight turn</option><option>Coach access restriction</option><option>Other</option></select></label><label>Notes<textarea name="notes" rows="3" placeholder="Explain what happened or what needs checking."></textarea></label><button type="submit">Submit road report</button></form></section>
   <section class="card wide"><p class="muted"><strong>Important:</strong> This driver view supports route planning only. Follow road signs, temporary restrictions and operator instructions at all times.</p></section>
 </main>
-<script>window.ROUTE_EXPORT_DATA=${jsonForHtml(route)};</script>
+<script>window.ROUTE_EXPORT_DATA=${jsonForHtml(route)};window.DRIVER_ROUTE_ID=${JSON.stringify(record.id)};</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+function toast(message,type){let t=document.createElement('div');t.className='toast '+(type||'');t.textContent=message;document.body.appendChild(t);setTimeout(()=>t.remove(),4200)}
 const data=window.ROUTE_EXPORT_DATA;const map=L.map('driverMap',{zoomControl:true,preferCanvas:true}).setView([51.5072,-0.1276],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors',detectRetina:true,crossOrigin:true}).addTo(map);const pin=(c)=>L.divIcon({className:'',html:'<span class="coach-map-pin '+c+'"></span>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-12]});if((data.points||[]).length){const line=L.polyline(data.points,{weight:7,opacity:.9,className:'coach-route-line'}).addTo(map);L.marker(data.points[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);L.marker(data.points[data.points.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);function fit(){map.invalidateSize(true);map.fitBounds(line.getBounds(),{padding:[34,34],maxZoom:15})}[250,800,1400].forEach((d)=>setTimeout(fit,d));window.addEventListener('resize',fit)}
+document.getElementById('completeBtn')?.addEventListener('click',async()=>{const btn=document.getElementById('completeBtn');btn.disabled=true;btn.textContent='Marking complete…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/complete',{method:'POST'});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not mark route completed.');document.getElementById('statusBadge').textContent='completed';toast('Route marked as completed.','success');btn.textContent='Completed';}catch(e){toast(e.message,'error');btn.disabled=false;btn.textContent='Mark completed';}});
+document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget;const payload=Object.fromEntries(new FormData(form));try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not save report.');form.reset();toast('Road report sent to operations.','success');}catch(err){toast(err.message,'error');}});
 </script>
 </body>
 </html>`;
@@ -903,7 +909,7 @@ app.patch('/api/routes/:id', async (req, res) => {
   }
 });
 
-app.get('/driver-route/:id', async (req, res) => {
+async function sendDriverRoutePage(req, res) {
   try {
     const companyId = await ensureCompany();
     const routeResult = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
@@ -912,6 +918,45 @@ app.get('/driver-route/:id', async (req, res) => {
     res.type('html').send(buildDriverRouteHtml(apiRoute(routeResult.rows[0]), companyToSettings(settingsResult.rows[0] || {})));
   } catch (error) {
     res.status(500).send(error.message || 'Driver route error.');
+  }
+}
+
+app.get('/driver/route/:id', sendDriverRoutePage);
+app.get('/driver-route/:id', sendDriverRoutePage);
+
+app.post('/driver/route/:id/complete', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const result = await dbRequired().query(
+      'UPDATE "Route" SET status=$1, "updatedAt"=NOW() WHERE id=$2 AND "companyId"=$3 RETURNING id,status',
+      ['COMPLETED', req.params.id, companyId]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Route not found.' });
+    res.json({ ok: true, status: toApiStatus(result.rows[0].status) });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Could not mark route completed.' });
+  }
+});
+
+app.post('/driver/route/:id/report', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const routeResult = await dbRequired().query('SELECT id,"driverId" FROM "Route" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
+    if (!routeResult.rows.length) return res.status(404).json({ error: 'Route not found.' });
+    const report = {
+      id: id('issue'),
+      roadName: String(req.body?.roadName || '').trim().slice(0, 160),
+      issueType: String(req.body?.issueType || 'Unsuitable road').trim().slice(0, 120),
+      notes: String(req.body?.notes || '').trim().slice(0, 1000)
+    };
+    if (!report.roadName && !report.notes) return res.status(400).json({ error: 'Please add a road/location or notes before submitting.' });
+    const result = await dbRequired().query(
+      'INSERT INTO "UnsuitableRoadReport" (id,"companyId","routeId","driverId","issueType",location,notes,"createdAt") VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING *',
+      [report.id, companyId, req.params.id, routeResult.rows[0].driverId || null, report.issueType, report.roadName, report.notes]
+    );
+    res.status(201).json({ ok: true, report: apiReport(result.rows[0]) });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Could not save road report.' });
   }
 });
 
