@@ -248,6 +248,52 @@ function driverRouteUrl(id) {
   return `${window.location.origin}/driver/route/${encodeURIComponent(id)}`;
 }
 
+function routePackUrl(id) {
+  return `${window.location.origin}/driver/route/${encodeURIComponent(id)}/route-pack`;
+}
+
+function normalisePhoneForWhatsApp(phone = '') {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.startsWith('0')) digits = `44${digits.slice(1)}`;
+  return digits;
+}
+
+function routeAssignmentMessage(record) {
+  const route = record?.route || {};
+  const driver = record?.driver?.name || 'Driver';
+  const vehicle = route.vehicle || record?.vehicle || {};
+  const vehicleText = [vehicle.name, vehicle.registration].filter(Boolean).join(' ') || 'Assigned coach';
+  const riskScore = route.risk?.score ?? record?.riskScore ?? '-';
+  const riskLevel = route.risk?.level || 'Review required';
+  const warnings = Array.isArray(route.warnings) ? route.warnings : [];
+  const warningSummary = warnings.length
+    ? warnings.slice(0, 3).map((w) => `- ${w.title || w.message || w}`).join('\n')
+    : '- No route-specific warnings recorded. Driver must still follow road signs.';
+
+  return `Hi ${driver}, your coach route has been assigned.\n\nRoute: ${record?.origin || record?.startAddress || 'Start'} → ${record?.destination || record?.destinationAddress || 'Destination'}\nVehicle: ${vehicleText}\nRisk score: ${riskScore}/100 (${riskLevel})\n\nOpen your live route here:\n${driverRouteUrl(record.id)}\n\nRoute pack / printable guidance:\n${routePackUrl(record.id)}\n\nSafety warning summary:\n${warningSummary}\n\nPlease review the safety warnings before departure and follow all road signs, restrictions and operator instructions.`;
+}
+
+async function copyTextToClipboard(text, successMessage = 'Copied.') {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(successMessage, 'success');
+    return true;
+  } catch {
+    prompt('Copy this text:', text);
+    return false;
+  }
+}
+
+function openWhatsAppForRoute(record) {
+  const message = routeAssignmentMessage(record);
+  const phone = normalisePhoneForWhatsApp(record?.driver?.phone || '');
+  const encoded = encodeURIComponent(message);
+  const url = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+  window.open(url, '_blank');
+}
+
 function renderDashboardStats() {
   if (!dashboardStats) return;
   const assigned = approvedRoutes.filter((r) => r.status === 'assigned').length;
@@ -534,6 +580,11 @@ async function loadApprovedRoutes() {
         </label>
       </div>
       <span class="driver-link">Driver mobile view: ${escapeHtml(shareUrl)}</span>
+      <details class="assignment-message-box">
+        <summary>Driver assignment message</summary>
+        <textarea readonly>${escapeHtml(routeAssignmentMessage(r))}</textarea>
+        <div class="hint">Copy this into WhatsApp, SMS or email when assigning the route.</div>
+      </details>
       <div class="journey-events-panel" data-events-for="${escapeHtml(r.id)}" hidden>
         <strong>Journey events</strong>
         <div class="journey-events-list muted">Click “View journey events” to load driver activity.</div>
@@ -543,6 +594,8 @@ async function loadApprovedRoutes() {
         <button class="secondary" data-action="load-route" data-id="${escapeHtml(r.id)}">Load map</button>
         <button class="secondary" data-action="open-driver-view" data-id="${escapeHtml(r.id)}">Open driver link</button>
         <button class="secondary" data-action="copy-driver-link" data-id="${escapeHtml(r.id)}">Copy driver link</button>
+        <button class="secondary" data-action="copy-assignment-message" data-id="${escapeHtml(r.id)}">Copy WhatsApp/SMS message</button>
+        <button class="secondary" data-action="open-whatsapp-message" data-id="${escapeHtml(r.id)}">Open WhatsApp</button>
         <button class="secondary" data-action="view-events" data-id="${escapeHtml(r.id)}">View journey events</button>
         <button class="secondary" data-action="open-report" data-id="${escapeHtml(r.id)}">Open PDF report</button>
         <button class="secondary danger" data-action="delete-route" data-id="${escapeHtml(r.id)}">Delete</button>
@@ -1001,14 +1054,24 @@ approvedRoutesEl.addEventListener('click', async (event) => {
   }
   if (action === 'copy-driver-link') {
     const url = driverRouteUrl(id);
-    try {
-      await navigator.clipboard.writeText(url);
-      showToast('Driver route link copied.', 'success');
+    const copied = await copyTextToClipboard(url, 'Driver route link copied.');
+    if (copied) {
       button.textContent = 'Copied link';
       setTimeout(() => { button.textContent = 'Copy driver link'; }, 1400);
-    } catch {
-      prompt('Copy this driver link:', url);
     }
+  }
+  if (action === 'copy-assignment-message') {
+    if (!record) return;
+    const copied = await copyTextToClipboard(routeAssignmentMessage(record), 'Driver assignment message copied.');
+    if (copied) {
+      button.textContent = 'Copied message';
+      setTimeout(() => { button.textContent = 'Copy WhatsApp/SMS message'; }, 1600);
+    }
+  }
+  if (action === 'open-whatsapp-message') {
+    if (!record) return;
+    openWhatsAppForRoute(record);
+    showToast('WhatsApp message opened. Review before sending.', 'info');
   }
   if (action === 'view-events') {
     const card = button.closest('.saved-item');
@@ -1032,7 +1095,7 @@ approvedRoutesEl.addEventListener('click', async (event) => {
     try {
       const updated = await updateSavedRoute(id, { status, driverId });
       if (latestSavedRoute?.id === id) setLatestSavedRoute(updated);
-      showToast('Route status / driver assignment saved.', 'success');
+      showToast(driverId ? 'Route assigned. Copy the WhatsApp/SMS message to notify the driver.' : 'Route status saved.', 'success');
     } catch (error) {
       showToast(error.message, 'error');
     } finally {

@@ -484,3 +484,38 @@ body:not(.locked) .app-shell { display: block; }
 .journey-event-row span { display:block; color: var(--muted, #b7aa8a); font-size: .85rem; margin-top: .15rem; }
 .journey-event-row p { margin: .3rem 0 0; color: var(--muted, #b7aa8a); }
 .error-text { color: #ffd4d4; }
+
+.assignment-message-box {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(232, 195, 90, 0.22);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.assignment-message-box summary {
+  cursor: pointer;
+  color: #ffe9a6;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.assignment-message-box textarea {
+  width: 100%;
+  min-height: 185px;
+  resize: vertical;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.28);
+  color: #f5f0e4;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.assignment-message-box .hint {
+  margin-top: 7px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.86rem;
+}

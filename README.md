@@ -1,70 +1,41 @@
-# Coach Safe Route Planner PostgreSQL Beta - Auth Upgrade
+# Coach Safe Route Planner – Driver Assignment Notification Upgrade
 
-This version adds email/password login, token-based sessions, user-role foundation, and protected API routes.
+This upgrade adds copyable driver assignment notifications for the live operator beta.
 
-## New environment variables
+## Added
 
-Set these locally in `.env` and in Render Environment Variables:
+- Driver assignment message preview inside each saved route card.
+- **Copy WhatsApp/SMS message** button.
+- **Open WhatsApp** button.
+- Message includes route, driver link, route pack link, vehicle details, risk score and warning summary.
+- Improved confirmation after route status/driver assignment is saved.
 
-```env
-TOMTOM_API_KEY=your_tomtom_key_here
-DATABASE_URL=your_render_database_url_here
-JWT_SECRET=replace_with_a_long_random_secret
-ADMIN_EMAIL=admin@point2point.site
-ADMIN_PASSWORD=replace_with_a_strong_admin_password
-AUTH_TOKEN_HOURS=12
-RESET_ADMIN_PASSWORD=false
-DEFAULT_COUNTRY_SET=GB
-TOMTOM_TRAVEL_MODE=truck
-ENABLE_MOCK_MODE=false
-NODE_ENV=production
-```
+## Files changed
 
-On first startup, if the `User` table is empty, the app creates one admin user using `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+Copy these files into your existing Git project and replace the current versions:
+
+- `public/app.js`
+- `public/styles.css`
+- `README.md`
 
 ## Deploy
 
-Build Command:
-
-```bash
-npm install --no-package-lock --registry=https://registry.npmjs.org/ && npx prisma generate
+```powershell
+cd "$env:USERPROFILE\Downloads\coach-safe-route-planner-postgres-beta\coach-safe-route-planner-postgres-beta"
+git add public/app.js public/styles.css README.md
+git commit -m "Add driver assignment notification messages"
+git push
 ```
 
-Start Command:
+Render should redeploy automatically.
 
-```bash
-npx prisma migrate deploy && npm start
-```
+## Test
 
-## After deploying
+1. Log in at `https://coach.point2point.site`.
+2. Open **Saved routes**.
+3. Assign a driver and save status/driver.
+4. Click **Copy WhatsApp/SMS message**.
+5. Paste it into WhatsApp/SMS/email.
+6. Click **Open WhatsApp** and confirm the message opens for review before sending.
 
-Open:
-
-```text
-https://coach.point2point.site/api/health
-```
-
-Then sign in at:
-
-```text
-https://coach.point2point.site
-```
-
-Use the `ADMIN_EMAIL` and `ADMIN_PASSWORD` values you set in Render.
-
-## If you forget the admin password
-
-Set `RESET_ADMIN_PASSWORD=true` in Render, set a new `ADMIN_PASSWORD`, redeploy once, sign in, then set `RESET_ADMIN_PASSWORD=false` and redeploy again.
-
-## Driver mobile route page upgrade
-
-This version adds a driver-only route view:
-
-- `/driver/route/:routeId` mobile-friendly route page
-- Legacy `/driver-route/:routeId` still works
-- Driver can view map, safety warnings, vehicle details and guidance
-- Driver can mark route completed
-- Driver can submit unsuitable road reports directly from the route page
-- Operator saved route links now use `/driver/route/:routeId`
-
-Deploy using the same Render environment variables as the auth version.
+The app does not send the message automatically. It prepares it for operator review during beta testing.
