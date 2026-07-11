@@ -1,3 +1,54 @@
+function showToast(message, type = 'info') {
+  let container = document.getElementById('toastContainer');
+
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.style.position = 'fixed';
+    container.style.right = '20px';
+    container.style.bottom = '20px';
+    container.style.zIndex = '9999';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '10px';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.textContent = message;
+
+  const isSuccess = type === 'success';
+  const isError = type === 'error';
+
+  toast.style.padding = '14px 16px';
+  toast.style.borderRadius = '12px';
+  toast.style.maxWidth = '360px';
+  toast.style.fontWeight = '700';
+  toast.style.boxShadow = '0 12px 30px rgba(0,0,0,0.35)';
+  toast.style.border = isSuccess
+    ? '1px solid #2ecc71'
+    : isError
+      ? '1px solid #ff6b6b'
+      : '1px solid #e8c35a';
+
+  toast.style.background = isSuccess
+    ? '#12351f'
+    : isError
+      ? '#3b1111'
+      : '#2b2208';
+
+  toast.style.color = isSuccess
+    ? '#d8ffe5'
+    : isError
+      ? '#ffd4d4'
+      : '#ffe9a6';
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.remove();
+  }, 4500);
+}
 const form = document.getElementById('routeForm');
 const presetSelect = document.getElementById('presetSelect');
 const vehicleSelect = document.getElementById('vehicleSelect');
