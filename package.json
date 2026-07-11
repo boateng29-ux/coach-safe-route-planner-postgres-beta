@@ -1,0 +1,25 @@
+{
+  "name": "coach-safe-route-planner-postgres-beta",
+  "version": "0.2.0",
+  "description": "Coach-safe route planner MVP using TomTom routing with coach vehicle dimensions.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "pg": "^8.13.1",
+    "@prisma/client": "^7.8.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "prisma": "^7.8.0"
+  }
+}

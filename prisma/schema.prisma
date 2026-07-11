@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Company {
+  id           String   @id @default(cuid())
+  name         String
+  brandingName String?
+  logoUrl      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users        User[]
+  vehicles     Vehicle[]
+  drivers      Driver[]
+  routes       Route[]
+  reports      UnsuitableRoadReport[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  companyId    String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(DISPATCHER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company      Company  @relation(fields: [companyId], references: [id])
+}
+
+model Vehicle {
+  id           String   @id @default(cuid())
+  companyId    String
+  registration String?
+  name         String
+  coachType    String
+  heightM      Float
+  widthM       Float
+  lengthM      Float
+  weightKg     Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company      Company  @relation(fields: [companyId], references: [id])
+  routes       Route[]
+}
+
+model Driver {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  routes    Route[]
+  reports   UnsuitableRoadReport[]
+}
+
+model Route {
+  id                 String      @id @default(cuid())
+  companyId          String
+  vehicleId          String?
+  driverId           String?
+  title              String
+  startAddress       String
+  destinationAddress String
+  distanceMiles      Float?
+  durationMinutes    Int?
+  riskScore          Int?
+  status             RouteStatus @default(DRAFT)
+  routeGeometry      Json?
+  guidance           Json?
+  warnings           Json?
+  approvedNotes      String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  company            Company     @relation(fields: [companyId], references: [id])
+  vehicle            Vehicle?    @relation(fields: [vehicleId], references: [id])
+  driver             Driver?     @relation(fields: [driverId], references: [id])
+  reports            UnsuitableRoadReport[]
+}
+
+model UnsuitableRoadReport {
+  id        String   @id @default(cuid())
+  companyId String
+  routeId   String?
+  driverId  String?
+  issueType String
+  location  String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  route     Route?   @relation(fields: [routeId], references: [id])
+  driver    Driver?  @relation(fields: [driverId], references: [id])
+}
+
+enum UserRole {
+  ADMIN
+  DISPATCHER
+  DRIVER
+  VIEWER
+}
+
+enum RouteStatus {
+  DRAFT
+  APPROVED
+  ASSIGNED
+  COMPLETED
+}

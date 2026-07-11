@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coach Safe Route Planner | Point 2 Point</title>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQb7BCHj8EKpD1PpfO5GdK8LAzE+zAM=" crossorigin="" />
+  <link rel="stylesheet" href="/vendor/leaflet-local.css?v=11" />
+  <link rel="stylesheet" href="/styles.css?v=11" />
+</head>
+<body class="locked">
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="logo-mark login-logo">P2P</div>
+      <p class="eyebrow">Operator access</p>
+      <h1>Coach Safe Route Planner</h1>
+      <p class="subtitle">Local MVP login screen for route planners, transport managers and operations staff.</p>
+      <label>
+        Demo PIN
+        <input id="loginPin" type="password" inputmode="numeric" placeholder="Enter PIN" autocomplete="off" />
+      </label>
+      <button id="loginButton" class="primary" type="button">Open operator platform</button>
+      <p id="loginMessage" class="login-message">Demo PIN: <strong>1234</strong></p>
+    </div>
+  </div>
+
+  <div id="appShell" class="app-shell" aria-hidden="true">
+  <header class="topbar">
+    <div class="brand-block">
+      <img id="brandLogo" class="brand-logo" alt="Company logo" hidden />
+      <div id="brandInitials" class="logo-mark">P2P</div>
+      <div>
+        <p class="eyebrow" id="brandCompany">Point 2 Point Operations MVP</p>
+        <h1 id="brandTitle">Coach Safe Route Planner</h1>
+        <p class="subtitle">Plan, approve, assign and share coach-safe routes with vehicle profiles, driver links, route status and issue reporting.</p>
+      </div>
+    </div>
+    <div class="status-card" id="providerStatus">Checking provider…</div>
+  </header>
+
+  <nav class="workspace-tabs">
+    <button class="active" type="button" data-view="planner">Route planner</button>
+    <button type="button" data-view="dashboard">Admin dashboard</button>
+    <button type="button" data-view="routes" data-focus="approvedRoutesCard">Saved routes</button>
+    <button type="button" data-view="vehicles" data-focus="vehicleCard">Vehicles</button>
+    <button type="button" data-view="drivers" data-focus="driverCard">Drivers</button>
+    <button type="button" data-view="reports" data-focus="reportsCard">Road reports</button>
+    <button type="button" data-view="settings" data-focus="settingsCard">Branding</button>
+  </nav>
+
+  <main class="layout view-panel active" data-panel="planner">
+    <section class="panel planner-panel">
+      <div class="section-title">
+        <span>01</span>
+        <div>
+          <h2>Route details</h2>
+          <p>Select a saved coach, assign a driver and calculate the route.</p>
+        </div>
+      </div>
+
+      <form id="routeForm" class="form-grid">
+        <label>
+          Start point
+          <input name="start" value="Hounslow, London" autocomplete="off" required />
+        </label>
+        <label>
+          Destination
+          <input name="destination" value="Wembley Stadium, London" autocomplete="off" required />
+        </label>
+
+        <label>
+          Saved vehicle database
+          <select name="vehicleDatabaseId" id="vehicleSelect">
+            <option value="">Use manual coach profile</option>
+          </select>
+        </label>
+
+        <label>
+          Assign driver
+          <select name="driverId" id="driverSelect">
+            <option value="">No driver assigned</option>
+          </select>
+        </label>
+
+        <label>
+          Coach type
+          <select name="preset" id="presetSelect">
+            <option value="midi">Midi Coach / 33 seat</option>
+            <option value="standard" selected>Standard Coach / 49–57 seat</option>
+            <option value="triAxle">Tri-axle Coach</option>
+            <option value="doubleDecker">Double-decker Coach</option>
+          </select>
+        </label>
+
+        <div class="dimensions">
+          <label>Height m<input name="heightM" type="number" step="0.01" value="3.65" required /></label>
+          <label>Width m<input name="widthM" type="number" step="0.01" value="2.55" required /></label>
+          <label>Length m<input name="lengthM" type="number" step="0.01" value="12.2" required /></label>
+          <label>Weight kg<input name="weightKg" type="number" step="1" value="18000" required /></label>
+        </div>
+
+        <fieldset class="checks">
+          <legend>Route preferences</legend>
+          <label><input type="checkbox" name="avoidLowEmissionZones" /> Avoid low-emission zones where possible</label>
+          <label><input type="checkbox" name="avoidTolls" /> Avoid toll roads</label>
+          <label><input type="checkbox" name="avoidFerries" checked /> Avoid ferries</label>
+          <label><input type="checkbox" name="avoidUnpaved" checked /> Avoid unpaved roads</label>
+          <label><input type="checkbox" name="avoidTunnels" /> Avoid tunnels</label>
+        </fieldset>
+
+        <button class="primary" type="submit">Calculate coach-safe route</button>
+      </form>
+    </section>
+
+    <section class="map-shell">
+      <div id="map"></div>
+      <div class="summary-bar" id="summaryBar">
+        <strong>No route calculated yet</strong>
+        <span>Use the planner to generate the first route.</span>
+      </div>
+    </section>
+
+    <section class="panel results-panel">
+      <div class="section-title">
+        <span>02</span>
+        <div>
+          <h2>Safety review</h2>
+          <p>Warnings, risk score and approval actions.</p>
+        </div>
+      </div>
+
+      <div id="riskCard" class="risk-card empty">No risk score yet.</div>
+      <div id="warnings" class="warnings empty">No warnings yet.</div>
+
+      <label class="full-label">
+        Operator approval notes
+        <textarea id="operatorNotes" rows="3" placeholder="Example: Final hotel approach checked. Driver must avoid side street after 18:00."></textarea>
+      </label>
+
+      <div class="actions">
+        <button id="saveRoute" class="secondary" type="button" disabled>Save approved route</button>
+        <button id="printRoute" class="secondary" type="button" disabled>Print route pack</button>
+        <button id="exportInteractive" class="secondary" type="button" disabled>Export zoomable map</button>
+        <button id="openPdfReport" class="secondary" type="button" disabled>Open PDF route report</button>
+      </div>
+
+      <details id="reportDetails" class="report-details">
+        <summary>Report unsuitable road</summary>
+        <form id="reportForm" class="mini-form">
+          <label>Road / location name<input name="roadName" placeholder="Example: Narrow hotel approach road" /></label>
+          <label>Issue type
+            <select name="issueType">
+              <option>Unsuitable road</option>
+              <option>Low bridge concern</option>
+              <option>Narrow road</option>
+              <option>Weight restriction concern</option>
+              <option>Tight turn</option>
+              <option>Coach access restriction</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label>Notes<textarea name="notes" rows="3" placeholder="Describe what the driver/operator found."></textarea></label>
+          <button class="secondary" type="submit" disabled id="submitReport">Save road report</button>
+        </form>
+      </details>
+
+      <h3>Guidance preview</h3>
+      <ol id="instructions" class="instructions"></ol>
+    </section>
+  </main>
+
+  <section class="admin-shell view-panel" data-panel="dashboard">
+    <div class="section-title">
+      <span>03</span>
+      <div>
+        <h2>Local admin dashboard</h2>
+        <p>Operator platform features with local MVP login, route assignment and dashboard data stored in <code>data/db.json</code>.</p>
+      </div>
+    </div>
+
+    <div class="admin-grid">
+      <article id="dashboardSummaryCard" class="panel admin-card dashboard-card">
+        <h3>Operations summary</h3>
+        <div id="dashboardStats" class="dashboard-stats">Loading dashboard…</div>
+        <p class="muted">Use the tabs above to manage routes, drivers, vehicles and route issues. This is a local MVP dashboard; full secure login can be connected later.</p>
+      </article>
+
+      <article id="approvedRoutesCard" class="panel admin-card wide-card">
+        <h3>Saved route library</h3>
+        <p class="muted">Change route status, assign a driver, open the driver mobile view, or copy a share link.</p>
+        <div id="approvedRoutes" class="saved-routes empty">No approved routes yet.</div>
+      </article>
+
+      <article id="vehicleCard" class="panel admin-card">
+        <h3>Coach / vehicle database</h3>
+        <form id="vehicleForm" class="mini-form">
+          <input name="name" placeholder="Vehicle name e.g. 57 Seat Coach 01" required />
+          <input name="registration" placeholder="Registration / fleet ID" />
+          <select name="preset">
+            <option value="standard">Standard Coach / 49–57 seat</option>
+            <option value="midi">Midi Coach / 33 seat</option>
+            <option value="triAxle">Tri-axle Coach</option>
+            <option value="doubleDecker">Double-decker Coach</option>
+          </select>
+          <div class="dimensions">
+            <input name="heightM" type="number" step="0.01" placeholder="Height m" value="3.65" />
+            <input name="widthM" type="number" step="0.01" placeholder="Width m" value="2.55" />
+            <input name="lengthM" type="number" step="0.01" placeholder="Length m" value="12.2" />
+            <input name="weightKg" type="number" step="1" placeholder="Weight kg" value="18000" />
+          </div>
+          <textarea name="notes" rows="2" placeholder="Notes"></textarea>
+          <button class="secondary" type="submit">Add vehicle</button>
+        </form>
+        <div id="vehicleList" class="database-list"></div>
+      </article>
+
+      <article id="driverCard" class="panel admin-card">
+        <h3>Driver database</h3>
+        <form id="driverForm" class="mini-form">
+          <input name="name" placeholder="Driver name" required />
+          <input name="phone" placeholder="Phone" />
+          <input name="email" placeholder="Email" />
+          <input name="base" placeholder="Base / depot" />
+          <textarea name="notes" rows="2" placeholder="Notes"></textarea>
+          <button class="secondary" type="submit">Add driver</button>
+        </form>
+        <div id="driverList" class="database-list"></div>
+      </article>
+
+      <article id="reportsCard" class="panel admin-card">
+        <h3>Route issue reports dashboard</h3>
+        <div id="reportList" class="database-list empty">No road reports yet.</div>
+      </article>
+
+      <article id="settingsCard" class="panel admin-card wide-card">
+        <h3>Company branding</h3>
+        <p class="muted">Upload a logo and rename the platform for print reports, driver links and the operator dashboard.</p>
+        <form id="settingsForm" class="mini-form settings-form">
+          <input name="companyName" id="companyNameInput" placeholder="Company name" />
+          <input name="appName" id="appNameInput" placeholder="App name" />
+          <input name="accentName" id="accentNameInput" placeholder="Theme label e.g. Gold / Black" />
+          <label class="file-label">Company logo
+            <input id="logoUpload" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" />
+          </label>
+          <div class="logo-preview-box"><img id="logoPreview" alt="Logo preview" hidden /><span id="logoPreviewText">No logo uploaded</span></div>
+          <div class="card-actions">
+            <button class="secondary" type="submit">Save branding</button>
+            <button id="clearLogo" class="secondary danger" type="button">Remove logo</button>
+          </div>
+        </form>
+      </article>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <strong>Important:</strong> This MVP supports safer route planning but does not replace road signs, temporary restrictions, driver judgement, legal compliance or operator route approval.
+  </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/app.js?v=11"></script>
+</body>
+</html>
