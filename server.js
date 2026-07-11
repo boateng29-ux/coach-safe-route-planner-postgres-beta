@@ -42,6 +42,9 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 const COACH_PRESETS = {
   midi: { name: 'Midi Coach / 33 seat', heightM: 3.2, widthM: 2.55, lengthM: 9.5, weightKg: 12000, maxSpeedKmh: 90 },
