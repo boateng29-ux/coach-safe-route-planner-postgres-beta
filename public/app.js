@@ -622,6 +622,21 @@ async function loadHealth() {
 
 async function loadPresets() {
   presets = await api('/api/presets');
+  const current = presetSelect.value || 'standard';
+  const groups = {};
+  Object.entries(presets).forEach(([key, preset]) => {
+    const group = preset.category || 'Coach / bus';
+    if (!groups[group]) groups[group] = [];
+    groups[group].push([key, preset]);
+  });
+
+  presetSelect.innerHTML = Object.entries(groups).map(([group, entries]) => `
+    <optgroup label="${escapeHtml(group)}">
+      ${entries.map(([key, preset]) => `<option value="${escapeHtml(key)}">${escapeHtml(preset.name || key)}${preset.seats ? ` • ${escapeHtml(preset.seats)} seats` : ''}</option>`).join('')}
+    </optgroup>
+  `).join('');
+
+  presetSelect.value = presets[current] ? current : 'standard';
   setPresetFields(presetSelect.value);
 }
 

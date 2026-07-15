@@ -53,10 +53,33 @@ app.get('/', (req, res) => {
 });
 
 const COACH_PRESETS = {
-  midi: { name: 'Midi Coach / 33 seat', heightM: 3.2, widthM: 2.55, lengthM: 9.5, weightKg: 12000, maxSpeedKmh: 90 },
-  standard: { name: 'Standard Coach / 49–57 seat', heightM: 3.65, widthM: 2.55, lengthM: 12.2, weightKg: 18000, maxSpeedKmh: 90 },
-  triAxle: { name: 'Tri-axle Coach', heightM: 3.75, widthM: 2.55, lengthM: 13.8, weightKg: 26000, maxSpeedKmh: 90 },
-  doubleDecker: { name: 'Double-decker Coach', heightM: 4.35, widthM: 2.55, lengthM: 13.5, weightKg: 26000, maxSpeedKmh: 90 }
+  // Legacy keys kept for existing saved vehicles/routes
+  minibus16: { name: 'UK Minibus / 9–16 seat', category: 'Minibus', seats: '9–16', heightM: 2.65, widthM: 2.10, lengthM: 6.10, weightKg: 3500, maxSpeedKmh: 90, notes: 'Typical long-wheelbase 16-seat minibus. Confirm actual plate/V5C dimensions.' },
+  accessibleMinibus: { name: 'Accessible Minibus / wheelchair lift', category: 'Minibus', seats: '9–16', heightM: 2.85, widthM: 2.25, lengthM: 6.80, weightKg: 5000, maxSpeedKmh: 90, notes: 'Higher-access/welfare minibus profile; useful for school and community transport.' },
+  xlMinibus: { name: 'XL Minibus / 17–22 seat', category: 'Minibus', seats: '17–22', heightM: 3.00, widthM: 2.35, lengthM: 7.70, weightKg: 7200, maxSpeedKmh: 90, notes: 'Large minibus / small coach profile.' },
+
+  midi: { name: 'Midi Coach / 33 seat', category: 'Midi coach', seats: '29–35', heightM: 3.20, widthM: 2.55, lengthM: 9.50, weightKg: 12000, maxSpeedKmh: 90, notes: 'Original midi coach preset retained.' },
+  midi29: { name: 'Midi Coach / 25–29 seat', category: 'Midi coach', seats: '25–29', heightM: 3.10, widthM: 2.45, lengthM: 8.80, weightKg: 10000, maxSpeedKmh: 90, notes: 'Short midi coach for smaller groups.' },
+  midi35: { name: 'Midi Coach / 33–35 seat', category: 'Midi coach', seats: '33–35', heightM: 3.30, widthM: 2.55, lengthM: 9.80, weightKg: 12500, maxSpeedKmh: 90, notes: 'Common 33–35 seat midi coach profile.' },
+
+  standard: { name: 'Standard Coach / 49–57 seat', category: 'Full-size coach', seats: '49–57', heightM: 3.65, widthM: 2.55, lengthM: 12.20, weightKg: 18000, maxSpeedKmh: 90, notes: 'Original standard coach preset retained.' },
+  coach49: { name: 'Full-size Coach / 49–53 seat', category: 'Full-size coach', seats: '49–53', heightM: 3.55, widthM: 2.55, lengthM: 12.00, weightKg: 18000, maxSpeedKmh: 90, notes: 'Typical 12m touring coach.' },
+  coach57: { name: 'Full-size Coach / 53–57 seat', category: 'Full-size coach', seats: '53–57', heightM: 3.65, widthM: 2.55, lengthM: 12.20, weightKg: 19000, maxSpeedKmh: 90, notes: 'Common UK 57-seat coach profile.' },
+  highDecker: { name: 'High-deck Coach / VIP Touring', category: 'Full-size coach', seats: '49–57', heightM: 3.85, widthM: 2.55, lengthM: 12.90, weightKg: 21000, maxSpeedKmh: 90, notes: 'Higher touring coach; stronger low-bridge caution.' },
+  longCoach61: { name: 'Long Coach / 59–61 seat', category: 'Long coach', seats: '59–61', heightM: 3.75, widthM: 2.55, lengthM: 13.20, weightKg: 22000, maxSpeedKmh: 90, notes: 'Long two-axle/extended coach profile.' },
+  triAxle: { name: 'Tri-axle Coach', category: 'Long coach', seats: '61–70', heightM: 3.75, widthM: 2.55, lengthM: 13.80, weightKg: 26000, maxSpeedKmh: 90, notes: 'Original tri-axle preset retained.' },
+  triAxle70: { name: 'Tri-axle Coach / 65–70 seat', category: 'Long coach', seats: '65–70', heightM: 3.80, widthM: 2.55, lengthM: 14.50, weightKg: 26000, maxSpeedKmh: 90, notes: 'Long tri-axle touring coach; confirm operator plate before route approval.' },
+  doubleDecker: { name: 'Double-decker Coach', category: 'Double deck', seats: '70–85', heightM: 4.35, widthM: 2.55, lengthM: 13.50, weightKg: 26000, maxSpeedKmh: 90, notes: 'Original double-decker coach preset retained.' },
+  doubleDeckCoach85: { name: 'Double-deck Coach / 75–85 seat', category: 'Double deck', seats: '75–85', heightM: 4.35, widthM: 2.55, lengthM: 13.70, weightKg: 26000, maxSpeedKmh: 90, notes: 'High-capacity double-deck coach profile.' },
+
+  communityBus: { name: 'Community Bus / 16–22 seat', category: 'Bus', seats: '16–22', heightM: 2.90, widthM: 2.35, lengthM: 7.50, weightKg: 7500, maxSpeedKmh: 80, notes: 'Community / dial-a-ride style bus profile.' },
+  midibus: { name: 'Midibus / local service', category: 'Bus', seats: '25–35', heightM: 3.00, widthM: 2.50, lengthM: 8.90, weightKg: 12000, maxSpeedKmh: 80, notes: 'Short local service bus / midibus.' },
+  singleDeckBus10: { name: 'Single-deck Bus / 10–11m', category: 'Bus', seats: '35–45', heightM: 3.10, widthM: 2.55, lengthM: 10.80, weightKg: 17000, maxSpeedKmh: 80, notes: 'Typical urban single-deck bus.' },
+  singleDeckBus12: { name: 'Single-deck Bus / 12m', category: 'Bus', seats: '40–50', heightM: 3.15, widthM: 2.55, lengthM: 12.00, weightKg: 19000, maxSpeedKmh: 80, notes: 'Full-size 12m service bus profile.' },
+  schoolBus: { name: 'School Bus / 50–70 seat', category: 'Bus', seats: '50–70', heightM: 3.25, widthM: 2.55, lengthM: 12.00, weightKg: 18000, maxSpeedKmh: 80, notes: 'School/contract bus profile.' },
+  doubleDeckBus: { name: 'Double-deck Bus / 10–11m', category: 'Double deck bus', seats: '60–80', heightM: 4.35, widthM: 2.55, lengthM: 10.60, weightKg: 19000, maxSpeedKmh: 80, notes: 'Urban double-deck bus profile.' },
+  doubleDeckBusLong: { name: 'Double-deck Bus / 11–12m', category: 'Double deck bus', seats: '70–90', heightM: 4.40, widthM: 2.55, lengthM: 11.50, weightKg: 26000, maxSpeedKmh: 80, notes: 'Longer high-capacity double-deck bus.' },
+  articulatedBus: { name: 'Articulated Bus / 18m', category: 'Specialist bus', seats: '90+', heightM: 3.20, widthM: 2.55, lengthM: 18.00, weightKg: 28000, maxSpeedKmh: 80, notes: 'Specialist articulated bus profile; use only where relevant and confirm permitted use.' }
 };
 
 const DEFAULT_DB = {
