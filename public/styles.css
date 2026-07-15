@@ -162,15 +162,21 @@ input:focus, select:focus, textarea:focus { border-color: var(--gold); box-shado
 .checks input { width: auto; margin: 0; }
 
 button {
-  border: 0;
+  border: 1px solid rgba(241, 213, 138, 0.78);
   border-radius: 0.85rem;
   padding: 0.9rem 1rem;
-  font-weight: 800;
+  font-weight: 900;
   cursor: pointer;
+  background: #050505;
+  color: var(--gold-2);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(214,173,82,0.14);
 }
+button:hover { background: linear-gradient(135deg, #151006, #2a210d); color: #fff2b6; }
+button:focus-visible { outline: 3px solid rgba(241, 213, 138, 0.42); outline-offset: 2px; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
-.primary { background: linear-gradient(135deg, var(--gold-2), var(--gold)); color: #151006; }
-.secondary { background: #211b0d; color: var(--gold-2); border: 1px solid var(--line); }
+.primary { background: #050505; color: var(--gold-2); border: 1px solid rgba(241, 213, 138, 0.88); }
+.primary:hover { background: linear-gradient(135deg, var(--gold-2), var(--gold)); color: #151006; }
+.secondary { background: #050505; color: var(--gold-2); border: 1px solid rgba(241, 213, 138, 0.68); }
 .secondary.danger { border-color: rgba(255, 107, 107, 0.45); color: #ffb3b3; }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; margin-top: 0.9rem; }
 
@@ -339,9 +345,9 @@ body:not(.locked) .app-shell { display: block; }
   backdrop-filter: blur(12px);
 }
 .workspace-tabs button {
-  border: 1px solid var(--line);
-  background: rgba(255,255,255,.035);
-  color: var(--text);
+  border: 1px solid rgba(241,213,138,.62);
+  background: #050505;
+  color: var(--gold-2);
   border-radius: 999px;
   padding: .58rem .85rem;
   font-weight: 800;
@@ -349,7 +355,7 @@ body:not(.locked) .app-shell { display: block; }
 }
 .workspace-tabs button.active {
   color: #151006;
-  background: linear-gradient(135deg, var(--gold2), var(--gold));
+  background: linear-gradient(135deg, var(--gold-2), var(--gold));
   border-color: transparent;
 }
 .view-panel { display: none; }
