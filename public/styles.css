@@ -566,3 +566,56 @@ body:not(.locked) .app-shell { display: block; }
 }
 .tracking-summary.tracking-waiting strong { color: #ffd166; }
 .tracking-summary.tracking-idle { opacity: .9; }
+
+/* Multiple stops / waypoints */
+.waypoint-section {
+  border: 1px solid rgba(214, 173, 82, 0.2);
+  border-radius: 0.95rem;
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.025);
+}
+.waypoint-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.waypoint-head strong {
+  display: block;
+  color: var(--gold-2);
+}
+.waypoint-head span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin-top: 0.15rem;
+}
+.waypoint-list {
+  display: grid;
+  gap: 0.65rem;
+}
+.waypoint-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: end;
+}
+.coach-map-pin.stop {
+  background: var(--gold-2);
+  position: relative;
+}
+.coach-map-pin.stop::after {
+  content: '';
+  position: absolute;
+  inset: 0.26rem;
+  border-radius: 999px;
+  background: #111;
+}
+@media (max-width: 560px) {
+  .waypoint-head,
+  .waypoint-row {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+}

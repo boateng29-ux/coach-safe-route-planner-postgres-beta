@@ -254,6 +254,73 @@ function routePackUrl(id) {
   return `${window.location.origin}/driver/route/${encodeURIComponent(id)}/route-pack`;
 }
 
+
+function ensureWaypointUi() {
+  if (!form || document.getElementById('waypointSection')) return;
+  const destinationInput = form.elements.destination;
+  const destinationLabel = destinationInput?.closest('label');
+  const section = document.createElement('section');
+  section.id = 'waypointSection';
+  section.className = 'waypoint-section';
+  section.innerHTML = `
+    <div class="waypoint-head">
+      <div>
+        <strong>Multiple stops</strong>
+        <span>Add intermediate stops in the order the coach should visit them.</span>
+      </div>
+      <button id="addWaypointBtn" class="secondary small-button" type="button">+ Add stop</button>
+    </div>
+    <div id="waypointList" class="waypoint-list"></div>
+  `;
+  if (destinationLabel) destinationLabel.insertAdjacentElement('afterend', section);
+  else form.insertBefore(section, form.firstChild);
+  section.querySelector('#addWaypointBtn')?.addEventListener('click', () => addWaypointInput());
+}
+
+function addWaypointInput(value = '') {
+  const list = document.getElementById('waypointList');
+  if (!list) return;
+  const count = list.querySelectorAll('[data-waypoint-row]').length;
+  if (count >= 8) {
+    showToast('Maximum 8 intermediate stops for this beta.', 'error');
+    return;
+  }
+  const row = document.createElement('div');
+  row.className = 'waypoint-row';
+  row.dataset.waypointRow = 'true';
+  row.innerHTML = `
+    <label>Stop ${count + 1}<input data-waypoint-input autocomplete="off" placeholder="Example: Hotel pickup, school, service station" /></label>
+    <button class="secondary danger" type="button" data-remove-waypoint>Remove</button>
+  `;
+  row.querySelector('[data-waypoint-input]').value = value;
+  row.querySelector('[data-remove-waypoint]')?.addEventListener('click', () => {
+    row.remove();
+    renumberWaypointInputs();
+  });
+  list.appendChild(row);
+}
+
+function renumberWaypointInputs() {
+  document.querySelectorAll('[data-waypoint-row]').forEach((row, index) => {
+    const label = row.querySelector('label');
+    if (label && label.firstChild) label.firstChild.textContent = `Stop ${index + 1}`;
+  });
+}
+
+function routeStops() {
+  return Array.from(document.querySelectorAll('[data-waypoint-input]'))
+    .map((input) => String(input.value || '').trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function stopsText(route = currentRoute) {
+  const count = Array.isArray(route?.waypoints) ? route.waypoints.length : routeStops().length;
+  return count ? ` • ${count} stop${count === 1 ? '' : 's'}` : '';
+}
+
+ensureWaypointUi();
+
 function routeTrackingFromEvent(record = {}, event = null) {
   const status = String(record.status || 'approved').toLowerCase();
   if (status === 'completed' || event?.eventType === 'route_completed') {
@@ -414,6 +481,7 @@ function formData() {
   return {
     start: data.get('start'),
     destination: data.get('destination'),
+    stops: routeStops(),
     driverId: data.get('driverId') || '',
     vehicleDatabaseId: data.get('vehicleDatabaseId') || '',
     vehicle: {
@@ -521,10 +589,14 @@ function renderMap(route) {
     className: 'coach-route-line'
   }).addTo(map);
 
-  markerLayer = L.layerGroup([
+  const routeMarkers = [
     L.marker(points[0], { icon: routePin('start') }).bindPopup(`Start: ${escapeHtml(route.origin.label)}`),
+    ...((route.waypoints || [])
+      .filter((stop) => Number.isFinite(Number(stop.lat)) && Number.isFinite(Number(stop.lon)))
+      .map((stop, index) => L.marker([Number(stop.lat), Number(stop.lon)], { icon: routePin('stop') }).bindPopup(`Stop ${index + 1}: ${escapeHtml(stop.label || 'Planned stop')}`))),
     L.marker(points[points.length - 1], { icon: routePin('end') }).bindPopup(`Destination: ${escapeHtml(route.destination.label)}`)
-  ]).addTo(map);
+  ];
+  markerLayer = L.layerGroup(routeMarkers).addTo(map);
 
   setTimeout(() => {
     map.invalidateSize(true);
@@ -537,7 +609,7 @@ function renderSummary(route) {
   const driver = selectedDriverRecord();
   summaryBar.innerHTML = `
     <strong>${escapeHtml(route.origin.label)} → ${escapeHtml(route.destination.label)}</strong>
-    <span>${metresToMiles(s.lengthInMeters || 0)} miles • ${secondsToText(s.travelTimeInSeconds || 0)} • ${route.provider === 'tomtom' ? 'Live TomTom road route' : 'Mock/demo route'}${driver ? ` • Driver: ${escapeHtml(driver.name)}` : ''}</span>
+    <span>${metresToMiles(s.lengthInMeters || 0)} miles • ${secondsToText(s.travelTimeInSeconds || 0)}${stopsText(route)} • ${route.provider === 'tomtom' ? 'Live TomTom road route' : 'Mock/demo route'}${driver ? ` • Driver: ${escapeHtml(driver.name)}` : ''}</span>
   `;
 }
 
@@ -819,6 +891,11 @@ function buildStandaloneRouteHtml(route, { autoPrint = false } = {}) {
     window.fitRouteForPrint = fitExportMap;
     if (data.points.length) {
       L.marker(data.points[0], { icon:pin('start') }).bindPopup('Start: ' + (data.origin?.label || 'Start')).addTo(map);
+      (data.waypoints || []).forEach((stop, index) => {
+        if (Number.isFinite(Number(stop.lat)) && Number.isFinite(Number(stop.lon))) {
+          L.marker([Number(stop.lat), Number(stop.lon)], { icon:pin('stop') }).bindPopup('Stop ' + (index + 1) + ': ' + (stop.label || 'Planned stop')).addTo(map);
+        }
+      });
       L.marker(data.points[data.points.length - 1], { icon:pin('end') }).bindPopup('Destination: ' + (data.destination?.label || 'Destination')).addTo(map);
       [250, 800, 1500].forEach((delay) => setTimeout(fitExportMap, delay));
     }

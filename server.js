@@ -289,8 +289,12 @@ function calculateRisk(route, vehicle, options = {}) {
   return { score, level, recommendation };
 }
 
-async function tomtomRoute(origin, destination, vehicle, options = {}) {
-  const routeLocations = `${origin.lat},${origin.lon}:${destination.lat},${destination.lon}`;
+async function tomtomRoute(origin, destination, vehicle, options = {}, waypoints = []) {
+  const safeWaypoints = Array.isArray(waypoints)
+    ? waypoints.filter((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lon))).slice(0, 8)
+    : [];
+  const allRoutePoints = [origin, ...safeWaypoints, destination];
+  const routeLocations = allRoutePoints.map((point) => `${point.lat},${point.lon}`).join(':');
   const url = new URL(`https://api.tomtom.com/routing/1/calculateRoute/${routeLocations}/json`);
   url.searchParams.set('key', TOMTOM_API_KEY);
   url.searchParams.set('routeType', 'fastest');
@@ -332,6 +336,7 @@ async function tomtomRoute(origin, destination, vehicle, options = {}) {
     provider: 'tomtom',
     origin,
     destination,
+    waypoints: safeWaypoints,
     vehicle,
     options,
     summary: route.summary,
@@ -344,6 +349,13 @@ async function tomtomRoute(origin, destination, vehicle, options = {}) {
     }))
   };
   base.warnings = routeWarnings(route, vehicle, options);
+  if (safeWaypoints.length) {
+    base.warnings.push({
+      level: 'notice',
+      title: 'Multiple stops included',
+      message: `This route includes ${safeWaypoints.length} intermediate stop${safeWaypoints.length === 1 ? '' : 's'} before the final destination. Review each stop for coach access, turning space and safe passenger drop-off.`
+    });
+  }
   base.risk = calculateRisk(base, vehicle, options);
   return base;
 }
@@ -366,6 +378,7 @@ function mockRoute(start, destination, vehicle, options = {}) {
     provider: 'mock',
     origin,
     destination: dest,
+    waypoints: [],
     vehicle,
     options,
     summary,
@@ -424,10 +437,12 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
       <strong>${escapeHtml(w.title || 'Route note')}</strong>
       <p>${escapeHtml(w.message || '')}</p>
     </article>`).join('') || '<p class="muted">No warnings returned.</p>';
-  const instructionItems = (route.instructions || []).map((i, index) => `<li><span>${index + 1}</span>${escapeHtml(i.instruction || 'Continue')}</li>`).join('') || '<li><span>1</span>No guidance returned.</li>';
   const vehicle = route.vehicle || record.vehicleRecord || {};
-  const risk = route.risk || { score: 0, level: 'Not scored', recommendation: 'Review route manually.' };
   const driver = record.driver || {};
+  const plannedStops = Array.isArray(route.waypoints) ? route.waypoints : [];
+  const stopsHtml = plannedStops.length
+    ? `<section class="card"><h2>Planned stops</h2><ol>${plannedStops.map((stop, index) => `<li><span>${index + 1}</span>${escapeHtml(stop.label || `Stop ${index + 1}`)}</li>`).join('')}</ol></section>`
+    : '';
   const logo = settings.logoDataUrl ? `<img class="logo-img" src="${escapeHtml(settings.logoDataUrl)}" alt="Company logo">` : '<div class="logo-mark">P2P</div>';
   const fullReportUrl = `/driver/route/${escapeHtml(record.id)}/route-pack`;
   return `<!doctype html>
@@ -460,16 +475,16 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
     <button id="mapHeadingBtn" class="secondary active" type="button">Direction up</button>
     <button id="mapFullscreenBtn" class="secondary" type="button">Full screen</button>
     <button id="mapWakeLockBtn" class="secondary" type="button">Keep screen on</button>
+    <button id="mapCompleteBtn" class="secondary" type="button">Complete route</button>
   </div>
 </div>
 <main class="content">
   <section class="card"><h2>Driver summary</h2><div class="stats"><div class="stat"><strong>Driver</strong>${escapeHtml(driver.name || 'Not assigned')}</div><div class="stat"><strong>Vehicle</strong>${escapeHtml(vehicle.name || 'Coach')}<br>${escapeHtml(vehicle.registration || '')}</div><div class="stat"><strong>Height</strong>${escapeHtml(vehicle.heightM || '')}m</div><div class="stat"><strong>Weight</strong>${Number(vehicle.weightKg || 0).toLocaleString()}kg</div></div><p class="muted"><strong>Operator notes:</strong> ${escapeHtml(record.operatorNotes || 'None')}</p><div class="buttons"><a class="button" href="${fullReportUrl}" target="_blank">Open route pack</a><button class="secondary" onclick="window.print()">Print</button><button id="completeBtn" class="button" type="button">Mark completed</button></div></section>
   <section class="card gps-card"><h2>Live GPS driver mode</h2><p class="muted">Shows your current location against the approved route. Keep using road signs and operator instructions.</p><div class="gps-grid"><div class="gps-pill"><strong>Status</strong><span id="gpsStatus">Not started</span></div><div class="gps-pill"><strong>Accuracy</strong><span id="gpsAccuracy">—</span></div><div class="gps-pill"><strong>Distance from route</strong><span id="gpsDistance">—</span></div><div class="gps-pill"><strong>Tracking</strong><span id="gpsTracking">Off</span></div></div><div id="offRouteAlert" class="offroute">You appear to be away from the approved route. Stop when safe and check with operations before continuing.</div><div class="buttons" style="margin-top:.8rem"><button id="startGpsBtn" type="button">Start live GPS</button><button id="centerGpsBtn" class="secondary" type="button" disabled>Centre on me</button><button id="stopGpsBtn" class="secondary" type="button" disabled>Stop GPS</button></div></section>
-  <section class="card nav-card"><h2>Turn-by-turn guidance mode</h2><p class="muted">Uses live GPS to show the next route instruction. This is beta guidance, not a certified satnav.</p><div class="nav-top"><div class="nav-instruction"><span class="nav-label">Next instruction</span><div id="navCurrentInstruction" class="nav-main">Start live GPS to begin guidance.</div><div class="nav-meta"><div class="gps-pill"><strong>Distance to next</strong><span id="navDistanceToNext">—</span></div><div class="gps-pill"><strong>Route progress</strong><span id="navProgressText">0%</span></div><div class="gps-pill"><strong>Remaining distance</strong><span id="navRemainingDistance">—</span></div><div class="gps-pill"><strong>ETA remaining</strong><span id="navEtaRemaining">—</span></div></div></div><div class="nav-bar" aria-label="Route progress"><div id="navProgressFill" class="nav-fill"></div></div><div class="buttons"><button id="journeyStartBtn" type="button">Start journey</button><button id="nextInstructionBtn" class="secondary" type="button">Show next instruction</button><button id="recalcBtn" class="secondary" type="button">Recalculate route</button></div><div id="driverEventLog" class="event-log"><p>Journey event log ready.</p></div></div></section>
+  <section class="card nav-card"><h2>Turn-by-turn guidance mode</h2><p class="muted">Uses live GPS to show the next route instruction. This is beta guidance, not a certified satnav.</p><div class="nav-top"><div class="nav-instruction"><span class="nav-label">Next instruction</span><div id="navCurrentInstruction" class="nav-main">Start live GPS to begin guidance.</div><div class="nav-meta"><div class="gps-pill"><strong>Distance to next</strong><span id="navDistanceToNext">—</span></div><div class="gps-pill"><strong>Route progress</strong><span id="navProgressText">0%</span></div><div class="gps-pill"><strong>Remaining distance</strong><span id="navRemainingDistance">—</span></div><div class="gps-pill"><strong>ETA remaining</strong><span id="navEtaRemaining">—</span></div></div></div><div class="nav-bar" aria-label="Route progress"><div id="navProgressFill" class="nav-fill"></div></div><div class="buttons"><button id="journeyStartBtn" type="button">Start journey</button><button id="nextInstructionBtn" class="secondary" type="button">Show next instruction</button><button id="recalcBtn" class="secondary" type="button">Recalculate route</button><button id="journeyCompleteBtn" class="secondary" type="button">Complete route</button></div><div id="driverEventLog" class="event-log"><p>Journey event log ready.</p></div></div></section>
 
-  <section class="card"><h2>Risk score</h2><p style="font-size:2rem;font-weight:900;color:var(--gold2);margin:.2rem 0">${escapeHtml(risk.score)} / 100</p><strong>${escapeHtml(risk.level)} risk</strong><p class="muted">${escapeHtml(risk.recommendation)}</p></section>
+  ${stopsHtml}
   <section class="card"><h2>Safety review</h2>${warningCards}</section>
-  <section class="card"><h2>Guidance preview</h2><ol id="instructionList">${instructionItems}</ol></section>
   <section class="card wide"><h2>Report unsuitable road</h2><form id="driverReportForm" class="form-grid"><label>Road / location<input name="roadName" id="roadNameInput" placeholder="Example: narrow hotel approach" /></label><label>Issue type<select name="issueType"><option>Unsuitable road</option><option>Low bridge concern</option><option>Narrow road</option><option>Weight restriction concern</option><option>Tight turn</option><option>Coach access restriction</option><option>Other</option></select></label><label>Notes<textarea name="notes" rows="3" placeholder="Explain what happened or what needs checking."></textarea></label><input type="hidden" name="lat" id="reportLat"><input type="hidden" name="lng" id="reportLng"><input type="hidden" name="accuracyM" id="reportAccuracy"><div class="buttons"><button type="button" id="useGpsReportBtn" class="secondary">Use my GPS location</button><button type="submit">Submit road report</button></div></form></section>
   <section class="card wide"><p class="muted"><strong>Important:</strong> Turn-by-turn guidance mode is an aid only. Follow road signs, temporary restrictions, coach access signs and operator instructions at all times.</p></section>
 </main>
@@ -477,7 +492,7 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 function toast(message,type){let t=document.createElement('div');t.className='toast '+(type||'');t.textContent=message;document.body.appendChild(t);setTimeout(()=>t.remove(),4200)}
-let data=window.ROUTE_EXPORT_DATA;let routePoints=(data.points||[]);const map=L.map('driverMap',{zoomControl:true,preferCanvas:true,touchZoom:'center',scrollWheelZoom:true,doubleClickZoom:true,boxZoom:true,keyboard:true,dragging:true,tap:true}).setView([51.5072,-0.1276],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap contributors',detectRetina:true,crossOrigin:true}).addTo(map);const pin=(c)=>L.divIcon({className:'',html:'<span class="coach-map-pin '+c+'"></span>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-12]});let routeLine=null,startMarker=null,endMarker=null,routeUpEnabled=true,currentMapBearing=null,previousGpsPoint=null;function fit(){if(routeLine){map.invalidateSize(true);map.fitBounds(routeLine.getBounds(),{padding:[34,34],maxZoom:15})}}function bearingBetween(a,b){if(!a||!b)return null;const toRad=(d)=>d*Math.PI/180,toDeg=(r)=>r*180/Math.PI;const lat1=toRad(a[0]),lat2=toRad(b[0]),dLng=toRad(b[1]-a[1]);const y=Math.sin(dLng)*Math.cos(lat2);const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);return (toDeg(Math.atan2(y,x))+360)%360}function routeInitialBearing(){if(!routePoints||routePoints.length<2)return null;const start=routePoints[0];for(let i=1;i<routePoints.length;i++){if(haversine(start,routePoints[i])>25)return bearingBetween(start,routePoints[i])}return bearingBetween(routePoints[0],routePoints[1])}function setMapBearing(deg){if(!Number.isFinite(deg))return;currentMapBearing=deg;const mapEl=document.getElementById('driverMap');mapEl?.style.setProperty('--map-rotation',(-deg).toFixed(1)+'deg');mapEl?.classList.toggle('route-up',routeUpEnabled);const note=document.getElementById('directionNote');if(note)note.textContent=routeUpEnabled?'Direction-up map '+Math.round(deg)+'°':'North-up map'}function updateRouteUpButton(){const btn=document.getElementById('mapHeadingBtn');if(btn){btn.classList.toggle('active',routeUpEnabled);btn.textContent=routeUpEnabled?'Direction up':'North up'}const mapEl=document.getElementById('driverMap');mapEl?.classList.toggle('route-up',routeUpEnabled);if(routeUpEnabled&&currentMapBearing===null)setMapBearing(routeInitialBearing()||0);if(!routeUpEnabled){const note=document.getElementById('directionNote');if(note)note.textContent='North-up map'}}function drawRouteOnMap(){if(routeLine)map.removeLayer(routeLine);if(startMarker)map.removeLayer(startMarker);if(endMarker)map.removeLayer(endMarker);routeLine=null;startMarker=null;endMarker=null;if(routePoints.length){routeLine=L.polyline(routePoints,{weight:7,opacity:.9,className:'coach-route-line'}).addTo(map);startMarker=L.marker(routePoints[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);endMarker=L.marker(routePoints[routePoints.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);setMapBearing(routeInitialBearing()||0);[250,800,1400].forEach((d)=>setTimeout(fit,d));}}drawRouteOnMap();updateRouteUpButton();window.addEventListener('resize',fit)
+let data=window.ROUTE_EXPORT_DATA;let routePoints=(data.points||[]);const map=L.map('driverMap',{zoomControl:true,preferCanvas:true,touchZoom:'center',scrollWheelZoom:true,doubleClickZoom:true,boxZoom:true,keyboard:true,dragging:true,tap:true}).setView([51.5072,-0.1276],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap contributors',detectRetina:true,crossOrigin:true}).addTo(map);const pin=(c)=>L.divIcon({className:'',html:'<span class="coach-map-pin '+c+'"></span>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-12]});let routeLine=null,startMarker=null,endMarker=null,waypointLayer=null,routeUpEnabled=true,currentMapBearing=null,previousGpsPoint=null;function fit(){if(routeLine){map.invalidateSize(true);map.fitBounds(routeLine.getBounds(),{padding:[34,34],maxZoom:15})}}function bearingBetween(a,b){if(!a||!b)return null;const toRad=(d)=>d*Math.PI/180,toDeg=(r)=>r*180/Math.PI;const lat1=toRad(a[0]),lat2=toRad(b[0]),dLng=toRad(b[1]-a[1]);const y=Math.sin(dLng)*Math.cos(lat2);const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);return (toDeg(Math.atan2(y,x))+360)%360}function routeInitialBearing(){if(!routePoints||routePoints.length<2)return null;const start=routePoints[0];for(let i=1;i<routePoints.length;i++){if(haversine(start,routePoints[i])>25)return bearingBetween(start,routePoints[i])}return bearingBetween(routePoints[0],routePoints[1])}function setMapBearing(deg){if(!Number.isFinite(deg))return;currentMapBearing=deg;const mapEl=document.getElementById('driverMap');mapEl?.style.setProperty('--map-rotation',(-deg).toFixed(1)+'deg');mapEl?.classList.toggle('route-up',routeUpEnabled);const note=document.getElementById('directionNote');if(note)note.textContent=routeUpEnabled?'Direction-up map '+Math.round(deg)+'°':'North-up map'}function updateRouteUpButton(){const btn=document.getElementById('mapHeadingBtn');if(btn){btn.classList.toggle('active',routeUpEnabled);btn.textContent=routeUpEnabled?'Direction up':'North up'}const mapEl=document.getElementById('driverMap');mapEl?.classList.toggle('route-up',routeUpEnabled);if(routeUpEnabled&&currentMapBearing===null)setMapBearing(routeInitialBearing()||0);if(!routeUpEnabled){const note=document.getElementById('directionNote');if(note)note.textContent='North-up map'}}function drawRouteOnMap(){if(routeLine)map.removeLayer(routeLine);if(startMarker)map.removeLayer(startMarker);if(endMarker)map.removeLayer(endMarker);if(waypointLayer)map.removeLayer(waypointLayer);routeLine=null;startMarker=null;endMarker=null;waypointLayer=null;if(routePoints.length){routeLine=L.polyline(routePoints,{weight:7,opacity:.9,className:'coach-route-line'}).addTo(map);startMarker=L.marker(routePoints[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);endMarker=L.marker(routePoints[routePoints.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);const wp=(data.waypoints||[]).filter(w=>Number.isFinite(Number(w.lat))&&Number.isFinite(Number(w.lon))).map((w,i)=>L.marker([Number(w.lat),Number(w.lon)],{icon:pin('stop')}).bindPopup('Stop '+(i+1)+': '+(w.label||'Planned stop')));if(wp.length)waypointLayer=L.layerGroup(wp).addTo(map);setMapBearing(routeInitialBearing()||0);[250,800,1400].forEach((d)=>setTimeout(fit,d));}}drawRouteOnMap();updateRouteUpButton();window.addEventListener('resize',fit)
 let watchId=null,currentGps=null,driverMarker=null,accuracyCircle=null,followDriver=false,journeyStarted=false,currentInstructionIndex=0,lastLoggedInstruction=-1,wakeLock=null;const gpsIcon=L.divIcon({className:'driver-location-marker',html:'<span class="driver-location-dot"></span>',iconSize:[28,28],iconAnchor:[14,14]});
 function syncMapControlStates(){const wakeBtn=document.getElementById('mapWakeLockBtn');if(wakeBtn){wakeBtn.classList.toggle('active',!!wakeLock);wakeBtn.textContent=wakeLock?'Screen stays on':'Keep screen on'}const fullBtn=document.getElementById('mapFullscreenBtn');if(fullBtn){fullBtn.textContent=document.fullscreenElement?'Exit full screen':'Full screen'}updateRouteUpButton()}
 async function requestWakeLock(){if(!('wakeLock' in navigator)){toast('Screen wake lock is not supported in this browser. Keep your device display settings active for this journey.','error');return}try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;syncMapControlStates();logEvent('Screen wake lock released.')});syncMapControlStates();toast('Screen will stay awake while this page is visible.','success');postJourneyEvent('screen_wake_lock_enabled','Driver enabled keep-screen-on mode.',{})}catch(err){toast('Could not keep screen awake: '+(err.message||'permission denied'),'error')}}
@@ -521,6 +536,8 @@ function applyReroute(newRoute){data=newRoute||data;routePoints=(data.points||[]
 document.getElementById('recalcBtn')?.addEventListener('click',async()=>{const btn=document.getElementById('recalcBtn');if(!currentGps){toast('Start live GPS first so the app can reroute from your current position.','error');return}btn.disabled=true;const oldText=btn.textContent;btn.textContent='Recalculating…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/reroute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:currentGps.lat,lng:currentGps.lng,accuracyM:currentGps.accuracy})});const payload=await r.json();if(!r.ok)throw new Error(payload.error||'Could not recalculate route.');applyReroute(payload.route);toast('Coach-safe route recalculated from your GPS position.','success');logEvent('Coach-safe reroute calculated from driver GPS.')}catch(err){toast(err.message,'error');logEvent('Reroute failed: '+err.message)}finally{btn.disabled=false;btn.textContent=oldText}});
 if(instructions.length){updateGuidance(0,0)}
 document.getElementById('completeBtn')?.addEventListener('click',async()=>{const btn=document.getElementById('completeBtn');btn.disabled=true;btn.textContent='Marking complete…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/complete',{method:'POST'});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not mark route completed.');document.getElementById('statusBadge').textContent='completed';toast('Route marked as completed.','success');logEvent('Journey completed.');btn.textContent='Completed';}catch(e){toast(e.message,'error');btn.disabled=false;btn.textContent='Mark completed';}});
+document.getElementById('mapCompleteBtn')?.addEventListener('click',()=>document.getElementById('completeBtn')?.click());
+document.getElementById('journeyCompleteBtn')?.addEventListener('click',()=>document.getElementById('completeBtn')?.click());
 document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget;updateReportGpsFields();const payload=Object.fromEntries(new FormData(form));try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not save report.');form.reset();toast('Road report sent to operations.','success');logEvent('Road report sent to operations.');}catch(err){toast(err.message,'error');}});
 </script>
 </body>
@@ -560,9 +577,10 @@ function buildRouteReportHtml(record) {
       <p>${escapeHtml(w.message || '')}</p>
     </article>`).join('') || '<p class="muted">No warnings returned.</p>';
   const instructionItems = (route.instructions || []).map((i) => `<li>${escapeHtml(i.instruction || 'Continue')}</li>`).join('') || '<li>No guidance returned.</li>';
-  const risk = route.risk || { score: 0, level: 'Not scored', recommendation: 'Review route manually.' };
   const driver = record.driver?.name || 'Not assigned';
   const vehicle = route.vehicle || {};
+  const stops = Array.isArray(route.waypoints) ? route.waypoints : [];
+  const stopsSummary = stops.length ? `<h3>Planned stops</h3><ol>${stops.map((stop, index) => `<li>${index + 1}. ${escapeHtml(stop.label || `Stop ${index + 1}`)}</li>`).join('')}</ol>` : '';
   const liveRouteUrl = `/driver/route/${escapeHtml(record.id || '')}`;
 
   return `<!doctype html>
@@ -617,7 +635,7 @@ function buildRouteReportHtml(record) {
   const routeBounds=routeLine.getBounds();
   function fitExportMap(){if(!(data.points||[]).length)return;map.invalidateSize(true);requestAnimationFrame(()=>map.fitBounds(routeBounds,{padding:[36,36],maxZoom:14,animate:false}))}
   window.fitRouteForPrint=fitExportMap;
-  if((data.points||[]).length){L.marker(data.points[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);L.marker(data.points[data.points.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);[250,800,1500].forEach((delay)=>setTimeout(fitExportMap,delay))}
+  if((data.points||[]).length){L.marker(data.points[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);(data.waypoints||[]).forEach((w,i)=>{if(Number.isFinite(Number(w.lat))&&Number.isFinite(Number(w.lon)))L.marker([Number(w.lat),Number(w.lon)],{icon:pin('stop')}).bindPopup('Stop '+(i+1)+': '+(w.label||'Planned stop')).addTo(map)});L.marker(data.points[data.points.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);[250,800,1500].forEach((delay)=>setTimeout(fitExportMap,delay))}
   window.addEventListener('beforeprint',()=>{fitExportMap();setTimeout(fitExportMap,350)});if(window.matchMedia){const mq=window.matchMedia('print');if(mq.addEventListener)mq.addEventListener('change',(event)=>{if(event.matches){fitExportMap();setTimeout(fitExportMap,350)}})}
 </script>
 </body>
@@ -1245,6 +1263,9 @@ app.post('/api/route', async (req, res) => {
   try {
     const { start, destination, vehicle: rawVehicle, options } = req.body || {};
     if (!start || !destination) return res.status(400).json({ error: 'Start and destination are required.' });
+    const stopQueries = Array.isArray(req.body?.stops)
+      ? req.body.stops.map((stop) => String(stop || '').trim()).filter(Boolean).slice(0, 8)
+      : [];
     const vehicle = cleanVehicle(rawVehicle);
     if (!HAS_LIVE_TOMTOM_KEY) {
       if (ENABLE_MOCK_MODE) return res.json(mockRoute(start, destination, vehicle, options));
@@ -1252,8 +1273,12 @@ app.post('/api/route', async (req, res) => {
         error: 'Live TomTom routing is not enabled. Add TOMTOM_API_KEY to the .env file in this exact project folder, restart with npm.cmd start, then recalculate. Mock mode is disabled so the map will not draw an approximate straight route.'
       });
     }
-    const [origin, dest] = await Promise.all([tomtomGeocode(start), tomtomGeocode(destination)]);
-    const result = await tomtomRoute(origin, dest, vehicle, options || {});
+    const [origin, dest, ...waypoints] = await Promise.all([
+      tomtomGeocode(start),
+      tomtomGeocode(destination),
+      ...stopQueries.map((stop) => tomtomGeocode(stop))
+    ]);
+    const result = await tomtomRoute(origin, dest, vehicle, options || {}, waypoints);
     res.json(result);
   } catch (error) {
     console.error(error);
