@@ -519,3 +519,44 @@ body:not(.locked) .app-shell { display: block; }
   color: rgba(255, 255, 255, 0.68);
   font-size: 0.86rem;
 }
+
+/* v0.3 route tracking status */
+.tracking-summary {
+  margin-top: .65rem;
+  padding: .65rem .75rem;
+  border-radius: .8rem;
+  border: 1px solid rgba(214,173,82,.24);
+  background: rgba(255,255,255,.035);
+}
+.tracking-summary strong {
+  color: var(--gold-2, #f1d58a);
+  display: block;
+}
+.tracking-summary span {
+  color: var(--muted, #b7aa8a);
+  font-size: .84rem;
+  margin-top: .2rem;
+}
+.tracking-summary.tracking-live,
+.tracking-summary.tracking-completed {
+  border-color: rgba(46,204,113,.45);
+  background: rgba(46,204,113,.08);
+}
+.tracking-summary.tracking-live strong,
+.tracking-summary.tracking-completed strong { color: #8ee6a8; }
+.tracking-summary.tracking-alert {
+  border-color: rgba(255,107,107,.55);
+  background: rgba(255,107,107,.1);
+}
+.tracking-summary.tracking-alert strong { color: #ffb3b3; }
+.tracking-summary.tracking-rerouted {
+  border-color: rgba(158,208,255,.5);
+  background: rgba(158,208,255,.09);
+}
+.tracking-summary.tracking-rerouted strong { color: #9ed0ff; }
+.tracking-summary.tracking-waiting {
+  border-color: rgba(255,209,102,.4);
+  background: rgba(255,209,102,.08);
+}
+.tracking-summary.tracking-waiting strong { color: #ffd166; }
+.tracking-summary.tracking-idle { opacity: .9; }

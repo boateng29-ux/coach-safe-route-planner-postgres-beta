@@ -69,6 +69,8 @@ let vehicles = [];
 let drivers = [];
 let approvedRoutes = [];
 let reports = [];
+let latestJourneyEvents = [];
+let routeTrackingMap = {};
 let settings = {};
 let pendingLogoDataUrl = '';
 let authToken = localStorage.getItem('p2pCoachAuthToken') || '';
@@ -252,6 +254,58 @@ function routePackUrl(id) {
   return `${window.location.origin}/driver/route/${encodeURIComponent(id)}/route-pack`;
 }
 
+function routeTrackingFromEvent(record = {}, event = null) {
+  const status = String(record.status || 'approved').toLowerCase();
+  if (status === 'completed' || event?.eventType === 'route_completed') {
+    return { label: 'Completed', className: 'tracking-completed', detail: event ? `Completed ${new Date(event.createdAt).toLocaleString()}` : 'Driver marked the journey complete.' };
+  }
+  if (!record.driverId) {
+    return { label: 'Not assigned', className: 'tracking-idle', detail: 'No driver has been assigned yet.' };
+  }
+  if (!event) {
+    return { label: 'Assigned, not opened', className: 'tracking-waiting', detail: 'Driver link generated. Waiting for driver activity.' };
+  }
+  const when = new Date(event.createdAt).toLocaleString();
+  const map = {
+    operator_route_updated: ['Assigned / updated', 'tracking-waiting', 'Operator changed the driver or status.'],
+    driver_route_opened: ['Driver opened route', 'tracking-active', 'Driver opened the live route page.'],
+    driver_route_pack_opened: ['Route pack opened', 'tracking-active', 'Driver opened the printable route pack.'],
+    gps_started: ['GPS active', 'tracking-live', 'Driver started live GPS tracking.'],
+    gps_stopped: ['GPS stopped', 'tracking-waiting', 'Driver stopped live GPS tracking.'],
+    journey_started: ['Journey started', 'tracking-live', 'Driver tapped Start journey.'],
+    off_route_warning: ['Off-route warning', 'tracking-alert', event.message || 'Driver is away from the approved route.'],
+    reroute_calculated: ['Rerouted', 'tracking-rerouted', 'Coach-safe reroute calculated from driver GPS.'],
+    road_report_submitted: ['Road report submitted', 'tracking-alert', event.message || 'Driver submitted an issue report.'],
+    screen_wake_lock_enabled: ['Screen kept on', 'tracking-live', 'Driver enabled keep-screen-on mode.'],
+    screen_wake_lock_disabled: ['Screen wake off', 'tracking-active', 'Driver disabled keep-screen-on mode.']
+  };
+  const [label, className, detail] = map[event.eventType] || ['Driver activity', 'tracking-active', event.message || 'Driver activity recorded.'];
+  return { label, className, detail: `${detail} • ${when}` };
+}
+
+function buildRouteTrackingMap(routes = [], events = []) {
+  const latestByRoute = new Map();
+  events.forEach((event) => {
+    if (!event.routeId) return;
+    const current = latestByRoute.get(event.routeId);
+    if (!current || new Date(event.createdAt) > new Date(current.createdAt)) latestByRoute.set(event.routeId, event);
+  });
+  routeTrackingMap = {};
+  routes.forEach((route) => {
+    routeTrackingMap[route.id] = routeTrackingFromEvent(route, latestByRoute.get(route.id) || null);
+  });
+}
+
+async function refreshJourneyTracking() {
+  try {
+    latestJourneyEvents = await api('/api/journey-events?limit=250');
+  } catch (error) {
+    latestJourneyEvents = [];
+    console.warn('Could not load journey tracking', error);
+  }
+  buildRouteTrackingMap(approvedRoutes, latestJourneyEvents);
+}
+
 function normalisePhoneForWhatsApp(phone = '') {
   let digits = String(phone || '').replace(/\D/g, '');
   if (!digits) return '';
@@ -298,10 +352,11 @@ function renderDashboardStats() {
   if (!dashboardStats) return;
   const assigned = approvedRoutes.filter((r) => r.status === 'assigned').length;
   const completed = approvedRoutes.filter((r) => r.status === 'completed').length;
+  const liveCount = Object.values(routeTrackingMap).filter((t) => ['tracking-live', 'tracking-alert', 'tracking-rerouted'].includes(t.className)).length;
   dashboardStats.innerHTML = `
     <div class="dash-stat"><strong>${approvedRoutes.length}</strong><span>Saved routes</span></div>
     <div class="dash-stat"><strong>${assigned}</strong><span>Assigned routes</span></div>
-    <div class="dash-stat"><strong>${vehicles.length}</strong><span>Vehicles</span></div>
+    <div class="dash-stat"><strong>${liveCount}</strong><span>Live / active</span></div>
     <div class="dash-stat"><strong>${reports.length}</strong><span>Road reports</span></div>
   `;
 }
@@ -550,6 +605,7 @@ async function loadDrivers() {
 
 async function loadApprovedRoutes() {
   approvedRoutes = await api('/api/routes');
+  await refreshJourneyTracking();
   renderDashboardStats();
   if (!approvedRoutes.length) {
     approvedRoutesEl.className = 'saved-routes empty';
@@ -559,12 +615,14 @@ async function loadApprovedRoutes() {
   approvedRoutesEl.className = 'saved-routes';
   approvedRoutesEl.innerHTML = approvedRoutes.map((r) => {
     const shareUrl = driverRouteUrl(r.id);
+    const tracking = routeTrackingMap[r.id] || routeTrackingFromEvent(r, null);
     return `
     <div class="saved-item" data-route-id="${escapeHtml(r.id)}">
       <strong>${escapeHtml(r.origin)} → ${escapeHtml(r.destination)}</strong>
       <span>${escapeHtml(r.route?.vehicle?.name || 'Coach')} • ${escapeHtml(r.driver?.name || 'No driver')} • ${new Date(r.createdAt).toLocaleString()}</span>
       <span class="badge">Risk ${escapeHtml(r.route?.risk?.score ?? '-')}/100 • ${escapeHtml(r.route?.risk?.level || 'Not scored')}</span>
       <span class="status-pill">${escapeHtml(r.status || 'approved')}</span>
+      <div class="tracking-summary ${escapeHtml(tracking.className)}"><strong>${escapeHtml(tracking.label)}</strong><span>${escapeHtml(tracking.detail)}</span></div>
       <div class="route-management-grid">
         <label>Route status
           <select data-field="status">${routeStatusOptions(r.status || 'approved')}</select>
@@ -596,6 +654,7 @@ async function loadApprovedRoutes() {
         <button class="secondary" data-action="copy-driver-link" data-id="${escapeHtml(r.id)}">Copy driver link</button>
         <button class="secondary" data-action="copy-assignment-message" data-id="${escapeHtml(r.id)}">Copy WhatsApp/SMS message</button>
         <button class="secondary" data-action="open-whatsapp-message" data-id="${escapeHtml(r.id)}">Open WhatsApp</button>
+        <button class="secondary" data-action="refresh-tracking" data-id="${escapeHtml(r.id)}">Refresh tracking</button>
         <button class="secondary" data-action="view-events" data-id="${escapeHtml(r.id)}">View journey events</button>
         <button class="secondary" data-action="open-report" data-id="${escapeHtml(r.id)}">Open PDF report</button>
         <button class="secondary danger" data-action="delete-route" data-id="${escapeHtml(r.id)}">Delete</button>
@@ -1072,6 +1131,17 @@ approvedRoutesEl.addEventListener('click', async (event) => {
     if (!record) return;
     openWhatsAppForRoute(record);
     showToast('WhatsApp message opened. Review before sending.', 'info');
+  }
+  if (action === 'refresh-tracking') {
+    button.disabled = true;
+    button.textContent = 'Refreshing…';
+    try {
+      await loadApprovedRoutes();
+      showToast('Route tracking refreshed.', 'success');
+    } finally {
+      button.disabled = false;
+    }
+    return;
   }
   if (action === 'view-events') {
     const card = button.closest('.saved-item');
