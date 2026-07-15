@@ -468,11 +468,6 @@ function cleanRouteStatus(value = '') {
 function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
   const route = record.route || {};
   const title = `${route.origin?.label || 'Start'} to ${route.destination?.label || 'Destination'}`;
-  const warningCards = (route.warnings || []).map((w) => `
-    <article class="warning ${escapeHtml(w.level || 'notice')}">
-      <strong>${escapeHtml(w.title || 'Route note')}</strong>
-      <p>${escapeHtml(w.message || '')}</p>
-    </article>`).join('') || '<p class="muted">No warnings returned.</p>';
   const vehicle = route.vehicle || record.vehicleRecord || {};
   const driver = record.driver || {};
   const plannedStops = Array.isArray(route.waypoints) ? route.waypoints : [];
@@ -522,7 +517,6 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
   <div id="driverEventLog" hidden></div>
 
   ${stopsHtml}
-  <section class="card"><h2>Safety review</h2>${warningCards}</section>
   <section class="card wide"><h2>Report unsuitable road</h2><form id="driverReportForm" class="form-grid"><label>Road / location<input name="roadName" id="roadNameInput" placeholder="Example: narrow hotel approach" /></label><label>Issue type<select name="issueType"><option>Unsuitable road</option><option>Low bridge concern</option><option>Narrow road</option><option>Weight restriction concern</option><option>Tight turn</option><option>Coach access restriction</option><option>Other</option></select></label><label>Notes<textarea name="notes" rows="3" placeholder="Explain what happened or what needs checking."></textarea></label><input type="hidden" name="lat" id="reportLat"><input type="hidden" name="lng" id="reportLng"><input type="hidden" name="accuracyM" id="reportAccuracy"><div class="buttons"><button type="button" id="useGpsReportBtn" class="secondary">Use my GPS location</button><button type="submit">Submit road report</button></div></form></section>
   <section class="card wide"><p class="muted"><strong>Important:</strong> Voice guidance is an aid only. Follow road signs, temporary restrictions, coach access signs and operator instructions at all times.</p></section>
 </main>
