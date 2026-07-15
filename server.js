@@ -397,10 +397,23 @@ function mockRoute(start, destination, vehicle, options = {}) {
 }
 
 function stripRouteForStorage(route = {}) {
+  const waypoints = Array.isArray(route.waypoints)
+    ? route.waypoints
+        .filter((stop) => stop && Number.isFinite(Number(stop.lat)) && Number.isFinite(Number(stop.lon)))
+        .slice(0, 8)
+        .map((stop, index) => ({
+          label: String(stop.label || stop.address?.freeformAddress || `Stop ${index + 1}`).trim().slice(0, 220),
+          lat: Number(stop.lat),
+          lon: Number(stop.lon),
+          raw: stop.raw || null
+        }))
+    : [];
+
   return {
     provider: route.provider,
     origin: route.origin,
     destination: route.destination,
+    waypoints,
     vehicle: route.vehicle,
     options: route.options || {},
     summary: route.summary || {},
