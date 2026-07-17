@@ -312,6 +312,132 @@ function calculateRisk(route, vehicle, options = {}) {
   return { score, level, recommendation };
 }
 
+
+function toTitleCase(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function routeOffsetForPointIndex(routePoints = [], pointIndex = 0) {
+  const index = Math.max(0, Math.min(Number(pointIndex) || 0, Math.max(0, routePoints.length - 1)));
+  let total = 0;
+  for (let i = 1; i <= index; i += 1) {
+    const a = routePoints[i - 1];
+    const b = routePoints[i];
+    if (Array.isArray(a) && Array.isArray(b)) total += haversineMeters(a, b);
+  }
+  return Math.round(total);
+}
+
+function buildLaneGuidance(section = {}) {
+  const lanes = Array.isArray(section.lanes) ? section.lanes : [];
+  if (!lanes.length) return null;
+  const recommended = lanes
+    .map((lane, index) => ({ lane, index }))
+    .filter(({ lane }) => lane.follow);
+  const recommendedText = recommended.length
+    ? recommended.map(({ index }) => `${index + 1}`).join(', ')
+    : '';
+  const directions = recommended.length
+    ? [...new Set(recommended.map(({ lane }) => toTitleCase(lane.follow || (lane.directions || [])[0] || 'continue')))].join(' / ')
+    : [...new Set(lanes.flatMap((lane) => lane.directions || []).map(toTitleCase))].filter(Boolean).join(' / ');
+  const visual = lanes.map((lane) => lane.follow ? '●' : '○').join(' ');
+  return {
+    laneCount: lanes.length,
+    recommendedLaneNumbers: recommended.map(({ index }) => index + 1),
+    recommendedText,
+    directions,
+    visual,
+    text: recommended.length
+      ? `Use lane${recommended.length > 1 ? 's' : ''} ${recommendedText} of ${lanes.length}${directions ? ` for ${directions}` : ''}.`
+      : `Lane layout available: ${lanes.length} lane${lanes.length === 1 ? '' : 's'}${directions ? `, ${directions}` : ''}. Follow road signs.`,
+    raw: lanes
+  };
+}
+
+function normalizeRouteSections(sections = [], routePoints = []) {
+  const out = { lanes: [], speedLimits: [], roadShields: [] };
+  for (const section of Array.isArray(sections) ? sections : []) {
+    const type = String(section.sectionType || '').toUpperCase();
+    const startPointIndex = Number(section.startPointIndex || 0);
+    const endPointIndex = Number(section.endPointIndex || startPointIndex);
+    const startOffsetM = routeOffsetForPointIndex(routePoints, startPointIndex);
+    const endOffsetM = routeOffsetForPointIndex(routePoints, endPointIndex);
+    if (type === 'LANES') {
+      const guidance = buildLaneGuidance(section);
+      if (guidance) out.lanes.push({
+        startPointIndex,
+        endPointIndex,
+        startOffsetM,
+        endOffsetM,
+        ...guidance
+      });
+    }
+    if (type === 'SPEED_LIMIT') {
+      const kmh = Number(section.maxSpeedLimitInKmh);
+      if (Number.isFinite(kmh)) out.speedLimits.push({
+        startPointIndex,
+        endPointIndex,
+        startOffsetM,
+        endOffsetM,
+        maxSpeedLimitInKmh: kmh,
+        maxSpeedLimitMph: Math.round(kmh * 0.621371)
+      });
+    }
+    if (type === 'ROAD_SHIELDS') {
+      out.roadShields.push({
+        startPointIndex,
+        endPointIndex,
+        startOffsetM,
+        endOffsetM,
+        roadShieldReferences: section.roadShieldReferences || []
+      });
+    }
+  }
+  return out;
+}
+
+function laneForInstruction(sections, instruction = {}) {
+  const pointIndex = Number(instruction.pointIndex);
+  const offset = Number(instruction.routeOffsetInMeters || instruction.distanceM || 0);
+  const lanes = sections?.lanes || [];
+  if (Number.isFinite(pointIndex)) {
+    const exact = lanes.find((section) => pointIndex >= section.startPointIndex && pointIndex <= section.endPointIndex);
+    if (exact) return exact;
+    const ahead = lanes
+      .filter((section) => section.startPointIndex >= pointIndex && (section.startOffsetM - offset) <= 650)
+      .sort((a, b) => a.startPointIndex - b.startPointIndex)[0];
+    if (ahead) return ahead;
+  }
+  return lanes
+    .filter((section) => section.startOffsetM >= offset && (section.startOffsetM - offset) <= 650)
+    .sort((a, b) => a.startOffsetM - b.startOffsetM)[0] || null;
+}
+
+function speedLimitForInstruction(sections, instruction = {}) {
+  const offset = Number(instruction.routeOffsetInMeters || instruction.distanceM || 0);
+  const pointIndex = Number(instruction.pointIndex);
+  const speedLimits = sections?.speedLimits || [];
+  if (Number.isFinite(pointIndex)) {
+    const exact = speedLimits.find((section) => pointIndex >= section.startPointIndex && pointIndex <= section.endPointIndex);
+    if (exact) return exact;
+  }
+  return speedLimits.find((section) => offset >= section.startOffsetM && offset <= section.endOffsetM)
+    || speedLimits.filter((section) => section.startOffsetM <= offset).sort((a, b) => b.startOffsetM - a.startOffsetM)[0]
+    || null;
+}
+
+function nextSafetyCameraAlert(route, instruction = {}) {
+  const alerts = Array.isArray(route?.safetyAlerts) ? route.safetyAlerts : [];
+  if (!alerts.length) return null;
+  const offset = Number(instruction.routeOffsetInMeters || instruction.distanceM || 0);
+  return alerts
+    .filter((alert) => Number(alert.offsetM || alert.routeOffsetInMeters || 0) >= offset)
+    .sort((a, b) => Number(a.offsetM || a.routeOffsetInMeters || 0) - Number(b.offsetM || b.routeOffsetInMeters || 0))[0] || null;
+}
+
 async function tomtomRoute(origin, destination, vehicle, options = {}, waypoints = []) {
   const safeWaypoints = Array.isArray(waypoints)
     ? waypoints.filter((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lon))).slice(0, 8)
@@ -326,6 +452,8 @@ async function tomtomRoute(origin, destination, vehicle, options = {}, waypoints
   url.searchParams.set('routeRepresentation', 'polyline');
   url.searchParams.set('instructionsType', 'text');
   url.searchParams.set('language', 'en-GB');
+  url.searchParams.set('instructionAnnouncementPoints', 'all');
+  url.searchParams.set('instructionRoadShieldReferences', 'all');
   url.searchParams.set('travelMode', TOMTOM_TRAVEL_MODE);
   url.searchParams.set('vehicleCommercial', 'true');
   url.searchParams.set('vehicleHeight', String(vehicle.heightM));
@@ -334,6 +462,9 @@ async function tomtomRoute(origin, destination, vehicle, options = {}, waypoints
   url.searchParams.set('vehicleWeight', String(vehicle.weightKg));
   url.searchParams.set('vehicleMaxSpeed', String(vehicle.maxSpeedKmh));
   url.searchParams.append('sectionType', 'traffic');
+  url.searchParams.append('sectionType', 'lanes');
+  url.searchParams.append('sectionType', 'speedLimit');
+  url.searchParams.append('sectionType', 'roadShields');
 
   if (options.avoidTolls) url.searchParams.append('avoid', 'tollRoads');
   if (options.avoidFerries) url.searchParams.append('avoid', 'ferries');
@@ -355,6 +486,7 @@ async function tomtomRoute(origin, destination, vehicle, options = {}, waypoints
     throw new Error('TomTom returned too few route geometry points. The route cannot be exported safely because it may draw as a straight line. Try a more precise start/destination or check TomTom route coverage.');
   }
   const instructions = route.guidance?.instructions || [];
+  const sections = normalizeRouteSections(route.sections || [], points);
   const base = {
     provider: 'tomtom',
     origin,
@@ -364,12 +496,42 @@ async function tomtomRoute(origin, destination, vehicle, options = {}, waypoints
     options,
     summary: route.summary,
     points,
-    instructions: instructions.slice(0, 40).map((i) => ({
-      instruction: i.message,
-      street: i.street,
-      distanceM: i.routeOffsetInMeters,
-      travelTimeSeconds: i.travelTimeInSeconds
-    }))
+    sections,
+    safetyAlerts: [],
+    instructions: instructions.slice(0, 80).map((i) => {
+      const laneGuidance = laneForInstruction(sections, i);
+      const speedLimit = speedLimitForInstruction(sections, i);
+      return {
+        instruction: i.combinedMessage || i.message,
+        street: i.street || '',
+        signpostText: i.signpostText || '',
+        roadNumbers: i.roadNumbers || [],
+        maneuver: i.maneuver || '',
+        instructionType: i.instructionType || '',
+        junctionType: i.junctionType || '',
+        drivingSide: i.drivingSide || '',
+        turnAngle: i.turnAngleInDecimalDegrees || null,
+        pointIndex: i.pointIndex,
+        point: i.point || null,
+        distanceM: i.routeOffsetInMeters,
+        travelTimeSeconds: i.travelTimeInSeconds,
+        earlyWarning: i.earlyWarningAnnouncement || null,
+        mainAnnouncement: i.mainAnnouncement || null,
+        confirmationAnnouncement: i.confirmationAnnouncement || null,
+        laneGuidance: laneGuidance ? {
+          laneCount: laneGuidance.laneCount,
+          recommendedLaneNumbers: laneGuidance.recommendedLaneNumbers,
+          recommendedText: laneGuidance.recommendedText,
+          directions: laneGuidance.directions,
+          visual: laneGuidance.visual,
+          text: laneGuidance.text
+        } : null,
+        speedLimit: speedLimit ? {
+          maxSpeedLimitInKmh: speedLimit.maxSpeedLimitInKmh,
+          maxSpeedLimitMph: speedLimit.maxSpeedLimitMph
+        } : null
+      };
+    })
   };
   base.warnings = routeWarnings(route, vehicle, options);
   if (safeWaypoints.length) {
@@ -490,7 +652,7 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
   *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;background:#070707;color:var(--text)}
   header{position:sticky;top:0;z-index:1000;background:linear-gradient(135deg,#050505,#17120a);border-bottom:1px solid var(--line);padding:.85rem 1rem;display:flex;gap:.85rem;align-items:center}.logo-mark{width:46px;height:46px;border-radius:999px;background:linear-gradient(135deg,var(--gold2),var(--gold));display:grid;place-items:center;color:#151006;font-weight:900;flex:0 0 auto}.logo-img{max-width:56px;max-height:56px;border-radius:.7rem;object-fit:contain;background:#fff;padding:.15rem}.eyebrow{color:var(--gold2);text-transform:uppercase;letter-spacing:.12em;font-size:.68rem}h1{font-size:1.15rem;margin:.15rem 0}.muted{color:var(--muted)}
   #driverMap{height:55vh;min-height:23rem;width:100%;background:#101418;touch-action:pan-x pan-y;overscroll-behavior:contain;--map-rotation:0deg}.driver-map-shell{position:relative;background:#101418}.driver-map-shell:fullscreen{width:100vw;height:100vh;background:#050505}.driver-map-shell:fullscreen #driverMap{height:100vh;min-height:100vh}.driver-map-controls{position:absolute;left:.65rem;right:.65rem;bottom:.75rem;z-index:900;display:flex;gap:.45rem;flex-wrap:wrap;justify-content:center;pointer-events:none}.driver-map-controls button{pointer-events:auto;padding:.62rem .72rem;border-radius:999px;box-shadow:0 10px 22px rgba(0,0,0,.55);backdrop-filter:blur(7px);background:rgba(5,5,5,.94)!important;color:var(--gold2)!important;border:1px solid rgba(241,213,138,.82)!important;text-shadow:0 1px 0 #000}.driver-map-controls button.active{background:linear-gradient(135deg,var(--gold2),var(--gold))!important;color:#151006!important;border-color:rgba(241,213,138,.95)!important;text-shadow:none}.driver-map-controls button.warn{background:#1a0505!important;color:#ffd4d4!important;border-color:#ff6b6b!important}.driver-map-controls button:focus-visible,.button:focus-visible,button:focus-visible{outline:3px solid rgba(241,213,138,.45);outline-offset:2px}#driverMap.route-up .leaflet-tile-pane,#driverMap.route-up .leaflet-overlay-pane,#driverMap.route-up .leaflet-marker-pane,#driverMap.route-up .leaflet-shadow-pane{rotate:var(--map-rotation);scale:1.42;transform-origin:50% 50%;transition:rotate .25s ease}#driverMap.route-up .leaflet-popup-pane,#driverMap.route-up .leaflet-tooltip-pane{rotate:0deg}.direction-note{position:absolute;top:.65rem;left:.65rem;z-index:850;background:rgba(5,5,5,.82);border:1px solid rgba(241,213,138,.58);border-radius:999px;color:var(--gold2);padding:.38rem .62rem;font-weight:900;font-size:.78rem;pointer-events:none}@media(max-width:520px){.driver-map-controls{justify-content:space-between}.driver-map-controls button{font-size:.78rem;padding:.58rem .55rem;flex:1 1 calc(50% - .45rem)}}.content{padding:1rem;display:grid;gap:1rem}.card{border:1px solid var(--line);border-radius:1rem;background:rgba(255,255,255,.045);padding:1rem}.stats{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}.stat{border:1px solid var(--line);border-radius:.8rem;padding:.75rem}.stat strong{display:block;color:var(--gold2)}.status{display:inline-block;padding:.28rem .55rem;border:1px solid var(--line);border-radius:999px;color:var(--gold2);font-weight:800;text-transform:capitalize}.warning{border:1px solid var(--line);border-radius:.75rem;padding:.75rem;margin-bottom:.65rem}.warning p{margin:.35rem 0 0;color:var(--muted)}.warning.high strong{color:var(--danger)}.warning.medium strong{color:var(--warn)}.warning.notice strong{color:var(--notice)}ol{list-style:none;padding:0;margin:0;color:var(--muted)}li{display:grid;grid-template-columns:1.8rem 1fr;gap:.5rem;margin-bottom:.65rem}li span{display:grid;place-items:center;width:1.45rem;height:1.45rem;border-radius:999px;background:rgba(214,173,82,.18);color:var(--gold2);font-weight:900}.buttons{display:flex;gap:.6rem;flex-wrap:wrap}.button,button{border:1px solid rgba(241,213,138,.82);border-radius:.7rem;padding:.78rem .95rem;font-weight:900;background:#050505;color:var(--gold2);text-decoration:none;display:inline-block;cursor:pointer;box-shadow:0 8px 22px rgba(0,0,0,.32),inset 0 0 0 1px rgba(214,173,82,.18)}.button:hover,button:hover{background:linear-gradient(135deg,#151006,#2a210d);color:#fff2b6}.button:active,button:active{transform:translateY(1px)}.button.primary,button.primary{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#151006}.secondary{background:#050505;color:var(--gold2);border:1px solid rgba(241,213,138,.72)}.danger{background:#1a0505;color:#ffd4d4;border:1px solid #ff6b6b}.form-grid{display:grid;gap:.7rem}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:.75rem;background:#050505;color:var(--text);padding:.75rem;font:inherit}label{display:grid;gap:.35rem;color:var(--gold2);font-weight:800}.toast{position:fixed;right:1rem;bottom:1rem;z-index:2000;max-width:min(24rem,calc(100vw - 2rem));padding:.85rem 1rem;border-radius:.85rem;background:#12351f;color:#d8ffe5;border:1px solid #2ecc71;box-shadow:0 16px 38px rgba(0,0,0,.45);font-weight:800}.toast.error{background:#3b1111;color:#ffd4d4;border-color:#ff6b6b}.coach-map-pin{display:inline-flex;width:1.15rem;height:1.15rem;border-radius:999px;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,.55)}.coach-map-pin.start{background:#2fd36b}.coach-map-pin.end{background:#ff6b6b}.coach-map-pin.stop{background:var(--gold2)}.coach-stop-pin{display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:999px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#151006;border:3px solid #fff;box-shadow:0 3px 14px rgba(0,0,0,.55);font-weight:900;font-size:.82rem}.travel-order-list{display:grid;gap:.65rem}.travel-order-item{grid-template-columns:2rem 1fr;align-items:start;border:1px solid var(--line);border-radius:.9rem;padding:.75rem;background:rgba(255,255,255,.035);margin:0}.travel-order-item span{background:rgba(214,173,82,.22);border:1px solid rgba(241,213,138,.42)}.travel-order-item strong{color:var(--gold2)}.travel-order-item p{margin:.18rem 0 0;color:var(--muted)}.travel-order-item.start span{background:rgba(47,211,107,.18);color:#8ee6a8}.travel-order-item.end span{background:rgba(255,107,107,.18);color:#ffd4d4}.stop-label{background:#050505;color:var(--gold2);border:1px solid rgba(241,213,138,.6);border-radius:999px;font-weight:900;padding:.15rem .35rem}.coach-route-line{stroke-linecap:round;stroke-linejoin:round}
-  .gps-card{border-color:rgba(142,230,168,.36);background:linear-gradient(180deg,rgba(142,230,168,.08),rgba(255,255,255,.035))}.gps-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}.gps-pill{border:1px solid rgba(142,230,168,.28);border-radius:.8rem;padding:.72rem;background:rgba(142,230,168,.05)}.gps-pill strong{display:block;color:var(--good);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}.offroute{display:none;margin-top:.75rem;border:1px solid var(--danger);color:#ffd4d4;background:#2b0909;border-radius:.8rem;padding:.75rem;font-weight:800}.offroute.show{display:block}.driver-location-dot{position:relative;display:block;width:1.25rem;height:1.25rem;border-radius:50%;background:#2979ff;border:3px solid #fff;box-shadow:0 0 0 7px rgba(41,121,255,.22),0 4px 14px rgba(0,0,0,.45)}.driver-location-dot::before{content:'';position:absolute;left:50%;top:-.65rem;transform:translateX(-50%);border-left:.28rem solid transparent;border-right:.28rem solid transparent;border-bottom:.72rem solid #fff;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}.driver-location-dot::after{content:'';position:absolute;inset:-.65rem;border:1px solid rgba(41,121,255,.45);border-radius:50%;animation:pulse 1.5s infinite}@keyframes pulse{from{transform:scale(.65);opacity:.9}to{transform:scale(1.75);opacity:0}}
+  .gps-card{border-color:rgba(142,230,168,.36);background:linear-gradient(180deg,rgba(142,230,168,.08),rgba(255,255,255,.035))}.gps-grid{display:grid;grid-template-columns:1fr 1fr;gap:.65rem}.gps-pill{border:1px solid rgba(142,230,168,.28);border-radius:.8rem;padding:.72rem;background:rgba(142,230,168,.05)}.gps-pill strong{display:block;color:var(--good);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}.nav-assist-card{border-color:rgba(241,213,138,.4);background:linear-gradient(180deg,rgba(241,213,138,.08),rgba(255,255,255,.035))}.nav-hero{border:1px solid rgba(241,213,138,.35);border-radius:1rem;padding:1rem;background:#050505;margin-bottom:.75rem}.nav-hero strong{display:block;color:var(--gold2);font-size:1.15rem}.nav-hero .distance{color:#fff2b6;font-weight:900;margin-top:.3rem}.nav-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}.nav-info{border:1px solid var(--line);border-radius:.85rem;padding:.72rem;background:rgba(0,0,0,.22)}.nav-info strong{display:block;color:var(--gold2);font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.25rem}.lane-visual{font-size:1.35rem;letter-spacing:.2rem;color:var(--gold2);white-space:nowrap}.camera-muted{color:var(--muted)}.instruction-list{max-height:18rem;overflow:auto;border-top:1px solid var(--line);padding-top:.75rem;margin-top:.75rem}.instruction-list li{padding:.55rem;border-radius:.75rem}.instruction-list li.instruction-current{background:rgba(241,213,138,.13);color:#fff2b6}.instruction-list li.instruction-passed{opacity:.45}@media(max-width:620px){.nav-info-grid{grid-template-columns:1fr}}.offroute{display:none;margin-top:.75rem;border:1px solid var(--danger);color:#ffd4d4;background:#2b0909;border-radius:.8rem;padding:.75rem;font-weight:800}.offroute.show{display:block}.driver-location-dot{position:relative;display:block;width:1.25rem;height:1.25rem;border-radius:50%;background:#2979ff;border:3px solid #fff;box-shadow:0 0 0 7px rgba(41,121,255,.22),0 4px 14px rgba(0,0,0,.45)}.driver-location-dot::before{content:'';position:absolute;left:50%;top:-.65rem;transform:translateX(-50%);border-left:.28rem solid transparent;border-right:.28rem solid transparent;border-bottom:.72rem solid #fff;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}.driver-location-dot::after{content:'';position:absolute;inset:-.65rem;border:1px solid rgba(41,121,255,.45);border-radius:50%;animation:pulse 1.5s infinite}@keyframes pulse{from{transform:scale(.65);opacity:.9}to{transform:scale(1.75);opacity:0}}
   .nav-card{border-color:rgba(158,208,255,.34);background:linear-gradient(180deg,rgba(158,208,255,.08),rgba(255,255,255,.035))}.nav-top{display:grid;gap:.75rem}.nav-instruction{border:1px solid rgba(158,208,255,.34);border-radius:1rem;background:rgba(158,208,255,.06);padding:1rem}.nav-label{display:block;color:var(--notice);font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;font-weight:900}.nav-main{font-size:1.25rem;line-height:1.25;font-weight:900;margin-top:.25rem}.nav-meta{display:grid;grid-template-columns:1fr 1fr;gap:.65rem;margin-top:.75rem}.nav-bar{height:.6rem;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;border:1px solid var(--line)}.nav-fill{height:100%;width:0;background:linear-gradient(90deg,var(--gold2),var(--gold));transition:width .25s}.event-log{max-height:9rem;overflow:auto;border:1px solid var(--line);border-radius:.75rem;padding:.7rem;background:rgba(0,0,0,.2);font-size:.88rem;color:var(--muted)}.event-log p{margin:.25rem 0}.instruction-current{border-color:rgba(241,213,138,.9)!important;background:rgba(214,173,82,.13)!important;color:var(--text)!important}.instruction-passed{opacity:.45}.next-marker{display:inline-grid;place-items:center;width:1.3rem;height:1.3rem;border-radius:999px;background:var(--notice);color:#06111f;font-weight:900}.voice-status{display:flex;justify-content:space-between;gap:.75rem;align-items:center;border:1px solid rgba(241,213,138,.35);border-radius:.85rem;padding:.75rem;background:rgba(214,173,82,.07);color:var(--gold2);font-weight:900}.voice-status span{color:var(--text)}
 
   @media(min-width:920px){.content{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}#driverMap{height:64vh}}
@@ -515,6 +677,7 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
   <section class="card"><h2>Driver summary</h2><div class="stats"><div class="stat"><strong>Driver</strong>${escapeHtml(driver.name || 'Not assigned')}</div><div class="stat"><strong>Vehicle</strong>${escapeHtml(vehicle.name || 'Coach')}<br>${escapeHtml(vehicle.registration || '')}</div><div class="stat"><strong>Height</strong>${escapeHtml(vehicle.heightM || '')}m</div><div class="stat"><strong>Weight</strong>${Number(vehicle.weightKg || 0).toLocaleString()}kg</div></div><p class="muted"><strong>Operator notes:</strong> ${escapeHtml(record.operatorNotes || 'None')}</p><div class="buttons"><button class="secondary" onclick="window.print()">Print</button><button id="completeBtn" class="button" type="button">Mark completed</button></div></section>
   <section class="card gps-card"><h2>Live GPS driver mode</h2><p class="muted">Shows your current location against the approved route. Keep using road signs and operator instructions.</p><div class="gps-grid"><div class="gps-pill"><strong>Status</strong><span id="gpsStatus">Not started</span></div><div class="gps-pill"><strong>Accuracy</strong><span id="gpsAccuracy">—</span></div><div class="gps-pill"><strong>Distance from route</strong><span id="gpsDistance">—</span></div><div class="gps-pill"><strong>Tracking</strong><span id="gpsTracking">Off</span></div></div><div id="offRouteAlert" class="offroute">You appear to be away from the approved route. Stop when safe and check with operations before continuing.</div><div class="buttons" style="margin-top:.8rem"><button id="startGpsBtn" type="button">Start live GPS</button><button id="centerGpsBtn" class="secondary" type="button" disabled>Centre on me</button><button id="stopGpsBtn" class="secondary" type="button" disabled>Stop GPS</button></div></section>
   <div id="driverEventLog" hidden></div>
+  <section class="card wide nav-assist-card"><h2>Live driving instructions</h2><div class="nav-hero"><strong id="navCurrentInstruction">Start journey to load next instruction</strong><div class="distance">Next action in <span id="navDistanceToNext">—</span></div></div><div class="nav-info-grid"><div class="nav-info"><strong>Lane guidance</strong><span id="navLaneGuidance">Follow road signs</span><div id="navLaneVisual" class="lane-visual"></div></div><div class="nav-info"><strong>Speed limit</strong><span id="navSpeedLimit">When available</span></div><div class="nav-info"><strong>Road / signpost</strong><span id="navRoadInfo">—</span></div><div class="nav-info"><strong>Camera alerts</strong><span id="navCameraAlert" class="camera-muted">No connected speed-camera feed</span></div></div><div style="margin-top:.75rem"><strong class="muted">All route instructions</strong><ol id="instructionList" class="instruction-list"></ol></div></section>
 
   ${stopsHtml}
   <section class="card wide"><h2>Report unsuitable road</h2><form id="driverReportForm" class="form-grid"><label>Road / location<input name="roadName" id="roadNameInput" placeholder="Example: narrow hotel approach" /></label><label>Issue type<select name="issueType"><option>Unsuitable road</option><option>Low bridge concern</option><option>Narrow road</option><option>Weight restriction concern</option><option>Tight turn</option><option>Coach access restriction</option><option>Other</option></select></label><label>Notes<textarea name="notes" rows="3" placeholder="Explain what happened or what needs checking."></textarea></label><input type="hidden" name="lat" id="reportLat"><input type="hidden" name="lng" id="reportLng"><input type="hidden" name="accuracyM" id="reportAccuracy"><div class="buttons"><button type="button" id="useGpsReportBtn" class="secondary">Use my GPS location</button><button type="submit">Submit road report</button></div></form></section>
@@ -532,7 +695,7 @@ async function toggleWakeLock(){if(wakeLock){try{await wakeLock.release()}catch(
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&wakeLock===null&&document.getElementById('mapWakeLockBtn')?.classList.contains('active'))requestWakeLock()});
 document.addEventListener('fullscreenchange',()=>{setTimeout(()=>{map.invalidateSize(true);if(currentGps&&followDriver){map.setView([currentGps.lat,currentGps.lng],Math.max(map.getZoom(),16),{animate:false})}else{fit()}syncMapControlStates()},160)});
 
-let instructions=(data.instructions||[]).map((i,idx)=>({index:idx,instruction:i.instruction||'Continue',street:i.street||'',distanceM:Number(i.distanceM||0),travelTimeSeconds:Number(i.travelTimeSeconds||0)})).sort((a,b)=>a.distanceM-b.distanceM);
+function normalizeDriverInstruction(i,idx){return {index:idx,instruction:i.instruction||'Continue',street:i.street||'',signpostText:i.signpostText||'',roadNumbers:Array.isArray(i.roadNumbers)?i.roadNumbers:[],maneuver:i.maneuver||'',instructionType:i.instructionType||'',junctionType:i.junctionType||'',pointIndex:i.pointIndex,laneGuidance:i.laneGuidance||null,speedLimit:i.speedLimit||null,distanceM:Number(i.distanceM||0),travelTimeSeconds:Number(i.travelTimeSeconds||0)}}let instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);let speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);let laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);let safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];
 let totalRouteM=Number(data.summary?.lengthInMeters||0);let totalTravelS=Number(data.summary?.travelTimeInSeconds||0);
 function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value}
 function haversine(a,b){const R=6371000;const toRad=(d)=>d*Math.PI/180;const dLat=toRad(b[0]-a[0]);const dLng=toRad(b[1]-a[1]);const lat1=toRad(a[0]);const lat2=toRad(b[0]);const x=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
@@ -551,7 +714,11 @@ function cleanSpeechText(text){return String(text||'Continue on the approved rou
 function speak(text,force=false){if(!force&&!voiceEnabled)return;if(!speechAvailable()){setVoiceStatus('Not supported');toast('Spoken guidance is not supported in this browser.','error');return}try{window.speechSynthesis.cancel();const utter=new SpeechSynthesisUtterance(cleanSpeechText(text));utter.lang='en-GB';utter.rate=.92;utter.pitch=1;utter.volume=1;utter.onstart=()=>setVoiceStatus('Speaking');utter.onend=()=>setVoiceStatus(voiceEnabled?'On':'Off');utter.onerror=()=>setVoiceStatus(voiceEnabled?'On':'Off');window.speechSynthesis.speak(utter)}catch(err){toast('Could not speak instruction.','error')}}
 function speakCurrentInstruction(force=false){const ins=instructions[currentInstructionIndex]||instructions[0];if(!ins){toast('No spoken instruction available.','error');return}const dist=Number(ins.distanceM||0);speak((force&& !voiceEnabled?'Voice test. ':'')+(ins.instruction||'Continue')+(dist>0?' in approximately '+metersText(Math.max(0,dist-(currentGps?nearestRouteProgressM([currentGps.lat,currentGps.lng],routePoints):0))):''),force)}
 function updateInstructionHighlight(idx){document.querySelectorAll('#instructionList li').forEach((el,i)=>{el.classList.toggle('instruction-current',i===idx);el.classList.toggle('instruction-passed',i<idx)})}
-function updateGuidance(progressM,offRouteM){const routeTotal=totalRouteM || routeMeasures[routeMeasures.length-1] || 0;let idx=instructions.findIndex((ins)=>Number(ins.distanceM||0)>progressM+20);if(idx<0)idx=Math.max(0,instructions.length-1);currentInstructionIndex=idx;const ins=instructions[idx]||{instruction:'Continue on approved route',distanceM:progressM};const distToNext=Math.max(0,Number(ins.distanceM||0)-progressM);const progressPct=routeTotal?Math.min(100,Math.max(0,(progressM/routeTotal)*100)):0;const remainingM=Math.max(0,routeTotal-progressM);const remainingS=routeTotal&&totalTravelS?totalTravelS*(remainingM/routeTotal):0;setText('navCurrentInstruction',ins.instruction);setText('navDistanceToNext',metersText(distToNext));setText('navProgressText',Math.round(progressPct)+'%');setText('navRemainingDistance',metersText(remainingM));setText('navEtaRemaining',timeText(remainingS));const fill=document.getElementById('navProgressFill');if(fill)fill.style.width=progressPct.toFixed(1)+'%';updateInstructionHighlight(idx);if(journeyStarted&&idx!==lastLoggedInstruction){lastLoggedInstruction=idx;logEvent('Next instruction: '+ins.instruction)}if(journeyStarted&&voiceEnabled&&idx!==lastSpokenInstruction){lastSpokenInstruction=idx;speak((distToNext>25?'In '+metersText(distToNext)+', ':'')+(ins.instruction||'Continue'))}if(offRouteM>250){logEvent('Off-route warning: approx '+Math.round(offRouteM)+'m from approved route.');const now=Date.now();if(voiceEnabled&&now-offRouteVoiceLastAt>120000){offRouteVoiceLastAt=now;speak('Warning. You appear to be away from the approved route. Stop when safe and check with operations before continuing.')}if(now-lastOffRouteSentAt>120000){lastOffRouteSentAt=now;postJourneyEvent('off_route_warning','Driver is approx '+Math.round(offRouteM)+'m from the approved route.',{distanceM:Math.round(offRouteM)})}}}
+function currentSpeedLimitForProgress(progressM){const exact=speedLimitSections.find((s)=>progressM>=Number(s.startOffsetM||0)&&progressM<=Number(s.endOffsetM||0));if(exact)return exact;return speedLimitSections.filter((s)=>Number(s.startOffsetM||0)<=progressM).sort((a,b)=>Number(b.startOffsetM||0)-Number(a.startOffsetM||0))[0]||null}
+function currentLaneForInstruction(ins,progressM){if(ins&&ins.laneGuidance)return ins.laneGuidance;return laneSections.find((s)=>progressM>=Number(s.startOffsetM||0)&&progressM<=Number(s.endOffsetM||0))||laneSections.filter((s)=>Number(s.startOffsetM||0)>=progressM&&Number(s.startOffsetM||0)-progressM<650).sort((a,b)=>Number(a.startOffsetM||0)-Number(b.startOffsetM||0))[0]||null}
+function nearestCameraForProgress(progressM){return safetyAlerts.filter((a)=>Number(a.offsetM||a.routeOffsetInMeters||0)>=progressM).sort((a,b)=>Number(a.offsetM||a.routeOffsetInMeters||0)-Number(b.offsetM||b.routeOffsetInMeters||0))[0]||null}
+function setAdvancedInstructionPanel(ins,progressM,distToNext){const lane=currentLaneForInstruction(ins,progressM);const speed=ins?.speedLimit||currentSpeedLimitForProgress(progressM);const camera=nearestCameraForProgress(progressM);setText('navLaneGuidance',lane?(lane.text||'Lane information available. Follow road signs.'):'No lane guidance for this junction. Follow road signs.');setText('navLaneVisual',lane?.visual||'');const mph=speed?.maxSpeedLimitMph;const kmh=speed?.maxSpeedLimitInKmh;setText('navSpeedLimit',(mph||kmh)?`${mph?mph+' mph':kmh+' km/h'}${kmh&&mph?' / '+kmh+' km/h':''}`:'Speed limit not returned for this road section.');const roadBits=[];if(ins?.street)roadBits.push(ins.street);if(ins?.roadNumbers?.length)roadBits.push(ins.roadNumbers.join(', '));if(ins?.signpostText)roadBits.push('towards '+ins.signpostText);setText('navRoadInfo',roadBits.join(' · ')||'—');if(camera){const camOffset=Number(camera.offsetM||camera.routeOffsetInMeters||0);setText('navCameraAlert',`${camera.type||'Camera alert'} in ${metersText(Math.max(0,camOffset-progressM))}`);document.getElementById('navCameraAlert')?.classList.remove('camera-muted')}else{setText('navCameraAlert','No connected speed-camera feed');document.getElementById('navCameraAlert')?.classList.add('camera-muted')}}
+function updateGuidance(progressM,offRouteM){const routeTotal=totalRouteM || routeMeasures[routeMeasures.length-1] || 0;let idx=instructions.findIndex((ins)=>Number(ins.distanceM||0)>progressM+20);if(idx<0)idx=Math.max(0,instructions.length-1);currentInstructionIndex=idx;const ins=instructions[idx]||{instruction:'Continue on approved route',distanceM:progressM};const distToNext=Math.max(0,Number(ins.distanceM||0)-progressM);const progressPct=routeTotal?Math.min(100,Math.max(0,(progressM/routeTotal)*100)):0;const remainingM=Math.max(0,routeTotal-progressM);const remainingS=routeTotal&&totalTravelS?totalTravelS*(remainingM/routeTotal):0;setText('navCurrentInstruction',ins.instruction);setText('navDistanceToNext',metersText(distToNext));setText('navProgressText',Math.round(progressPct)+'%');setText('navRemainingDistance',metersText(remainingM));setText('navEtaRemaining',timeText(remainingS));setAdvancedInstructionPanel(ins,progressM,distToNext);const fill=document.getElementById('navProgressFill');if(fill)fill.style.width=progressPct.toFixed(1)+'%';updateInstructionHighlight(idx);if(journeyStarted&&idx!==lastLoggedInstruction){lastLoggedInstruction=idx;logEvent('Next instruction: '+ins.instruction)}if(journeyStarted&&voiceEnabled&&idx!==lastSpokenInstruction){lastSpokenInstruction=idx;speak((distToNext>25?'In '+metersText(distToNext)+', ':'')+(ins.instruction||'Continue'))}if(offRouteM>250){logEvent('Off-route warning: approx '+Math.round(offRouteM)+'m from approved route.');const now=Date.now();if(voiceEnabled&&now-offRouteVoiceLastAt>120000){offRouteVoiceLastAt=now;speak('Warning. You appear to be away from the approved route. Stop when safe and check with operations before continuing.')}if(now-lastOffRouteSentAt>120000){lastOffRouteSentAt=now;postJourneyEvent('off_route_warning','Driver is approx '+Math.round(offRouteM)+'m from the approved route.',{distanceM:Math.round(offRouteM)})}}}
 
 function updateReportGpsFields(){if(!currentGps)return;document.getElementById('reportLat').value=currentGps.lat.toFixed(7);document.getElementById('reportLng').value=currentGps.lng.toFixed(7);document.getElementById('reportAccuracy').value=Math.round(currentGps.accuracy||0)}
 function onGps(pos){const lat=pos.coords.latitude,lng=pos.coords.longitude,acc=pos.coords.accuracy||0;const ll=[lat,lng];let heading=Number(pos.coords.heading);if(!Number.isFinite(heading)&&previousGpsPoint&&haversine(previousGpsPoint,ll)>6){heading=bearingBetween(previousGpsPoint,ll)}previousGpsPoint=ll;currentGps={lat,lng,accuracy:acc,heading:Number.isFinite(heading)?heading:currentMapBearing,when:new Date()};if(Number.isFinite(heading)&&routeUpEnabled)setMapBearing(heading);if(!driverMarker){driverMarker=L.marker(ll,{icon:gpsIcon,zIndexOffset:1000}).bindPopup('Your current position').addTo(map)}else{driverMarker.setLatLng(ll)}const markerEl=driverMarker?.getElement?.();if(markerEl&&Number.isFinite(currentGps.heading))markerEl.style.setProperty('--driver-heading',currentGps.heading.toFixed(1)+'deg');if(accuracyCircle){accuracyCircle.setLatLng(ll).setRadius(acc)}else{accuracyCircle=L.circle(ll,{radius:acc,weight:1,opacity:.45,fillOpacity:.08}).addTo(map)}setText('gpsStatus','Active');setText('gpsTracking','On');setText('gpsAccuracy',Math.round(acc)+'m');const dist=distanceFromRoute(ll,routePoints);const alert=document.getElementById('offRouteAlert');const progressM=nearestRouteProgressM(ll,routePoints);if(dist!==null&&Number.isFinite(dist)){setText('gpsDistance',Math.round(dist)+'m');if(dist>250){alert?.classList.add('show')}else{alert?.classList.remove('show')}updateGuidance(progressM,dist)}if(followDriver){map.setView(ll,Math.max(map.getZoom(),16),{animate:true})}updateReportGpsFields()}
@@ -571,10 +738,11 @@ function toggleVoiceGuidance(){if(!speechAvailable()){toast('Spoken guidance is 
 document.getElementById('voiceGuidanceBtn')?.addEventListener('click',toggleVoiceGuidance);
 document.getElementById('mapVoiceBtn')?.addEventListener('click',toggleVoiceGuidance);
 document.getElementById('nextInstructionBtn')?.addEventListener('click',()=>{const ins=instructions[currentInstructionIndex]||instructions[0];if(ins){toast(ins.instruction,'success');speakCurrentInstruction(true);logEvent('Instruction repeated: '+ins.instruction)}else{toast('No spoken instruction available.','error')}});
-function rebuildInstructionList(){const list=document.getElementById('instructionList');if(!list)return;list.innerHTML='';const rows=instructions.length?instructions:[{instruction:'No guidance returned.'}];rows.forEach((ins,idx)=>{const li=document.createElement('li');const sp=document.createElement('span');sp.textContent=String(idx+1);li.appendChild(sp);li.appendChild(document.createTextNode(ins.instruction||'Continue'));list.appendChild(li)})}
-function applyReroute(newRoute){data=newRoute||data;routePoints=(data.points||[]);instructions=(data.instructions||[]).map((i,idx)=>({index:idx,instruction:i.instruction||'Continue',street:i.street||'',distanceM:Number(i.distanceM||0),travelTimeSeconds:Number(i.travelTimeSeconds||0)})).sort((a,b)=>a.distanceM-b.distanceM);totalRouteM=Number(data.summary?.lengthInMeters||0);totalTravelS=Number(data.summary?.travelTimeInSeconds||0);routeMeasures=buildRouteMeasures(routePoints);currentInstructionIndex=0;lastLoggedInstruction=-1;lastSpokenInstruction=-1;drawRouteOnMap();rebuildInstructionList();if(routeUpEnabled)setMapBearing((currentGps&&Number.isFinite(currentGps.heading)?currentGps.heading:routeInitialBearing())||0);if(currentGps){const ll=[currentGps.lat,currentGps.lng];const dist=distanceFromRoute(ll,routePoints)||0;const progressM=nearestRouteProgressM(ll,routePoints);updateGuidance(progressM,dist)}else{updateGuidance(0,0)}fit()}
+function rebuildInstructionList(){const list=document.getElementById('instructionList');if(!list)return;list.innerHTML='';const rows=instructions.length?instructions:[{instruction:'No guidance returned.'}];rows.forEach((ins,idx)=>{const li=document.createElement('li');const sp=document.createElement('span');sp.textContent=String(idx+1);const wrap=document.createElement('div');const main=document.createElement('strong');main.textContent=ins.instruction||'Continue';wrap.appendChild(main);const details=[];if(ins.laneGuidance?.text)details.push(ins.laneGuidance.text);if(ins.speedLimit?.maxSpeedLimitMph)details.push('Speed limit: '+ins.speedLimit.maxSpeedLimitMph+' mph');if(ins.street)details.push(ins.street);if(details.length){const p=document.createElement('p');p.className='muted';p.textContent=details.join(' · ');wrap.appendChild(p)}li.appendChild(sp);li.appendChild(wrap);list.appendChild(li)})}
+function applyReroute(newRoute){data=newRoute||data;routePoints=(data.points||[]);instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];totalRouteM=Number(data.summary?.lengthInMeters||0);totalTravelS=Number(data.summary?.travelTimeInSeconds||0);routeMeasures=buildRouteMeasures(routePoints);currentInstructionIndex=0;lastLoggedInstruction=-1;lastSpokenInstruction=-1;drawRouteOnMap();rebuildInstructionList();if(routeUpEnabled)setMapBearing((currentGps&&Number.isFinite(currentGps.heading)?currentGps.heading:routeInitialBearing())||0);if(currentGps){const ll=[currentGps.lat,currentGps.lng];const dist=distanceFromRoute(ll,routePoints)||0;const progressM=nearestRouteProgressM(ll,routePoints);updateGuidance(progressM,dist)}else{updateGuidance(0,0)}fit()}
 async function recalcRouteFromGps(triggerBtn){const btn=triggerBtn||document.getElementById('recalcBtn')||document.getElementById('mapRecalcBtn');if(!currentGps){toast('Start live GPS first so the app can reroute from your current position.','error');return}if(btn)btn.disabled=true;const oldText=btn?btn.textContent:'';if(btn)btn.textContent='Recalculating…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/reroute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:currentGps.lat,lng:currentGps.lng,accuracyM:currentGps.accuracy})});const payload=await r.json();if(!r.ok)throw new Error(payload.error||'Could not recalculate route.');applyReroute(payload.route);toast('Coach-safe route recalculated from your GPS position.','success');logEvent('Coach-safe reroute calculated from driver GPS.');if(voiceEnabled)speak('Coach-safe route recalculated. Follow the updated spoken instructions.')}catch(err){toast(err.message,'error');logEvent('Reroute failed: '+err.message)}finally{if(btn){btn.disabled=false;btn.textContent=oldText}}}
 document.getElementById('recalcBtn')?.addEventListener('click',()=>recalcRouteFromGps(document.getElementById('recalcBtn')));
+rebuildInstructionList();
 if(instructions.length){updateGuidance(0,0)}
 document.getElementById('completeBtn')?.addEventListener('click',async()=>{const btn=document.getElementById('completeBtn');btn.disabled=true;btn.textContent='Marking complete…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/complete',{method:'POST'});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not mark route completed.');document.getElementById('statusBadge').textContent='completed';toast('Route marked as completed.','success');logEvent('Journey completed.');if(voiceEnabled)speak('Route completed.');btn.textContent='Completed';}catch(e){toast(e.message,'error');btn.disabled=false;btn.textContent='Mark completed';}});
 document.getElementById('journeyCompleteBtn')?.addEventListener('click',()=>document.getElementById('completeBtn')?.click());
