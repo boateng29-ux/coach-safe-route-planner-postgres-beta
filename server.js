@@ -320,6 +320,24 @@ function toTitleCase(value = '') {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+
+function haversineMeters(a, b) {
+  if (!a || !b) return 0;
+  const lat1 = Array.isArray(a) ? Number(a[0]) : Number(a.lat ?? a.latitude);
+  const lon1 = Array.isArray(a) ? Number(a[1]) : Number(a.lon ?? a.lng ?? a.longitude);
+  const lat2 = Array.isArray(b) ? Number(b[0]) : Number(b.lat ?? b.latitude);
+  const lon2 = Array.isArray(b) ? Number(b[1]) : Number(b.lon ?? b.lng ?? b.longitude);
+  if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return 0;
+  const R = 6371000;
+  const toRad = (deg) => deg * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const p1 = toRad(lat1);
+  const p2 = toRad(lat2);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
 function routeOffsetForPointIndex(routePoints = [], pointIndex = 0) {
   const index = Math.max(0, Math.min(Number(pointIndex) || 0, Math.max(0, routePoints.length - 1)));
   let total = 0;
@@ -697,7 +715,7 @@ document.addEventListener('fullscreenchange',()=>{setTimeout(()=>{map.invalidate
 function normalizeDriverInstruction(i,idx){return {index:idx,instruction:i.instruction||'Continue',street:i.street||'',signpostText:i.signpostText||'',roadNumbers:Array.isArray(i.roadNumbers)?i.roadNumbers:[],maneuver:i.maneuver||'',instructionType:i.instructionType||'',junctionType:i.junctionType||'',pointIndex:i.pointIndex,laneGuidance:i.laneGuidance||null,speedLimit:i.speedLimit||null,distanceM:Number(i.distanceM||0),travelTimeSeconds:Number(i.travelTimeSeconds||0)}}let instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);let speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);let laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);let safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];
 let totalRouteM=Number(data.summary?.lengthInMeters||0);let totalTravelS=Number(data.summary?.travelTimeInSeconds||0);
 function setText(id,value){const el=document.getElementById(id);if(el)el.textContent=value}
-function haversine(a,b){const R=6371000;const toRad=(d)=>d*Math.PI/180;const dLat=toRad(b[0]-a[0]);const dLng=toRad(b[1]-a[1]);const lat1=toRad(a[0]);const lat2=toRad(b[0]);const x=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
+function haversine(a,b){const R=6371000;const toRad=(d)=>d*Math.PI/180;const dLat=toRad(b[0]-a[0]);const dLng=toRad(b[1]-a[1]);const lat1=toRad(a[0]);const lat2=toRad(b[0]);const x=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}function haversineMetersClientSafe(a,b){return haversine(a,b)}
 function projectAround(p,origin){const R=6371000;const lat=origin[0]*Math.PI/180;return {x:(p[1]-origin[1])*Math.PI/180*Math.cos(lat)*R,y:(p[0]-origin[0])*Math.PI/180*R}}
 function distToSeg(p,a,b){const P=projectAround(p,p),A=projectAround(a,p),B=projectAround(b,p);const dx=B.x-A.x,dy=B.y-A.y;const len=dx*dx+dy*dy;if(!len)return haversine(p,a);let t=((P.x-A.x)*dx+(P.y-A.y)*dy)/len;t=Math.max(0,Math.min(1,t));const x=A.x+t*dx,y=A.y+t*dy;return Math.hypot(P.x-x,P.y-y)}
 function distanceFromRoute(p,pts){if(!pts||pts.length<2)return null;let best=Infinity;for(let i=0;i<pts.length-1;i++){const d=distToSeg(p,pts[i],pts[i+1]);if(d<best)best=d}return best}
