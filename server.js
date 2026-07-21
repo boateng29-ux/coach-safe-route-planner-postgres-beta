@@ -1059,6 +1059,112 @@ document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=
 })();
 </script>
 
+
+<!-- COACH_SAFE_DRIVER_ICON_CONTROLS_V1 START -->
+<style>
+  .coach-driver-icon-only {
+    font-size: 0 !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 0 !important;
+    min-height: 54px !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  .coach-driver-icon-only::before {
+    content: attr(data-icon);
+    font-size: 28px !important;
+    line-height: 1 !important;
+    display: inline-block !important;
+  }
+  .coach-driver-hidden-action {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+  @media (max-width: 768px) {
+    .coach-driver-icon-only {
+      min-height: 58px !important;
+      min-width: 58px !important;
+      padding-left: 18px !important;
+      padding-right: 18px !important;
+    }
+    .coach-driver-icon-only::before {
+      font-size: 30px !important;
+    }
+  }
+</style>
+<script>
+(function () {
+  if (window.location.pathname.indexOf('/driver') !== 0) return;
+
+  function normaliseText(value) {
+    return String(value || '').replace(/s+/g, ' ').trim().toLowerCase();
+  }
+
+  function iconForButton(text) {
+    if (text.indexOf('centre position') !== -1 || text.indexOf('center position') !== -1 || text === 'centre' || text === 'center') {
+      return { icon: '⌖', label: 'Centre position' };
+    }
+    if (text.indexOf('recalculate') !== -1 || text.indexOf('reroute') !== -1) {
+      return { icon: '↻', label: 'Recalculate route' };
+    }
+    if (text.indexOf('exit full screen') !== -1 || text.indexOf('exit fullscreen') !== -1) {
+      return { icon: '↙', label: 'Exit full screen' };
+    }
+    if (text.indexOf('full screen') !== -1 || text.indexOf('fullscreen') !== -1 || text.indexOf('large map') !== -1) {
+      return { icon: '⛶', label: 'Full screen' };
+    }
+    if (text.indexOf('keep screen') !== -1 || text.indexOf('wake') !== -1) {
+      return { icon: '☀', label: 'Keep screen on' };
+    }
+    if (text.indexOf('voice on') !== -1) {
+      return { icon: '🔊', label: 'Voice on' };
+    }
+    if (text.indexOf('voice off') !== -1 || text === 'voice') {
+      return { icon: '🔇', label: 'Voice off' };
+    }
+    return null;
+  }
+
+  function patchDriverButtons() {
+    var elements = document.querySelectorAll('button, a');
+
+    elements.forEach(function (el) {
+      var text = normaliseText(el.textContent);
+      if (!text) return;
+
+      if (text === 'print' || text.indexOf('print') !== -1 || text.indexOf('mark completed') !== -1 || text.indexOf('completed route') !== -1) {
+        el.classList.add('coach-driver-hidden-action');
+        el.setAttribute('aria-hidden', 'true');
+        el.setAttribute('tabindex', '-1');
+        return;
+      }
+
+      var mapped = iconForButton(text);
+      if (!mapped) return;
+
+      el.classList.add('coach-driver-icon-only');
+      el.setAttribute('data-icon', mapped.icon);
+      el.setAttribute('aria-label', mapped.label);
+      el.setAttribute('title', mapped.label);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', patchDriverButtons);
+  window.addEventListener('load', patchDriverButtons);
+  document.addEventListener('click', function () {
+    window.setTimeout(patchDriverButtons, 50);
+    window.setTimeout(patchDriverButtons, 350);
+  }, true);
+  window.setInterval(patchDriverButtons, 800);
+  patchDriverButtons();
+})();
+</script>
+<!-- COACH_SAFE_DRIVER_ICON_CONTROLS_V1 END -->
 </body>
 </html>`;
 }
@@ -1346,6 +1452,112 @@ function buildRouteReportHtml(record) {
 })();
 </script>
 
+
+<!-- COACH_SAFE_DRIVER_ICON_CONTROLS_V1 START -->
+<style>
+  .coach-driver-icon-only {
+    font-size: 0 !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 0 !important;
+    min-height: 54px !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  .coach-driver-icon-only::before {
+    content: attr(data-icon);
+    font-size: 28px !important;
+    line-height: 1 !important;
+    display: inline-block !important;
+  }
+  .coach-driver-hidden-action {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+  @media (max-width: 768px) {
+    .coach-driver-icon-only {
+      min-height: 58px !important;
+      min-width: 58px !important;
+      padding-left: 18px !important;
+      padding-right: 18px !important;
+    }
+    .coach-driver-icon-only::before {
+      font-size: 30px !important;
+    }
+  }
+</style>
+<script>
+(function () {
+  if (window.location.pathname.indexOf('/driver') !== 0) return;
+
+  function normaliseText(value) {
+    return String(value || '').replace(/s+/g, ' ').trim().toLowerCase();
+  }
+
+  function iconForButton(text) {
+    if (text.indexOf('centre position') !== -1 || text.indexOf('center position') !== -1 || text === 'centre' || text === 'center') {
+      return { icon: '⌖', label: 'Centre position' };
+    }
+    if (text.indexOf('recalculate') !== -1 || text.indexOf('reroute') !== -1) {
+      return { icon: '↻', label: 'Recalculate route' };
+    }
+    if (text.indexOf('exit full screen') !== -1 || text.indexOf('exit fullscreen') !== -1) {
+      return { icon: '↙', label: 'Exit full screen' };
+    }
+    if (text.indexOf('full screen') !== -1 || text.indexOf('fullscreen') !== -1 || text.indexOf('large map') !== -1) {
+      return { icon: '⛶', label: 'Full screen' };
+    }
+    if (text.indexOf('keep screen') !== -1 || text.indexOf('wake') !== -1) {
+      return { icon: '☀', label: 'Keep screen on' };
+    }
+    if (text.indexOf('voice on') !== -1) {
+      return { icon: '🔊', label: 'Voice on' };
+    }
+    if (text.indexOf('voice off') !== -1 || text === 'voice') {
+      return { icon: '🔇', label: 'Voice off' };
+    }
+    return null;
+  }
+
+  function patchDriverButtons() {
+    var elements = document.querySelectorAll('button, a');
+
+    elements.forEach(function (el) {
+      var text = normaliseText(el.textContent);
+      if (!text) return;
+
+      if (text === 'print' || text.indexOf('print') !== -1 || text.indexOf('mark completed') !== -1 || text.indexOf('completed route') !== -1) {
+        el.classList.add('coach-driver-hidden-action');
+        el.setAttribute('aria-hidden', 'true');
+        el.setAttribute('tabindex', '-1');
+        return;
+      }
+
+      var mapped = iconForButton(text);
+      if (!mapped) return;
+
+      el.classList.add('coach-driver-icon-only');
+      el.setAttribute('data-icon', mapped.icon);
+      el.setAttribute('aria-label', mapped.label);
+      el.setAttribute('title', mapped.label);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', patchDriverButtons);
+  window.addEventListener('load', patchDriverButtons);
+  document.addEventListener('click', function () {
+    window.setTimeout(patchDriverButtons, 50);
+    window.setTimeout(patchDriverButtons, 350);
+  }, true);
+  window.setInterval(patchDriverButtons, 800);
+  patchDriverButtons();
+})();
+</script>
+<!-- COACH_SAFE_DRIVER_ICON_CONTROLS_V1 END -->
 </body>
 </html>`;
 }
