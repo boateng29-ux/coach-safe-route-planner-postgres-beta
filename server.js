@@ -816,6 +816,194 @@ document.getElementById('completeBtn')?.addEventListener('click',async()=>{const
 document.getElementById('journeyCompleteBtn')?.addEventListener('click',()=>document.getElementById('completeBtn')?.click());
 document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget;updateReportGpsFields();const payload=Object.fromEntries(new FormData(form));try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not save report.');form.reset();toast('Road report sent to operations.','success');logEvent('Road report sent to operations.');}catch(err){toast(err.message,'error');}});
 </script>
+
+<!-- DRIVER_BUTTONS_REPAIR_V3 -->
+<style id="driver-buttons-repair-v3-css">
+  html, body { touch-action: manipulation; }
+  .leaflet-container { z-index: 1 !important; }
+  .leaflet-pane { pointer-events: auto !important; }
+  .leaflet-map-pane, .leaflet-tile-pane, .leaflet-overlay-pane, .leaflet-marker-pane, .leaflet-shadow-pane {
+    transform-origin: 50% 50% !important;
+  }
+  .leaflet-control-container, .leaflet-control, .leaflet-top, .leaflet-bottom {
+    pointer-events: auto !important;
+    z-index: 50000 !important;
+  }
+  button, a, input, select, textarea, [role="button"], .btn, .button, .driver-control, .map-control, .live-control, .voice-control {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+  }
+  .driver-map-controls, .map-controls, .live-map-controls, .driver-floating-controls,
+  .waze-control-bar, .waze-map-controls, .fullscreen-controls, .voice-controls,
+  [class*="control"], [class*="button"], [class*="toolbar"], [class*="actions"] {
+    pointer-events: auto !important;
+    z-index: 70000 !important;
+  }
+  .waze-overlay, .waze-instruction, .driver-instruction-overlay, .map-instruction-overlay,
+  .live-instruction-overlay, .instruction-overlay, [class*="overlay"] {
+    z-index: 65000 !important;
+  }
+  .waze-overlay button, .waze-overlay a, .driver-instruction-overlay button, .driver-instruction-overlay a,
+  .map-instruction-overlay button, .map-instruction-overlay a, .live-instruction-overlay button,
+  .live-instruction-overlay a, .instruction-overlay button, .instruction-overlay a, [class*="overlay"] button,
+  [class*="overlay"] a {
+    pointer-events: auto !important;
+  }
+  #driverMap, #map, .driver-map, .live-map {
+    position: relative;
+    z-index: 1 !important;
+  }
+  body.driver-fullscreen, body.map-fullscreen, body.fullscreen-mode {
+    overflow: hidden !important;
+  }
+  body.driver-fullscreen button, body.map-fullscreen button, body.fullscreen-mode button,
+  body.driver-fullscreen a, body.map-fullscreen a, body.fullscreen-mode a {
+    pointer-events: auto !important;
+  }
+</style>
+<script id="driver-buttons-repair-v3-js">
+(function () {
+  var installed = false;
+
+  function log(msg) {
+    try { console.log('[driver-buttons-repair]', msg); } catch (e) {}
+  }
+
+  function forceControlsAboveMap() {
+    var selectors = [
+      'button', 'a', '[role="button"]', '.btn', '.button',
+      '.driver-map-controls', '.map-controls', '.live-map-controls',
+      '.driver-floating-controls', '.waze-control-bar', '.waze-map-controls',
+      '.fullscreen-controls', '.voice-controls', '[class*="control"]',
+      '[class*="button"]', '[class*="toolbar"]', '[class*="actions"]'
+    ];
+
+    selectors.forEach(function (sel) {
+      try {
+        document.querySelectorAll(sel).forEach(function (el) {
+          el.style.pointerEvents = 'auto';
+          el.style.touchAction = 'manipulation';
+          var pos = window.getComputedStyle(el).position;
+          if (pos === 'static' && (el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button')) {
+            el.style.position = 'relative';
+          }
+          if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button') {
+            el.style.zIndex = '80000';
+          }
+        });
+      } catch (e) {}
+    });
+
+    try {
+      document.querySelectorAll('.leaflet-control-container, .leaflet-control').forEach(function (el) {
+        el.style.pointerEvents = 'auto';
+        el.style.zIndex = '60000';
+      });
+    } catch (e) {}
+  }
+
+  function removeBrokenDirectionButtons() {
+    try {
+      document.querySelectorAll('button, a').forEach(function (el) {
+        var text = (el.textContent || '').trim().toLowerCase();
+        var title = (el.getAttribute('title') || '').toLowerCase();
+        var label = (el.getAttribute('aria-label') || '').toLowerCase();
+        var combined = text + ' ' + title + ' ' + label;
+        if (combined.indexOf('north up') !== -1 || combined.indexOf('direction up') !== -1) {
+          el.remove();
+        }
+      });
+    } catch (e) {}
+  }
+
+  function repairLinks() {
+    try {
+      document.querySelectorAll('a[href]').forEach(function (a) {
+        var href = a.getAttribute('href');
+        if (!href || href === '#') return;
+        a.style.pointerEvents = 'auto';
+        a.style.touchAction = 'manipulation';
+        a.addEventListener('touchend', function (ev) {
+          if (a.dataset.driverRepairNavigating === '1') return;
+          var target = ev.target;
+          if (target && target.closest && target.closest('button')) return;
+          a.dataset.driverRepairNavigating = '1';
+          setTimeout(function () { a.dataset.driverRepairNavigating = '0'; }, 800);
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (a.target === '_blank') {
+            window.open(href, '_blank');
+          } else {
+            window.location.href = href;
+          }
+        }, { capture: true, passive: false });
+      });
+    } catch (e) {}
+  }
+
+  function bindTouchToClick() {
+    // Some mobile browsers/Leaflet overlays swallow click after touch.
+    // This forces a normal click from a user touch, without double-firing repeatedly.
+    document.addEventListener('touchend', function (ev) {
+      var el = ev.target && ev.target.closest ? ev.target.closest('button, [role="button"], .btn, .button') : null;
+      if (!el) return;
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') return;
+      if (el.dataset.driverRepairTouching === '1') return;
+
+      el.dataset.driverRepairTouching = '1';
+      setTimeout(function () { el.dataset.driverRepairTouching = '0'; }, 700);
+
+      ev.preventDefault();
+      ev.stopPropagation();
+      try { el.focus({ preventScroll: true }); } catch (e) {}
+      setTimeout(function () {
+        try { el.click(); } catch (e) {}
+      }, 0);
+    }, { capture: true, passive: false });
+  }
+
+  function showRepairNoticeIfDebug() {
+    if (location.search.indexOf('debugButtons=1') === -1) return;
+    var box = document.createElement('div');
+    box.textContent = 'Driver button repair active';
+    box.style.position = 'fixed';
+    box.style.left = '10px';
+    box.style.bottom = '10px';
+    box.style.zIndex = '999999';
+    box.style.background = '#111';
+    box.style.color = '#ffd36a';
+    box.style.padding = '8px 10px';
+    box.style.borderRadius = '10px';
+    box.style.fontSize = '12px';
+    box.style.boxShadow = '0 3px 10px rgba(0,0,0,.35)';
+    document.body.appendChild(box);
+  }
+
+  function initRepair() {
+    if (installed) return;
+    installed = true;
+    forceControlsAboveMap();
+    removeBrokenDirectionButtons();
+    repairLinks();
+    bindTouchToClick();
+    showRepairNoticeIfDebug();
+    setTimeout(forceControlsAboveMap, 600);
+    setTimeout(forceControlsAboveMap, 1600);
+    setInterval(function () {
+      forceControlsAboveMap();
+      removeBrokenDirectionButtons();
+    }, 3000);
+    log('active');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRepair);
+  } else {
+    initRepair();
+  }
+})();
+</script>
+
 </body>
 </html>`;
 }
@@ -915,6 +1103,194 @@ function buildRouteReportHtml(record) {
   if((data.points||[]).length){L.marker(data.points[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);(data.waypoints||[]).forEach((w,i)=>{if(Number.isFinite(Number(w.lat))&&Number.isFinite(Number(w.lon)))L.marker([Number(w.lat),Number(w.lon)],{icon:stopPin(i)}).bindPopup('Stop '+(i+1)+': '+(w.label||'Planned stop')).bindTooltip('Stop '+(i+1),{permanent:true,direction:'top',offset:[0,-18],className:'stop-label'}).addTo(map)});L.marker(data.points[data.points.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);[250,800,1500].forEach((delay)=>setTimeout(fitExportMap,delay))}
   window.addEventListener('beforeprint',()=>{fitExportMap();setTimeout(fitExportMap,350)});if(window.matchMedia){const mq=window.matchMedia('print');if(mq.addEventListener)mq.addEventListener('change',(event)=>{if(event.matches){fitExportMap();setTimeout(fitExportMap,350)}})}
 </script>
+
+<!-- DRIVER_BUTTONS_REPAIR_V3 -->
+<style id="driver-buttons-repair-v3-css">
+  html, body { touch-action: manipulation; }
+  .leaflet-container { z-index: 1 !important; }
+  .leaflet-pane { pointer-events: auto !important; }
+  .leaflet-map-pane, .leaflet-tile-pane, .leaflet-overlay-pane, .leaflet-marker-pane, .leaflet-shadow-pane {
+    transform-origin: 50% 50% !important;
+  }
+  .leaflet-control-container, .leaflet-control, .leaflet-top, .leaflet-bottom {
+    pointer-events: auto !important;
+    z-index: 50000 !important;
+  }
+  button, a, input, select, textarea, [role="button"], .btn, .button, .driver-control, .map-control, .live-control, .voice-control {
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+  }
+  .driver-map-controls, .map-controls, .live-map-controls, .driver-floating-controls,
+  .waze-control-bar, .waze-map-controls, .fullscreen-controls, .voice-controls,
+  [class*="control"], [class*="button"], [class*="toolbar"], [class*="actions"] {
+    pointer-events: auto !important;
+    z-index: 70000 !important;
+  }
+  .waze-overlay, .waze-instruction, .driver-instruction-overlay, .map-instruction-overlay,
+  .live-instruction-overlay, .instruction-overlay, [class*="overlay"] {
+    z-index: 65000 !important;
+  }
+  .waze-overlay button, .waze-overlay a, .driver-instruction-overlay button, .driver-instruction-overlay a,
+  .map-instruction-overlay button, .map-instruction-overlay a, .live-instruction-overlay button,
+  .live-instruction-overlay a, .instruction-overlay button, .instruction-overlay a, [class*="overlay"] button,
+  [class*="overlay"] a {
+    pointer-events: auto !important;
+  }
+  #driverMap, #map, .driver-map, .live-map {
+    position: relative;
+    z-index: 1 !important;
+  }
+  body.driver-fullscreen, body.map-fullscreen, body.fullscreen-mode {
+    overflow: hidden !important;
+  }
+  body.driver-fullscreen button, body.map-fullscreen button, body.fullscreen-mode button,
+  body.driver-fullscreen a, body.map-fullscreen a, body.fullscreen-mode a {
+    pointer-events: auto !important;
+  }
+</style>
+<script id="driver-buttons-repair-v3-js">
+(function () {
+  var installed = false;
+
+  function log(msg) {
+    try { console.log('[driver-buttons-repair]', msg); } catch (e) {}
+  }
+
+  function forceControlsAboveMap() {
+    var selectors = [
+      'button', 'a', '[role="button"]', '.btn', '.button',
+      '.driver-map-controls', '.map-controls', '.live-map-controls',
+      '.driver-floating-controls', '.waze-control-bar', '.waze-map-controls',
+      '.fullscreen-controls', '.voice-controls', '[class*="control"]',
+      '[class*="button"]', '[class*="toolbar"]', '[class*="actions"]'
+    ];
+
+    selectors.forEach(function (sel) {
+      try {
+        document.querySelectorAll(sel).forEach(function (el) {
+          el.style.pointerEvents = 'auto';
+          el.style.touchAction = 'manipulation';
+          var pos = window.getComputedStyle(el).position;
+          if (pos === 'static' && (el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button')) {
+            el.style.position = 'relative';
+          }
+          if (el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button') {
+            el.style.zIndex = '80000';
+          }
+        });
+      } catch (e) {}
+    });
+
+    try {
+      document.querySelectorAll('.leaflet-control-container, .leaflet-control').forEach(function (el) {
+        el.style.pointerEvents = 'auto';
+        el.style.zIndex = '60000';
+      });
+    } catch (e) {}
+  }
+
+  function removeBrokenDirectionButtons() {
+    try {
+      document.querySelectorAll('button, a').forEach(function (el) {
+        var text = (el.textContent || '').trim().toLowerCase();
+        var title = (el.getAttribute('title') || '').toLowerCase();
+        var label = (el.getAttribute('aria-label') || '').toLowerCase();
+        var combined = text + ' ' + title + ' ' + label;
+        if (combined.indexOf('north up') !== -1 || combined.indexOf('direction up') !== -1) {
+          el.remove();
+        }
+      });
+    } catch (e) {}
+  }
+
+  function repairLinks() {
+    try {
+      document.querySelectorAll('a[href]').forEach(function (a) {
+        var href = a.getAttribute('href');
+        if (!href || href === '#') return;
+        a.style.pointerEvents = 'auto';
+        a.style.touchAction = 'manipulation';
+        a.addEventListener('touchend', function (ev) {
+          if (a.dataset.driverRepairNavigating === '1') return;
+          var target = ev.target;
+          if (target && target.closest && target.closest('button')) return;
+          a.dataset.driverRepairNavigating = '1';
+          setTimeout(function () { a.dataset.driverRepairNavigating = '0'; }, 800);
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (a.target === '_blank') {
+            window.open(href, '_blank');
+          } else {
+            window.location.href = href;
+          }
+        }, { capture: true, passive: false });
+      });
+    } catch (e) {}
+  }
+
+  function bindTouchToClick() {
+    // Some mobile browsers/Leaflet overlays swallow click after touch.
+    // This forces a normal click from a user touch, without double-firing repeatedly.
+    document.addEventListener('touchend', function (ev) {
+      var el = ev.target && ev.target.closest ? ev.target.closest('button, [role="button"], .btn, .button') : null;
+      if (!el) return;
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') return;
+      if (el.dataset.driverRepairTouching === '1') return;
+
+      el.dataset.driverRepairTouching = '1';
+      setTimeout(function () { el.dataset.driverRepairTouching = '0'; }, 700);
+
+      ev.preventDefault();
+      ev.stopPropagation();
+      try { el.focus({ preventScroll: true }); } catch (e) {}
+      setTimeout(function () {
+        try { el.click(); } catch (e) {}
+      }, 0);
+    }, { capture: true, passive: false });
+  }
+
+  function showRepairNoticeIfDebug() {
+    if (location.search.indexOf('debugButtons=1') === -1) return;
+    var box = document.createElement('div');
+    box.textContent = 'Driver button repair active';
+    box.style.position = 'fixed';
+    box.style.left = '10px';
+    box.style.bottom = '10px';
+    box.style.zIndex = '999999';
+    box.style.background = '#111';
+    box.style.color = '#ffd36a';
+    box.style.padding = '8px 10px';
+    box.style.borderRadius = '10px';
+    box.style.fontSize = '12px';
+    box.style.boxShadow = '0 3px 10px rgba(0,0,0,.35)';
+    document.body.appendChild(box);
+  }
+
+  function initRepair() {
+    if (installed) return;
+    installed = true;
+    forceControlsAboveMap();
+    removeBrokenDirectionButtons();
+    repairLinks();
+    bindTouchToClick();
+    showRepairNoticeIfDebug();
+    setTimeout(forceControlsAboveMap, 600);
+    setTimeout(forceControlsAboveMap, 1600);
+    setInterval(function () {
+      forceControlsAboveMap();
+      removeBrokenDirectionButtons();
+    }, 3000);
+    log('active');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRepair);
+  } else {
+    initRepair();
+  }
+})();
+</script>
+
 </body>
 </html>`;
 }
