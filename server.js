@@ -2183,6 +2183,8 @@ function buildRouteReportHtml(record) {
 })();
 </script>
 <!-- P2P_DRIVER_GPS_MAP_CONTROLS_END -->
+<link rel="stylesheet" href="/driver-controls.css">
+<script src="/driver-controls.js" defer></script>
 </body>
 </html>`;
 }
