@@ -1165,6 +1165,285 @@ document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=
 })();
 </script>
 <!-- COACH_SAFE_DRIVER_ICON_CONTROLS_V1 END -->
+
+<!-- P2P_DRIVER_GPS_MAP_CONTROLS_START -->
+<style>
+  .p2p-hidden-driver-gps-card,
+  .p2p-hidden-driver-action {
+    display: none !important;
+  }
+
+  .p2p-driver-map-control-row {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 18px;
+    z-index: 999999 !important;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(52px, 1fr));
+    gap: 10px;
+    pointer-events: auto !important;
+  }
+
+  .p2p-driver-map-control-row button,
+  .p2p-driver-map-control-row a {
+    min-height: 54px !important;
+    border-radius: 999px !important;
+    border: 1px solid #e5c15a !important;
+    background: rgba(0,0,0,0.88) !important;
+    color: #f6d978 !important;
+    font-size: 22px !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .p2p-driver-map-control-row button.p2p-gps-active {
+    background: linear-gradient(135deg,#f6d978,#c79218) !important;
+    color: #050505 !important;
+    border-color: #ffe58a !important;
+  }
+
+  .p2p-driver-map-control-row button:active,
+  .p2p-driver-map-control-row a:active {
+    transform: scale(0.96);
+  }
+
+  .p2p-driver-mini-status {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 84px;
+    z-index: 999998 !important;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(229,193,90,0.6);
+    background: rgba(0,0,0,0.72);
+    color: #f7e6a3;
+    font-weight: 800;
+    font-size: 12px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s ease;
+  }
+
+  .p2p-driver-mini-status.p2p-show {
+    opacity: 1;
+  }
+
+  @media (max-width: 520px) {
+    .p2p-driver-map-control-row {
+      left: 10px;
+      right: 10px;
+      bottom: 14px;
+      gap: 8px;
+      grid-template-columns: repeat(5, minmax(48px, 1fr));
+    }
+
+    .p2p-driver-map-control-row button,
+    .p2p-driver-map-control-row a {
+      min-height: 50px !important;
+      font-size: 20px !important;
+    }
+
+    .p2p-driver-mini-status {
+      bottom: 76px;
+    }
+  }
+</style>
+<script>
+(function () {
+  if (window.__P2P_DRIVER_GPS_MAP_CONTROLS__) return;
+  window.__P2P_DRIVER_GPS_MAP_CONTROLS__ = true;
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  function cleanText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function textOf(el) {
+    return cleanText(el && el.textContent).toLowerCase();
+  }
+
+  function findButtonByWords(words) {
+    const buttons = Array.from(document.querySelectorAll('button, a'));
+    return buttons.find(function (el) {
+      const txt = textOf(el);
+      return words.some(function (word) { return txt.indexOf(word) !== -1; });
+    }) || null;
+  }
+
+  function findMap() {
+    return document.getElementById('driverMap') ||
+      document.getElementById('liveMap') ||
+      document.getElementById('routeMap') ||
+      document.getElementById('map') ||
+      document.querySelector('.leaflet-container');
+  }
+
+  function makeStatus(map) {
+    let status = document.getElementById('p2pDriverMiniStatus');
+    if (!status) {
+      status = document.createElement('div');
+      status.id = 'p2pDriverMiniStatus';
+      status.className = 'p2p-driver-mini-status';
+      status.textContent = 'GPS ready';
+      map.appendChild(status);
+    }
+    return status;
+  }
+
+  let statusTimer = null;
+  function showMiniStatus(message) {
+    const map = findMap();
+    if (!map) return;
+    const status = makeStatus(map);
+    status.textContent = message;
+    status.classList.add('p2p-show');
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function () { status.classList.remove('p2p-show'); }, 2500);
+  }
+
+  function setIcon(el, icon, label, active) {
+    if (!el) return;
+    el.textContent = icon;
+    el.setAttribute('aria-label', label);
+    el.setAttribute('title', label);
+    el.classList.add('p2p-icon-control');
+    if (active) el.classList.add('p2p-gps-active');
+    else el.classList.remove('p2p-gps-active');
+  }
+
+  function hideDriverNonMapActions() {
+    Array.from(document.querySelectorAll('button, a')).forEach(function (el) {
+      const txt = textOf(el);
+      if (txt === 'print' || txt.indexOf('mark completed') !== -1 || txt.indexOf('completed route') !== -1 || txt.indexOf('complete route') !== -1) {
+        el.classList.add('p2p-hidden-driver-action');
+        el.setAttribute('aria-hidden', 'true');
+        el.setAttribute('tabindex', '-1');
+      }
+    });
+  }
+
+  function findGpsCard(startGpsButton) {
+    if (!startGpsButton) return null;
+    let el = startGpsButton.parentElement;
+    while (el && el !== document.body) {
+      const txt = textOf(el);
+      if (txt.indexOf('live gps driver mode') !== -1 || (txt.indexOf('status') !== -1 && txt.indexOf('accuracy') !== -1 && txt.indexOf('tracking') !== -1)) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function updateGpsIcon(gpsBtn) {
+    if (!gpsBtn) return;
+    const txt = textOf(gpsBtn);
+    const active = txt.indexOf('stop') !== -1 || txt.indexOf('gps on') !== -1 || txt.indexOf('active') !== -1;
+    setIcon(gpsBtn, active ? '📡' : '📍', active ? 'Stop live GPS' : 'Start live GPS', active);
+  }
+
+  function applyControls() {
+    const map = findMap();
+    if (!map) return false;
+
+    if (getComputedStyle(map).position === 'static') {
+      map.style.position = 'relative';
+    }
+
+    let row = document.getElementById('p2pDriverMapControlRow');
+    if (!row) {
+      row = document.createElement('div');
+      row.id = 'p2pDriverMapControlRow';
+      row.className = 'p2p-driver-map-control-row';
+      map.appendChild(row);
+    }
+
+    const gpsBtn = findButtonByWords(['start live gps', 'stop live gps', 'start gps', 'stop gps']);
+    const centreBtn = findButtonByWords(['centre position', 'center position']);
+    const recalcBtn = findButtonByWords(['recalculate']);
+    const fullBtn = findButtonByWords(['full screen', 'exit full screen', 'fullscreen']);
+    const wakeBtn = findButtonByWords(['keep screen on', 'screen on']);
+    const voiceBtn = findButtonByWords(['voice on', 'voice off', 'mute voice']);
+
+    const gpsCard = findGpsCard(gpsBtn);
+
+    const controls = [gpsBtn, centreBtn, recalcBtn, fullBtn, wakeBtn, voiceBtn].filter(Boolean);
+    controls.forEach(function (btn) {
+      if (btn.parentElement !== row) row.appendChild(btn);
+      btn.style.pointerEvents = 'auto';
+      btn.style.touchAction = 'manipulation';
+      btn.classList.remove('p2p-hidden-driver-action');
+      btn.removeAttribute('aria-hidden');
+      btn.removeAttribute('tabindex');
+    });
+
+    updateGpsIcon(gpsBtn);
+    setIcon(centreBtn, '⌖', 'Centre position', false);
+    setIcon(recalcBtn, '↻', 'Recalculate route', false);
+    if (fullBtn) {
+      const fullTxt = textOf(fullBtn);
+      setIcon(fullBtn, fullTxt.indexOf('exit') !== -1 ? '↙' : '⛶', fullTxt.indexOf('exit') !== -1 ? 'Exit full screen' : 'Full screen', false);
+    }
+    setIcon(wakeBtn, '☀', 'Keep screen on', false);
+    if (voiceBtn) {
+      const voiceTxt = textOf(voiceBtn);
+      setIcon(voiceBtn, voiceTxt.indexOf('on') !== -1 ? '🔊' : '🔇', voiceTxt.indexOf('on') !== -1 ? 'Voice on' : 'Voice off', voiceTxt.indexOf('on') !== -1);
+    }
+
+    if (gpsBtn && !gpsBtn.__p2pGpsNoticeBound) {
+      gpsBtn.__p2pGpsNoticeBound = true;
+      gpsBtn.addEventListener('click', function () {
+        setTimeout(function () {
+          updateGpsIcon(gpsBtn);
+          const active = gpsBtn.classList.contains('p2p-gps-active');
+          showMiniStatus(active ? 'Live GPS started. Operator tracking will update.' : 'Live GPS stopped. Operator tracking will update.');
+        }, 250);
+      }, true);
+      gpsBtn.addEventListener('touchend', function () {
+        setTimeout(function () { updateGpsIcon(gpsBtn); }, 300);
+      }, true);
+    }
+
+    if (gpsCard) {
+      gpsCard.classList.add('p2p-hidden-driver-gps-card');
+      gpsCard.setAttribute('aria-hidden', 'true');
+    }
+
+    hideDriverNonMapActions();
+    return true;
+  }
+
+  ready(function () {
+    let attempts = 0;
+    const timer = setInterval(function () {
+      attempts += 1;
+      const ok = applyControls();
+      if (ok || attempts > 40) clearInterval(timer);
+    }, 250);
+
+    const observer = new MutationObserver(function () {
+      applyControls();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  });
+})();
+</script>
+<!-- P2P_DRIVER_GPS_MAP_CONTROLS_END -->
 </body>
 </html>`;
 }
@@ -1558,6 +1837,285 @@ function buildRouteReportHtml(record) {
 })();
 </script>
 <!-- COACH_SAFE_DRIVER_ICON_CONTROLS_V1 END -->
+
+<!-- P2P_DRIVER_GPS_MAP_CONTROLS_START -->
+<style>
+  .p2p-hidden-driver-gps-card,
+  .p2p-hidden-driver-action {
+    display: none !important;
+  }
+
+  .p2p-driver-map-control-row {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 18px;
+    z-index: 999999 !important;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(52px, 1fr));
+    gap: 10px;
+    pointer-events: auto !important;
+  }
+
+  .p2p-driver-map-control-row button,
+  .p2p-driver-map-control-row a {
+    min-height: 54px !important;
+    border-radius: 999px !important;
+    border: 1px solid #e5c15a !important;
+    background: rgba(0,0,0,0.88) !important;
+    color: #f6d978 !important;
+    font-size: 22px !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .p2p-driver-map-control-row button.p2p-gps-active {
+    background: linear-gradient(135deg,#f6d978,#c79218) !important;
+    color: #050505 !important;
+    border-color: #ffe58a !important;
+  }
+
+  .p2p-driver-map-control-row button:active,
+  .p2p-driver-map-control-row a:active {
+    transform: scale(0.96);
+  }
+
+  .p2p-driver-mini-status {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 84px;
+    z-index: 999998 !important;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(229,193,90,0.6);
+    background: rgba(0,0,0,0.72);
+    color: #f7e6a3;
+    font-weight: 800;
+    font-size: 12px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .18s ease;
+  }
+
+  .p2p-driver-mini-status.p2p-show {
+    opacity: 1;
+  }
+
+  @media (max-width: 520px) {
+    .p2p-driver-map-control-row {
+      left: 10px;
+      right: 10px;
+      bottom: 14px;
+      gap: 8px;
+      grid-template-columns: repeat(5, minmax(48px, 1fr));
+    }
+
+    .p2p-driver-map-control-row button,
+    .p2p-driver-map-control-row a {
+      min-height: 50px !important;
+      font-size: 20px !important;
+    }
+
+    .p2p-driver-mini-status {
+      bottom: 76px;
+    }
+  }
+</style>
+<script>
+(function () {
+  if (window.__P2P_DRIVER_GPS_MAP_CONTROLS__) return;
+  window.__P2P_DRIVER_GPS_MAP_CONTROLS__ = true;
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  function cleanText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function textOf(el) {
+    return cleanText(el && el.textContent).toLowerCase();
+  }
+
+  function findButtonByWords(words) {
+    const buttons = Array.from(document.querySelectorAll('button, a'));
+    return buttons.find(function (el) {
+      const txt = textOf(el);
+      return words.some(function (word) { return txt.indexOf(word) !== -1; });
+    }) || null;
+  }
+
+  function findMap() {
+    return document.getElementById('driverMap') ||
+      document.getElementById('liveMap') ||
+      document.getElementById('routeMap') ||
+      document.getElementById('map') ||
+      document.querySelector('.leaflet-container');
+  }
+
+  function makeStatus(map) {
+    let status = document.getElementById('p2pDriverMiniStatus');
+    if (!status) {
+      status = document.createElement('div');
+      status.id = 'p2pDriverMiniStatus';
+      status.className = 'p2p-driver-mini-status';
+      status.textContent = 'GPS ready';
+      map.appendChild(status);
+    }
+    return status;
+  }
+
+  let statusTimer = null;
+  function showMiniStatus(message) {
+    const map = findMap();
+    if (!map) return;
+    const status = makeStatus(map);
+    status.textContent = message;
+    status.classList.add('p2p-show');
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function () { status.classList.remove('p2p-show'); }, 2500);
+  }
+
+  function setIcon(el, icon, label, active) {
+    if (!el) return;
+    el.textContent = icon;
+    el.setAttribute('aria-label', label);
+    el.setAttribute('title', label);
+    el.classList.add('p2p-icon-control');
+    if (active) el.classList.add('p2p-gps-active');
+    else el.classList.remove('p2p-gps-active');
+  }
+
+  function hideDriverNonMapActions() {
+    Array.from(document.querySelectorAll('button, a')).forEach(function (el) {
+      const txt = textOf(el);
+      if (txt === 'print' || txt.indexOf('mark completed') !== -1 || txt.indexOf('completed route') !== -1 || txt.indexOf('complete route') !== -1) {
+        el.classList.add('p2p-hidden-driver-action');
+        el.setAttribute('aria-hidden', 'true');
+        el.setAttribute('tabindex', '-1');
+      }
+    });
+  }
+
+  function findGpsCard(startGpsButton) {
+    if (!startGpsButton) return null;
+    let el = startGpsButton.parentElement;
+    while (el && el !== document.body) {
+      const txt = textOf(el);
+      if (txt.indexOf('live gps driver mode') !== -1 || (txt.indexOf('status') !== -1 && txt.indexOf('accuracy') !== -1 && txt.indexOf('tracking') !== -1)) {
+        return el;
+      }
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function updateGpsIcon(gpsBtn) {
+    if (!gpsBtn) return;
+    const txt = textOf(gpsBtn);
+    const active = txt.indexOf('stop') !== -1 || txt.indexOf('gps on') !== -1 || txt.indexOf('active') !== -1;
+    setIcon(gpsBtn, active ? '📡' : '📍', active ? 'Stop live GPS' : 'Start live GPS', active);
+  }
+
+  function applyControls() {
+    const map = findMap();
+    if (!map) return false;
+
+    if (getComputedStyle(map).position === 'static') {
+      map.style.position = 'relative';
+    }
+
+    let row = document.getElementById('p2pDriverMapControlRow');
+    if (!row) {
+      row = document.createElement('div');
+      row.id = 'p2pDriverMapControlRow';
+      row.className = 'p2p-driver-map-control-row';
+      map.appendChild(row);
+    }
+
+    const gpsBtn = findButtonByWords(['start live gps', 'stop live gps', 'start gps', 'stop gps']);
+    const centreBtn = findButtonByWords(['centre position', 'center position']);
+    const recalcBtn = findButtonByWords(['recalculate']);
+    const fullBtn = findButtonByWords(['full screen', 'exit full screen', 'fullscreen']);
+    const wakeBtn = findButtonByWords(['keep screen on', 'screen on']);
+    const voiceBtn = findButtonByWords(['voice on', 'voice off', 'mute voice']);
+
+    const gpsCard = findGpsCard(gpsBtn);
+
+    const controls = [gpsBtn, centreBtn, recalcBtn, fullBtn, wakeBtn, voiceBtn].filter(Boolean);
+    controls.forEach(function (btn) {
+      if (btn.parentElement !== row) row.appendChild(btn);
+      btn.style.pointerEvents = 'auto';
+      btn.style.touchAction = 'manipulation';
+      btn.classList.remove('p2p-hidden-driver-action');
+      btn.removeAttribute('aria-hidden');
+      btn.removeAttribute('tabindex');
+    });
+
+    updateGpsIcon(gpsBtn);
+    setIcon(centreBtn, '⌖', 'Centre position', false);
+    setIcon(recalcBtn, '↻', 'Recalculate route', false);
+    if (fullBtn) {
+      const fullTxt = textOf(fullBtn);
+      setIcon(fullBtn, fullTxt.indexOf('exit') !== -1 ? '↙' : '⛶', fullTxt.indexOf('exit') !== -1 ? 'Exit full screen' : 'Full screen', false);
+    }
+    setIcon(wakeBtn, '☀', 'Keep screen on', false);
+    if (voiceBtn) {
+      const voiceTxt = textOf(voiceBtn);
+      setIcon(voiceBtn, voiceTxt.indexOf('on') !== -1 ? '🔊' : '🔇', voiceTxt.indexOf('on') !== -1 ? 'Voice on' : 'Voice off', voiceTxt.indexOf('on') !== -1);
+    }
+
+    if (gpsBtn && !gpsBtn.__p2pGpsNoticeBound) {
+      gpsBtn.__p2pGpsNoticeBound = true;
+      gpsBtn.addEventListener('click', function () {
+        setTimeout(function () {
+          updateGpsIcon(gpsBtn);
+          const active = gpsBtn.classList.contains('p2p-gps-active');
+          showMiniStatus(active ? 'Live GPS started. Operator tracking will update.' : 'Live GPS stopped. Operator tracking will update.');
+        }, 250);
+      }, true);
+      gpsBtn.addEventListener('touchend', function () {
+        setTimeout(function () { updateGpsIcon(gpsBtn); }, 300);
+      }, true);
+    }
+
+    if (gpsCard) {
+      gpsCard.classList.add('p2p-hidden-driver-gps-card');
+      gpsCard.setAttribute('aria-hidden', 'true');
+    }
+
+    hideDriverNonMapActions();
+    return true;
+  }
+
+  ready(function () {
+    let attempts = 0;
+    const timer = setInterval(function () {
+      attempts += 1;
+      const ok = applyControls();
+      if (ok || attempts > 40) clearInterval(timer);
+    }, 250);
+
+    const observer = new MutationObserver(function () {
+      applyControls();
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  });
+})();
+</script>
+<!-- P2P_DRIVER_GPS_MAP_CONTROLS_END -->
 </body>
 </html>`;
 }
