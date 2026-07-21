@@ -12,6 +12,62 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+/* IOS_DRIVER_ROUTE_LINK_NORMALIZER_START */
+function cleanDriverRouteIdForMobile(rawId) {
+  return String(rawId || '')
+    .replace(/[​-‍﻿]/g, '')
+    .replace(/["'<>]/g, '')
+    .trim()
+    .replace(/[).,;:]+$/g, '');
+}
+
+// iOS/WhatsApp/SMS sometimes opens driver links with invisible characters,
+// a trailing slash/punctuation, or the older /driver-route/:id path. This
+// normalises those links before the driver route handler tries to look up the route.
+app.use(function iosDriverRouteLinkNormalizer(req, res, next) {
+  try {
+    const originalUrl = req.url || '';
+    let query = '';
+    let pathOnly = originalUrl;
+
+    const queryIndex = originalUrl.indexOf('?');
+    if (queryIndex >= 0) {
+      pathOnly = originalUrl.slice(0, queryIndex);
+      query = originalUrl.slice(queryIndex);
+    }
+
+    const decodedPath = decodeURIComponent(pathOnly)
+      .replace(/[​-‍﻿]/g, '')
+      .trim();
+
+    // Old public driver route link: /driver-route/:id
+    let match = decodedPath.match(/^/driver-route/([^/?#]+)(/route-pack)?/?$/i);
+    if (match) {
+      const routeId = cleanDriverRouteIdForMobile(match[1]);
+      const suffix = match[2] || '';
+      return res.redirect(302, '/driver/route/' + encodeURIComponent(routeId) + suffix + query);
+    }
+
+    // Current public driver route link: /driver/route/:id
+    match = decodedPath.match(/^/driver/route/([^/?#]+)(/route-pack)?/?$/i);
+    if (match) {
+      const routeId = cleanDriverRouteIdForMobile(match[1]);
+      const suffix = match[2] || '';
+      const normalisedPath = '/driver/route/' + encodeURIComponent(routeId) + suffix;
+
+      if (decodedPath !== normalisedPath) {
+        return res.redirect(302, normalisedPath + query);
+      }
+    }
+  } catch (err) {
+    // Do not block the route page if normalisation fails.
+  }
+
+  next();
+});
+/* IOS_DRIVER_ROUTE_LINK_NORMALIZER_END */
+
 const PORT = process.env.PORT || 3000;
 const TOMTOM_API_KEY = String(process.env.TOMTOM_API_KEY || '').trim().replace(/^['\"]|['\"]$/g, '');
 const DEFAULT_COUNTRY_SET = process.env.DEFAULT_COUNTRY_SET || 'GB';
