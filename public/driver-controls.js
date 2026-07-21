@@ -1,539 +1,412 @@
-/* Clean Driver Controls - hard reset module
-   Keeps one driver map dock only and delegates to existing driver-page handlers when present. */
+/* Clean Driver Controls v1 - one dock only. Safe runtime module. */
 (function () {
   'use strict';
 
-  if (window.__cleanDriverControlsHardResetLoaded) return;
-  window.__cleanDriverControlsHardResetLoaded = true;
+  if (window.__cleanDriverControlsMounted) return;
+  window.__cleanDriverControlsMounted = true;
 
-  const DEBUG = new URLSearchParams(location.search).has('debugControls');
-  const log = (...args) => { if (DEBUG) console.log('[clean-driver-controls]', ...args); };
+  const DRIVER_PATH_RE = /\/driver(?:-route|\/route)\//i;
+  if (!DRIVER_PATH_RE.test(window.location.pathname)) return;
 
-  const state = {
-    mapShell: null,
-    mapEl: null,
-    dock: null,
-    toast: null,
+  const STATE = {
     gpsActive: false,
-    voiceOn: false,
-    wakeOn: false,
+    voiceEnabled: false,
+    keepScreenOn: false,
     wakeLock: null,
-    lastVoiceText: '',
-    localWatchId: null,
-    lastPosition: null,
-    hideTimer: null
+    fullscreen: false,
+    lastSpoken: '',
+    originalButtons: {}
   };
 
-  function ready(fn) {
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once: true });
-    else fn();
+  const LABELS = [
+    { key: 'gps', labels: ['start live gps', 'stop gps', 'use my gps location', 'gps active'] },
+    { key: 'centre', labels: ['centre position', 'center position'] },
+    { key: 'recalculate', labels: ['recalculate'] },
+    { key: 'fullscreen', labels: ['full screen', 'fullscreen', 'exit full screen', 'exit fullscreen', 'large map'] },
+    { key: 'screen', labels: ['keep screen on', 'screen on'] },
+    { key: 'voice', labels: ['voice on', 'voice off', 'mute voice', 'unmute voice'] },
+    { key: 'report', labels: ['submit road report', 'report road issue', 'report unsuitable road'] },
+    { key: 'print', labels: ['print'] },
+    { key: 'complete', labels: ['mark completed', 'completed route', 'complete route'] }
+  ];
+
+  function textOf(el) {
+    return ((el && (el.textContent || el.getAttribute('aria-label') || el.title)) || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
   }
 
-  function labelOf(el) {
-    if (!el) return '';
-    return [
-      el.textContent,
-      el.getAttribute && el.getAttribute('aria-label'),
-      el.getAttribute && el.getAttribute('title'),
-      el.getAttribute && el.getAttribute('data-action'),
-      el.id,
-      el.className && String(el.className)
-    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
-  }
-
-  function getClickableElements() {
-    return Array.from(document.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"]'))
-      .filter(el => !el.closest('#cleanDriverControlsDock'));
-  }
-
-  function findControl(type) {
-    const items = getClickableElements();
-    const matchers = {
-      gpsStart: [/start\s+live\s+gps/, /use\s+my\s+gps\s+location/, /start\s+gps/, /gps\s+location/],
-      gpsStop: [/stop\s+gps/, /stop\s+live\s+gps/, /gps\s+active/],
-      centre: [/centre\s+position/, /center\s+position/, /centre\s+map/, /center\s+map/],
-      recalc: [/recalculate/, /reroute/],
-      full: [/full\s*screen/, /enter\s+full\s*screen/],
-      exitFull: [/exit\s+full\s*screen/],
-      wake: [/keep\s+screen\s+on/, /screen\s+on/, /wake\s*lock/],
-      voice: [/voice\s+on/, /voice\s+off/, /mute/, /unmute/],
-      report: [/report\s+road/, /road\s+report/, /unsuitable\s+road/, /submit\s+road\s+report/]
-    };
-    const patterns = matchers[type] || [];
-    let best = null;
-    let bestScore = -1;
-    for (const el of items) {
-      const label = labelOf(el);
-      if (!label) continue;
-      let score = 0;
-      for (const re of patterns) if (re.test(label)) score += 10;
-      if (type === 'gpsStart' && /stop\s+gps|stop\s+live/.test(label)) score -= 20;
-      if (type === 'gpsStop' && /start\s+gps|use\s+my\s+gps/.test(label)) score -= 20;
-      if (el.offsetParent !== null) score += 2;
-      if (score > bestScore && score > 0) {
-        best = el;
-        bestScore = score;
-      }
-    }
-    return best;
-  }
-
-  function clickControl(type) {
-    const el = findControl(type);
-    if (!el) return false;
-    log('delegating click to', type, labelOf(el));
-    try {
-      el.click();
-      return true;
-    } catch (err) {
-      console.warn('Clean driver control failed to click original control:', type, err);
-      return false;
-    }
+  function matchesAny(text, labels) {
+    return labels.some(function (label) { return text.includes(label); });
   }
 
   function findMap() {
-    const maps = Array.from(document.querySelectorAll('.leaflet-container'))
-      .filter(el => el.offsetWidth > 150 && el.offsetHeight > 120)
-      .sort((a, b) => (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight));
-    return maps[0] || document.getElementById('driverMap') || document.getElementById('map') || null;
+    return document.querySelector('#map') || document.querySelector('.leaflet-container');
   }
 
-  function ensureMapShell() {
-    const mapEl = findMap();
-    if (!mapEl) return null;
-    state.mapEl = mapEl;
-    const shell = mapEl.parentElement || mapEl;
-    shell.style.position = shell.style.position || 'relative';
-    shell.style.overflow = shell.style.overflow || 'hidden';
-    state.mapShell = shell;
-    return shell;
+  function findMapShell() {
+    const map = findMap();
+    if (!map) return null;
+    let node = map;
+    for (let i = 0; i < 5 && node && node !== document.body; i += 1) {
+      const rect = node.getBoundingClientRect();
+      if (rect.width >= 260 && rect.height >= 220) return node;
+      node = node.parentElement;
+    }
+    return map.parentElement || map;
+  }
+
+  function callOriginalButton(key) {
+    const btn = STATE.originalButtons[key];
+    if (!btn || !document.contains(btn)) return false;
+    try {
+      btn.click();
+      return true;
+    } catch (err) {
+      console.warn('Original button failed:', key, err);
+      return false;
+    }
   }
 
   function hideLegacyControls() {
-    if (state.hideTimer) return;
-    state.hideTimer = setTimeout(() => {
-      state.hideTimer = null;
+    const candidates = Array.from(document.querySelectorAll('button, a, input[type="button"], input[type="submit"]'));
+    candidates.forEach(function (el) {
+      if (el.closest('.driver-clean-dock')) return;
+      const t = textOf(el);
+      if (!t) return;
 
-      const hideWords = [
-        'use my gps location', 'start live gps', 'stop live gps', 'stop gps', 'start gps',
-        'centre position', 'center position', 'recalculate', 'full screen', 'exit full screen',
-        'keep screen on', 'voice on', 'voice off', 'mark completed', 'completed route', 'print',
-        'submit road report', 'report road issue', 'report unsuitable road'
-      ];
-
-      getClickableElements().forEach(el => {
-        const label = labelOf(el);
-        if (hideWords.some(w => label.includes(w))) {
-          el.classList.add('clean-driver-controls-hidden');
-          el.setAttribute('data-clean-driver-hidden', 'true');
+      LABELS.forEach(function (group) {
+        if (matchesAny(t, group.labels)) {
+          if (!STATE.originalButtons[group.key] && group.key !== 'print' && group.key !== 'complete') {
+            STATE.originalButtons[group.key] = el;
+          }
+          el.classList.add('driver-legacy-hidden');
+          el.setAttribute('aria-hidden', 'true');
+          el.tabIndex = -1;
         }
       });
+    });
 
-      // Hide legacy cards/panels that scatter controls around the page.
-      Array.from(document.querySelectorAll('section, article, div, aside')).forEach(el => {
-        if (el.closest('#cleanDriverControlsDock') || el.closest('#cleanDriverControlsToast')) return;
-        const txt = (el.innerText || '').toLowerCase();
-        const cls = labelOf(el);
-        const isSmall = (el.querySelectorAll('button, a, [role="button"]').length <= 6);
-        const legacyCard =
-          txt.includes('live gps driver mode') ||
-          txt.includes('driver summary') ||
-          (txt.includes('status') && txt.includes('accuracy') && txt.includes('tracking')) ||
-          cls.includes('driver-summary') ||
-          cls.includes('gps-driver-mode');
-        if (legacyCard && isSmall) {
-          el.classList.add('clean-driver-controls-hidden');
-          el.setAttribute('data-clean-driver-hidden-card', 'true');
-        }
-      });
-
-      // Hide old generated docks/duplicate icon clusters while keeping our own dock.
-      Array.from(document.querySelectorAll('div, nav')).forEach(el => {
-        if (el.id === 'cleanDriverControlsDock' || el.closest('#cleanDriverControlsDock')) return;
-        const buttons = Array.from(el.querySelectorAll('button, [role="button"]'));
-        if (buttons.length < 3) return;
-        const label = labelOf(el);
-        const txt = buttons.map(labelOf).join(' ');
-        const iconish = /📍|📡|⌖|↻|⛶|☀|🔊|🔇|⚠|📌|🎙|↙/.test(el.textContent || '');
-        const looksLikeDock = label.includes('driver') && (label.includes('control') || label.includes('dock') || label.includes('floating'));
-        const hasKnownControls = /centre|center|recalculate|fullscreen|full screen|voice|gps|screen on/.test(txt);
-        if (iconish || looksLikeDock || hasKnownControls) {
-          el.classList.add('clean-driver-controls-hidden');
-          el.setAttribute('data-clean-driver-hidden-dock', 'true');
-        }
-      });
-    }, 60);
+    // Hide driver cards that should no longer clutter the page.
+    Array.from(document.querySelectorAll('section, article, div, aside')).forEach(function (el) {
+      if (el.closest('.driver-clean-dock')) return;
+      const t = textOf(el);
+      if (!t || t.length > 1200) return;
+      if (
+        t.includes('live gps driver mode') ||
+        t.includes('driver summary') ||
+        (t.includes('status') && t.includes('accuracy') && t.includes('distance') && t.includes('tracking'))
+      ) {
+        el.classList.add('driver-legacy-hidden');
+        el.setAttribute('aria-hidden', 'true');
+      }
+    });
   }
 
-  function makeButton(id, icon, label, extraClass) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.id = id;
-    btn.className = 'cdc-btn ' + (extraClass || '');
-    btn.textContent = icon;
-    btn.setAttribute('aria-label', label);
-    btn.setAttribute('title', label);
-    btn.addEventListener('click', ev => {
-      ev.preventDefault();
-      ev.stopPropagation();
-    }, { capture: true });
-    return btn;
+  function mapInvalidateSoon() {
+    setTimeout(function () {
+      try {
+        if (window.driverMap && typeof window.driverMap.invalidateSize === 'function') window.driverMap.invalidateSize();
+        if (window.map && typeof window.map.invalidateSize === 'function') window.map.invalidateSize();
+        const leafletMap = findMap();
+        if (leafletMap && leafletMap._leaflet_map && typeof leafletMap._leaflet_map.invalidateSize === 'function') leafletMap._leaflet_map.invalidateSize();
+      } catch (err) {}
+    }, 150);
   }
 
-  function showToast(message, ms = 2200) {
-    ensureToast();
-    if (!state.toast) return;
-    state.toast.textContent = message;
-    state.toast.classList.add('is-visible');
-    clearTimeout(state.toast._hideTimer);
-    state.toast._hideTimer = setTimeout(() => state.toast.classList.remove('is-visible'), ms);
+  function showToast(message, ms) {
+    const toast = document.querySelector('.driver-clean-toast');
+    if (!toast) return;
+    toast.textContent = message;
+    toast.classList.add('is-visible');
+    clearTimeout(showToast._timer);
+    showToast._timer = setTimeout(function () {
+      toast.classList.remove('is-visible');
+    }, ms || 2500);
   }
 
-  function ensureToast() {
-    const shell = ensureMapShell();
-    if (!shell) return null;
-    let toast = document.getElementById('cleanDriverControlsToast');
-    if (!toast) {
-      toast = document.createElement('div');
-      toast.id = 'cleanDriverControlsToast';
-      toast.setAttribute('role', 'status');
-      toast.setAttribute('aria-live', 'polite');
-      shell.appendChild(toast);
-    } else if (toast.parentElement !== shell) {
-      shell.appendChild(toast);
-    }
-    state.toast = toast;
-    return toast;
+  function updateGpsButton(btn) {
+    btn.textContent = STATE.gpsActive ? '📡' : '📍';
+    btn.setAttribute('aria-label', STATE.gpsActive ? 'Stop live GPS' : 'Start live GPS');
+    btn.title = STATE.gpsActive ? 'Stop live GPS' : 'Start live GPS';
+    btn.classList.toggle('is-active', STATE.gpsActive);
+    btn.classList.toggle('is-primary', !STATE.gpsActive);
   }
 
-  function updateGpsButton() {
-    const btn = document.getElementById('cdcGps');
-    if (!btn) return;
-    btn.textContent = state.gpsActive ? '📡' : '📍';
-    const label = state.gpsActive ? 'Stop live GPS' : 'Start live GPS';
-    btn.setAttribute('aria-label', label);
-    btn.setAttribute('title', label);
-    btn.classList.toggle('is-active', state.gpsActive);
+  function updateVoiceButton(btn) {
+    btn.textContent = STATE.voiceEnabled ? '🔊' : '🔇';
+    btn.setAttribute('aria-label', STATE.voiceEnabled ? 'Voice on' : 'Voice off');
+    btn.title = STATE.voiceEnabled ? 'Voice on' : 'Voice off';
+    btn.classList.toggle('is-active', STATE.voiceEnabled);
   }
 
-  function startFallbackGps() {
-    if (!navigator.geolocation) {
-      showToast('GPS is not available in this browser.');
-      return false;
-    }
-    state.localWatchId = navigator.geolocation.watchPosition(
-      pos => {
-        state.lastPosition = pos;
-        state.gpsActive = true;
-        updateGpsButton();
-      },
-      err => showToast('GPS failed: ' + (err && err.message ? err.message : 'permission or signal issue')),
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
-    );
-    state.gpsActive = true;
-    updateGpsButton();
-    showToast('Live GPS started.');
-    return true;
-  }
-
-  function stopFallbackGps() {
-    if (state.localWatchId != null && navigator.geolocation) {
-      navigator.geolocation.clearWatch(state.localWatchId);
-      state.localWatchId = null;
-    }
-    state.gpsActive = false;
-    updateGpsButton();
-    showToast('Live GPS stopped.');
-  }
-
-  function handleGps() {
-    if (state.gpsActive) {
-      const ok = clickControl('gpsStop');
-      if (!ok) stopFallbackGps();
-      state.gpsActive = false;
-      updateGpsButton();
-      showToast('Live GPS stopped.');
-      return;
-    }
-
-    const ok = clickControl('gpsStart');
-    if (!ok) startFallbackGps();
-    state.gpsActive = true;
-    updateGpsButton();
-    showToast('Live GPS started.');
-  }
-
-  function centreMap() {
-    if (clickControl('centre')) {
-      showToast('Centred on vehicle.');
-      return;
-    }
-    const pos = state.lastPosition;
-    const lat = pos && pos.coords && pos.coords.latitude;
-    const lng = pos && pos.coords && pos.coords.longitude;
-    const map = window.driverMap || window.map || window.leafletMap;
-    if (map && typeof map.setView === 'function' && lat && lng) {
-      map.setView([lat, lng], Math.max(map.getZoom ? map.getZoom() : 16, 16));
-      showToast('Centred on GPS.');
-    } else {
-      showToast('Start GPS first, then centre position.');
-    }
-  }
-
-  function recalculateRoute() {
-    if (clickControl('recalc')) {
-      showToast('Recalculating route.');
-      return;
-    }
-    if (typeof window.recalculateRoute === 'function') {
-      window.recalculateRoute();
-      showToast('Recalculating route.');
-      return;
-    }
-    showToast('Recalculate control was not found.');
-  }
-
-  function invalidateMapSoon() {
-    setTimeout(() => {
-      const map = window.driverMap || window.map || window.leafletMap;
-      if (map && typeof map.invalidateSize === 'function') map.invalidateSize();
-    }, 180);
-  }
-
-  function isFullscreen() {
-    return !!document.fullscreenElement || (state.mapShell && state.mapShell.classList.contains('clean-driver-map-fullscreen'));
-  }
-
-  function updateFullscreenButton() {
-    const btn = document.getElementById('cdcFullscreen');
-    if (!btn) return;
-    const active = isFullscreen();
+  function updateFullscreenButton(btn) {
+    const active = !!document.fullscreenElement || document.body.classList.contains('driver-clean-fullscreen');
+    STATE.fullscreen = active;
     btn.textContent = active ? '↙' : '⛶';
-    btn.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Fullscreen');
-    btn.setAttribute('title', active ? 'Exit fullscreen' : 'Fullscreen');
+    btn.setAttribute('aria-label', active ? 'Exit full screen' : 'Full screen');
+    btn.title = active ? 'Exit full screen' : 'Full screen';
     btn.classList.toggle('is-active', active);
   }
 
-  async function toggleFullscreen() {
-    const shell = ensureMapShell();
-    if (!shell) return;
-    try {
-      if (isFullscreen()) {
-        shell.classList.remove('clean-driver-map-fullscreen');
-        if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
-        showToast('Exited fullscreen.');
-      } else {
-        shell.classList.add('clean-driver-map-fullscreen');
-        if (shell.requestFullscreen) {
-          try { await shell.requestFullscreen(); } catch (_) { /* iOS fallback remains via CSS class */ }
-        }
-        showToast('Fullscreen driving view.');
-      }
-    } finally {
-      updateFullscreenButton();
-      invalidateMapSoon();
-      if (state.wakeOn) requestWakeLock();
-    }
-  }
-
-  async function requestWakeLock() {
-    if (!state.wakeOn) return;
-    try {
-      if ('wakeLock' in navigator && navigator.wakeLock && navigator.wakeLock.request) {
-        state.wakeLock = await navigator.wakeLock.request('screen');
-        state.wakeLock.addEventListener('release', () => { state.wakeLock = null; });
-        showToast('Keep screen on enabled.');
-      } else {
-        showToast('Keep screen on is not supported by this browser.');
-      }
-    } catch (err) {
-      showToast('Keep screen on failed. Tap again after GPS starts.');
-      console.warn('Wake lock failed', err);
-    }
-    updateWakeButton();
-  }
-
-  function updateWakeButton() {
-    const btn = document.getElementById('cdcWake');
-    if (!btn) return;
-    btn.classList.toggle('is-active', state.wakeOn);
-  }
-
-  async function toggleWake() {
-    state.wakeOn = !state.wakeOn;
-    if (state.wakeOn) {
-      await requestWakeLock();
-    } else {
-      try { if (state.wakeLock) await state.wakeLock.release(); } catch (_) {}
-      state.wakeLock = null;
-      showToast('Keep screen on disabled.');
-    }
-    updateWakeButton();
-    clickControl('wake');
-  }
-
-  function extractNextTurnText() {
-    const candidates = Array.from(document.querySelectorAll('[id*="next" i], [class*="next" i], [id*="turn" i], [class*="turn" i], .leaflet-container + *'));
-    for (const el of candidates) {
-      if (el.closest('#cleanDriverControlsDock') || el.closest('#cleanDriverControlsToast')) continue;
-      const txt = (el.innerText || '').replace(/\s+/g, ' ').trim();
-      if (!txt) continue;
-      if (/next turn|next action|turn left|turn right|roundabout|arrived|continue|bear left|bear right/i.test(txt)) {
-        return txt
-          .replace(/next turn/ig, '')
-          .replace(/next action in\s*\d+\s*m/ig, '')
-          .replace(/lane guidance.*$/ig, '')
-          .trim()
-          .slice(0, 220);
-      }
-    }
-    return 'Voice guidance is on.';
+  function updateWakeButton(btn) {
+    btn.textContent = '☀';
+    btn.setAttribute('aria-label', STATE.keepScreenOn ? 'Screen will stay on' : 'Keep screen on');
+    btn.title = STATE.keepScreenOn ? 'Screen will stay on' : 'Keep screen on';
+    btn.classList.toggle('is-active', STATE.keepScreenOn);
   }
 
   function speak(text) {
     if (!('speechSynthesis' in window)) {
-      showToast('Voice is not supported in this browser.');
+      showToast('Voice not supported in this browser.');
       return false;
     }
     try {
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text || 'Voice guidance is on.');
-      u.lang = 'en-GB';
-      u.rate = 0.95;
-      u.pitch = 1;
-      u.volume = 1;
-      window.speechSynthesis.speak(u);
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-GB';
+      utterance.rate = 0.95;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      window.speechSynthesis.speak(utterance);
       return true;
     } catch (err) {
-      showToast('Voice could not start. Check volume and browser permissions.');
+      showToast('Voice could not start. Check volume and browser settings.');
       return false;
     }
   }
 
-  function updateVoiceButton() {
-    const btn = document.getElementById('cdcVoice');
-    if (!btn) return;
-    btn.textContent = state.voiceOn ? '🔊' : '🔇';
-    btn.setAttribute('aria-label', state.voiceOn ? 'Voice on' : 'Voice off');
-    btn.setAttribute('title', state.voiceOn ? 'Voice on' : 'Voice off');
-    btn.classList.toggle('is-active', state.voiceOn);
+  function currentInstructionText() {
+    const selectors = [
+      '#mapNextInstruction',
+      '#currentInstructionText',
+      '#nextTurnText',
+      '.next-turn-title',
+      '.next-turn-instruction',
+      '[data-next-instruction]'
+    ];
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      const t = el && (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (t && !/next turn/i.test(t)) return t;
+    }
+    const overlay = document.querySelector('.driver-instruction-overlay, .waze-instruction-overlay, .driver-nav-overlay');
+    if (overlay) {
+      const text = (overlay.textContent || '').replace(/\s+/g, ' ').trim();
+      if (text) return text.replace(/^next turn\s*/i, '').replace(/next action in.*$/i, '').trim();
+    }
+    return 'Voice guidance is on.';
   }
 
-  function toggleVoice() {
-    state.voiceOn = !state.voiceOn;
-    clickControl('voice');
-    updateVoiceButton();
-    if (state.voiceOn) {
-      const text = extractNextTurnText();
-      state.lastVoiceText = text;
+  function maybeSpeakCurrentInstruction(force) {
+    if (!STATE.voiceEnabled) return;
+    const text = currentInstructionText();
+    if (!text) return;
+    if (force || text !== STATE.lastSpoken) {
+      STATE.lastSpoken = text;
       speak(text);
-      showToast('Voice guidance on.');
+    }
+  }
+
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        STATE.wakeLock = await navigator.wakeLock.request('screen');
+        STATE.wakeLock.addEventListener('release', function () {
+          STATE.wakeLock = null;
+        });
+        return true;
+      }
+    } catch (err) {
+      console.warn('Wake lock failed', err);
+    }
+    return false;
+  }
+
+  async function setKeepScreenOn(enabled, btn) {
+    STATE.keepScreenOn = enabled;
+    if (enabled) {
+      const ok = await requestWakeLock();
+      showToast(ok ? 'Screen will stay on.' : 'Wake lock not supported here. Keep this tab active.');
     } else {
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-      showToast('Voice guidance off.');
+      try {
+        if (STATE.wakeLock) await STATE.wakeLock.release();
+      } catch (err) {}
+      STATE.wakeLock = null;
+      showToast('Keep screen on disabled.');
     }
+    updateWakeButton(btn);
   }
 
-  function reportRoadIssue() {
-    if (clickControl('report')) {
-      showToast('Road report opened.');
-      return;
-    }
-    const form = document.querySelector('form[id*="report" i], [id*="roadReport" i], [class*="road-report" i]');
-    if (form && form.scrollIntoView) {
-      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      showToast('Road report section opened.');
-      return;
-    }
-    showToast('Road report control was not found.');
+  function triggerTouchSafe(fn) {
+    let locked = false;
+    return function (event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      if (locked) return;
+      locked = true;
+      setTimeout(function () { locked = false; }, 320);
+      fn(event);
+    };
   }
 
-  function createDock() {
-    const shell = ensureMapShell();
-    if (!shell) {
-      log('No map shell found yet');
-      return false;
-    }
+  function makeButton(className, label, handler) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'driver-clean-btn ' + (className || '');
+    btn.textContent = label.icon;
+    btn.setAttribute('aria-label', label.aria);
+    btn.title = label.aria;
+    const safeHandler = triggerTouchSafe(handler);
+    btn.addEventListener('click', safeHandler, { passive: false });
+    btn.addEventListener('touchend', safeHandler, { passive: false });
+    return btn;
+  }
 
-    // Remove any duplicate clean dock accidentally left elsewhere.
-    Array.from(document.querySelectorAll('#cleanDriverControlsDock')).forEach((el, idx) => {
-      if (idx > 0 || el.parentElement !== shell) el.remove();
+  function toggleFullscreen(btn) {
+    const shell = findMapShell();
+    const usingNative = !!document.fullscreenElement;
+    if (usingNative) {
+      document.exitFullscreen().catch(function () {});
+      document.body.classList.remove('driver-clean-fullscreen');
+      showToast('Exited full screen.');
+    } else if (shell && shell.requestFullscreen) {
+      shell.requestFullscreen().then(function () {
+        document.body.classList.add('driver-clean-fullscreen');
+        showToast('Full screen enabled.');
+        mapInvalidateSoon();
+      }).catch(function () {
+        document.body.classList.toggle('driver-clean-fullscreen');
+        showToast(document.body.classList.contains('driver-clean-fullscreen') ? 'App-style full screen enabled.' : 'Exited full screen.');
+        mapInvalidateSoon();
+      });
+    } else {
+      document.body.classList.toggle('driver-clean-fullscreen');
+      showToast(document.body.classList.contains('driver-clean-fullscreen') ? 'App-style full screen enabled.' : 'Exited full screen.');
+      mapInvalidateSoon();
+    }
+    setTimeout(function () { updateFullscreenButton(btn); }, 200);
+  }
+
+  function installDock() {
+    const shell = findMapShell();
+    if (!shell || shell.querySelector('.driver-clean-dock')) return;
+    shell.classList.add('driver-clean-map-shell');
+
+    hideLegacyControls();
+
+    const toast = document.createElement('div');
+    toast.className = 'driver-clean-toast';
+    shell.appendChild(toast);
+
+    const dock = document.createElement('div');
+    dock.className = 'driver-clean-dock';
+    dock.setAttribute('role', 'toolbar');
+    dock.setAttribute('aria-label', 'Driver map controls');
+
+    const gpsBtn = makeButton('gps is-primary', { icon: '📍', aria: 'Start live GPS' }, function () {
+      const called = callOriginalButton('gps');
+      STATE.gpsActive = !STATE.gpsActive;
+      updateGpsButton(gpsBtn);
+      showToast(STATE.gpsActive ? 'Live GPS started. Operator tracking active.' : 'Live GPS stopped.');
+      if (!called && STATE.gpsActive && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function () {
+          showToast('GPS permission accepted.');
+        }, function () {
+          showToast('GPS permission was not granted.');
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+      }
     });
 
-    let dock = document.getElementById('cleanDriverControlsDock');
-    if (!dock) {
-      dock = document.createElement('div');
-      dock.id = 'cleanDriverControlsDock';
-      dock.setAttribute('role', 'toolbar');
-      dock.setAttribute('aria-label', 'Driver map controls');
+    const centreBtn = makeButton('centre', { icon: '⌖', aria: 'Centre position' }, function () {
+      if (!callOriginalButton('centre')) {
+        try {
+          if (window.driverMap && window.currentDriverLatLng) window.driverMap.setView(window.currentDriverLatLng, Math.max(window.driverMap.getZoom(), 16));
+        } catch (err) {}
+      }
+      showToast('Centred on driver position.');
+    });
 
-      const gps = makeButton('cdcGps', '📍', 'Start live GPS', 'cdc-primary');
-      const centre = makeButton('cdcCentre', '⌖', 'Centre position');
-      const recalc = makeButton('cdcRecalc', '↻', 'Recalculate route');
-      const full = makeButton('cdcFullscreen', '⛶', 'Fullscreen');
-      const wake = makeButton('cdcWake', '☀', 'Keep screen on');
-      const voice = makeButton('cdcVoice', '🔇', 'Voice off');
-      const report = makeButton('cdcReport', '⚠️', 'Report road issue', 'cdc-report');
+    const recalcBtn = makeButton('recalculate', { icon: '↻', aria: 'Recalculate route' }, function () {
+      callOriginalButton('recalculate');
+      showToast('Recalculating route.');
+    });
 
-      gps.addEventListener('click', handleGps);
-      centre.addEventListener('click', centreMap);
-      recalc.addEventListener('click', recalculateRoute);
-      full.addEventListener('click', toggleFullscreen);
-      wake.addEventListener('click', toggleWake);
-      voice.addEventListener('click', toggleVoice);
-      report.addEventListener('click', reportRoadIssue);
+    const fullBtn = makeButton('fullscreen', { icon: '⛶', aria: 'Full screen' }, function () {
+      toggleFullscreen(fullBtn);
+    });
 
-      dock.append(gps, centre, recalc, full, wake, voice, report);
-    }
+    const wakeBtn = makeButton('screen', { icon: '☀', aria: 'Keep screen on' }, function () {
+      setKeepScreenOn(!STATE.keepScreenOn, wakeBtn);
+    });
 
-    if (dock.parentElement !== shell) shell.appendChild(dock);
-    state.dock = dock;
-    ensureToast();
-    updateGpsButton();
-    updateFullscreenButton();
-    updateWakeButton();
-    updateVoiceButton();
-    hideLegacyControls();
-    return true;
-  }
+    const voiceBtn = makeButton('voice', { icon: '🔇', aria: 'Voice off' }, function () {
+      const called = callOriginalButton('voice');
+      STATE.voiceEnabled = !STATE.voiceEnabled;
+      updateVoiceButton(voiceBtn);
+      if (STATE.voiceEnabled) {
+        maybeSpeakCurrentInstruction(true);
+        showToast('Voice guidance on.');
+      } else {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        showToast('Voice guidance off.');
+      }
+      if (!called && STATE.voiceEnabled) speak('Voice guidance is on.');
+    });
 
-  function setupObservers() {
-    const observer = new MutationObserver(() => {
-      createDock();
+    const reportBtn = makeButton('report is-danger', { icon: '⚠️', aria: 'Report road issue' }, function () {
+      callOriginalButton('report');
+      showToast('Road issue report opened.');
+    });
+
+    [gpsBtn, centreBtn, recalcBtn, fullBtn, wakeBtn, voiceBtn, reportBtn].forEach(function (btn) {
+      dock.appendChild(btn);
+    });
+
+    shell.appendChild(dock);
+    updateGpsButton(gpsBtn);
+    updateVoiceButton(voiceBtn);
+    updateFullscreenButton(fullBtn);
+    updateWakeButton(wakeBtn);
+
+    // Re-hide legacy buttons if the app re-renders them.
+    const observer = new MutationObserver(function () {
       hideLegacyControls();
     });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    document.addEventListener('fullscreenchange', () => {
-      updateFullscreenButton();
-      invalidateMapSoon();
-      if (state.wakeOn && !state.wakeLock) requestWakeLock();
-    });
+    // Speak changed next-turn text while voice is enabled.
+    setInterval(function () { maybeSpeakCurrentInstruction(false); }, 1800);
 
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && state.wakeOn && !state.wakeLock) requestWakeLock();
-    });
-
-    setInterval(() => {
-      if (state.voiceOn) {
-        const text = extractNextTurnText();
-        if (text && text !== state.lastVoiceText) {
-          state.lastVoiceText = text;
-          speak(text);
-        }
-      }
-    }, 2500);
+    showToast('Clean driver controls ready.', 1800);
   }
 
-  ready(() => {
-    // Retry because Leaflet can initialise after the HTML has loaded.
-    let attempts = 0;
-    const timer = setInterval(() => {
-      attempts += 1;
-      const ok = createDock();
-      if (ok || attempts >= 30) clearInterval(timer);
-    }, 300);
-    setupObservers();
-    if (DEBUG) showToast('Clean driver controls active');
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && STATE.keepScreenOn && !STATE.wakeLock) {
+      requestWakeLock();
+    }
   });
+
+  document.addEventListener('fullscreenchange', function () {
+    if (!document.fullscreenElement) {
+      document.body.classList.remove('driver-clean-fullscreen');
+    }
+    if (STATE.keepScreenOn && !STATE.wakeLock) requestWakeLock();
+    mapInvalidateSoon();
+    const btn = document.querySelector('.driver-clean-btn.fullscreen');
+    if (btn) updateFullscreenButton(btn);
+  });
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', installDock);
+  } else {
+    installDock();
+  }
+
+  // Some Leaflet pages render after DOMContentLoaded.
+  setTimeout(installDock, 800);
+  setTimeout(installDock, 2000);
 })();
