@@ -42,8 +42,7 @@ app.use(function iosDriverRouteLinkNormalizer(req, res, next) {
       .trim();
 
     // Old public driver route link: /driver-route/:id
-    let match = decodedPath.match(/^\/driver-route\/([^/?#]+)(\/route-pack)?\/?$/i);
-    if (match) {
+	let match = decodedPath.match(/^\/driver-route\/([^/?#]+)(\/route-pack)?\/?$/i);    if (match) {
       const routeId = cleanDriverRouteIdForMobile(match[1]);
       const suffix = match[2] || '';
       return res.redirect(302, '/driver/route/' + encodeURIComponent(routeId) + suffix + query);
