@@ -12,74 +12,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-
-// DRIVER_UI_MAP_CONTROLS_FIX_START
-app.use(function driverUiMapControlsFix(req, res, next) {
-  const requestPath = String(req.path || req.url || '');
-  if (!requestPath.includes('/driver')) return next();
-
-  const originalSend = res.send.bind(res);
-  res.send = function patchedDriverSend(body) {
-    try {
-      if (typeof body === 'string' && body.toLowerCase().includes('</body>') && !body.includes('driverUiMapControlsFixJs')) {
-        const css = '<style id="driverUiMapControlsFixCss">' +
-          'body.driver-ui-map-controls-fixed .driver-ui-hidden{display:none!important;visibility:hidden!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;}' +
-          'body.driver-ui-map-controls-fixed .driver-fixed-control-dock{position:fixed!important;left:50%!important;bottom:max(18px,env(safe-area-inset-bottom))!important;transform:translateX(-50%)!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(6,54px)!important;gap:10px!important;align-items:center!important;justify-content:center!important;pointer-events:auto!important;padding:10px!important;border-radius:28px!important;background:rgba(0,0,0,.35)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;box-sizing:border-box!important;}' +
-          'body.driver-ui-map-controls-fixed .driver-fixed-control-dock button,body.driver-ui-map-controls-fixed .driver-fixed-control-dock a{position:relative!important;width:54px!important;height:54px!important;min-width:54px!important;max-width:54px!important;min-height:54px!important;max-height:54px!important;border-radius:50%!important;margin:0!important;padding:0!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;line-height:1!important;font-size:0!important;overflow:hidden!important;white-space:nowrap!important;border:1px solid rgba(244,203,94,.9)!important;background:rgba(8,8,8,.96)!important;color:#f6d56d!important;box-shadow:0 4px 16px rgba(0,0,0,.35)!important;pointer-events:auto!important;touch-action:manipulation!important;text-decoration:none!important;}' +
-          'body.driver-ui-map-controls-fixed .driver-fixed-control-dock button:before,body.driver-ui-map-controls-fixed .driver-fixed-control-dock a:before{content:attr(data-driver-icon)!important;font-size:24px!important;line-height:1!important;color:#f6d56d!important;}' +
-          'body.driver-ui-map-controls-fixed .driver-fixed-control-dock [data-driver-control="voice"]{background:linear-gradient(135deg,#f8dc80,#dba62d)!important;color:#111!important;}' +
-          'body.driver-ui-map-controls-fixed .driver-fixed-control-dock [data-driver-control="voice"]:before{color:#111!important;}' +
-          'body.driver-ui-map-controls-fixed .driver-fixed-control-dock [data-driver-control="gps"]{background:rgba(10,10,10,.98)!important;}' +
-          'body.driver-ui-map-controls-fixed .driver-fixed-control-dock [data-driver-control="gps"].driver-gps-active{background:linear-gradient(135deg,#0b6,#073)!important;}' +
-          'body.driver-ui-map-controls-fixed .leaflet-container{touch-action:pan-x pan-y pinch-zoom!important;}' +
-          'body.driver-ui-map-controls-fixed .leaflet-control-container{pointer-events:none!important;}' +
-          'body.driver-ui-map-controls-fixed .leaflet-control-container .leaflet-control{pointer-events:auto!important;}' +
-          'body.driver-ui-map-controls-fixed [id*="driverControls"],body.driver-ui-map-controls-fixed [class*="driver-controls"],body.driver-ui-map-controls-fixed [class*="map-controls"]{pointer-events:auto!important;}' +
-          '@media(max-width:720px){body.driver-ui-map-controls-fixed .driver-fixed-control-dock{grid-template-columns:repeat(3,58px)!important;gap:12px!important;bottom:max(14px,env(safe-area-inset-bottom))!important;}body.driver-ui-map-controls-fixed .driver-fixed-control-dock button,body.driver-ui-map-controls-fixed .driver-fixed-control-dock a{width:58px!important;height:58px!important;min-width:58px!important;min-height:58px!important;max-width:58px!important;max-height:58px!important;}body.driver-ui-map-controls-fixed .driver-fixed-control-dock button:before,body.driver-ui-map-controls-fixed .driver-fixed-control-dock a:before{font-size:25px!important;}}' +
-          '</style>';
-
-        const js = '<script id="driverUiMapControlsFixJs">' +
-          '(function(){' +
-          'function ready(fn){if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",fn,{once:true});}else{fn();}}' +
-          'ready(function(){' +
-          'document.body.classList.add("driver-ui-map-controls-fixed");' +
-          'var dock=document.getElementById("driverFixedControlDock");if(!dock){dock=document.createElement("div");dock.id="driverFixedControlDock";dock.className="driver-fixed-control-dock";dock.setAttribute("aria-label","Driver map controls");document.body.appendChild(dock);}' +
-          'function low(el){return String((el.getAttribute("aria-label")||"")+" "+(el.getAttribute("title")||"")+" "+(el.textContent||"")+" "+(el.id||"")+" "+(el.className||"")).toLowerCase();}' +
-          'function allControls(){return Array.prototype.slice.call(document.querySelectorAll("button,a"));}' +
-          'function hideNonDriving(){allControls().forEach(function(el){var t=low(el);if(t.includes("print")||t.includes("mark completed")||t.includes("completed route")||t.includes("complete route")){el.classList.add("driver-ui-hidden");el.setAttribute("aria-hidden","true");}});}' +
-          'function hideDriverSummary(){var nodes=Array.prototype.slice.call(document.querySelectorAll("h1,h2,h3,h4,h5,strong,b,div,section"));var head=nodes.find(function(el){return String(el.textContent||"").trim().toLowerCase()==="driver summary";});if(!head)return;var card=head.closest("section,article,.card,.panel,.driver-summary,[class*=summary],[class*=card],[class*=panel]")||head.parentElement;if(card){card.classList.add("driver-ui-hidden");card.setAttribute("aria-hidden","true");}}' +
-          'var defs=[' +
-          '{key:"gps",icon:"📍",activeIcon:"📡",label:"Start or stop live GPS",words:["start live gps","stop gps","live gps","start gps"]},' +
-          '{key:"centre",icon:"⌖",label:"Centre position",words:["centre position","center position","centre","center"]},' +
-          '{key:"recalculate",icon:"↻",label:"Recalculate route",words:["recalculate","reroute"]},' +
-          '{key:"fullscreen",icon:"⛶",exitIcon:"↙",label:"Full screen",words:["full screen","fullscreen","exit full screen"]},' +
-          '{key:"screen",icon:"☀",label:"Keep screen on",words:["keep screen on","screen on","wake"]},' +
-          '{key:"voice",icon:"🔇",activeIcon:"🔊",label:"Voice on or off",words:["voice on","voice off","voice"]}' +
-          '];' +
-          'function findControl(def){var items=allControls().filter(function(el){if(el.id==="driverFixedControlDock")return false;if(el.closest("#driverFixedControlDock"))return false;if(el.classList.contains("driver-ui-hidden"))return false;var t=low(el);return def.words.some(function(w){return t.includes(w);});});return items[0]||null;}' +
-          'function configure(el,def){if(!el)return;var t=low(el);var icon=def.icon;if(def.key==="voice"&&t.includes("voice on"))icon=def.activeIcon;if(def.key==="gps"&&(t.includes("stop")||t.includes("active")))icon=def.activeIcon;if(def.key==="fullscreen"&&t.includes("exit"))icon=def.exitIcon;el.setAttribute("data-driver-control",def.key);el.setAttribute("data-driver-icon",icon);el.setAttribute("aria-label",def.label);el.setAttribute("title",def.label);el.style.pointerEvents="auto";el.style.touchAction="manipulation";if(!el.dataset.driverTouchFixed){el.dataset.driverTouchFixed="1";el.addEventListener("touchend",function(ev){if(el.disabled)return;ev.preventDefault();el.click();},{passive:false});el.addEventListener("click",function(){setTimeout(refresh,80);setTimeout(refresh,400);},true);}}' +
-          'function refresh(){hideNonDriving();hideDriverSummary();defs.forEach(function(def){var el=findControl(def);if(el){configure(el,def);dock.appendChild(el);}});}' +
-          'refresh();setTimeout(refresh,300);setTimeout(refresh,1000);setInterval(refresh,3000);' +
-          '});' +
-          '})();' +
-          '</script>';
-
-        const headAt = body.toLowerCase().lastIndexOf('</head>');
-        if (headAt >= 0) body = body.slice(0, headAt) + css + body.slice(headAt);
-        const bodyAt = body.toLowerCase().lastIndexOf('</body>');
-        if (bodyAt >= 0) body = body.slice(0, bodyAt) + js + body.slice(bodyAt);
-      }
-    } catch (err) {
-      console.error('Driver UI map controls fix injection failed:', err && err.message ? err.message : err);
-    }
-    return originalSend(body);
-  };
-  next();
-});
-// DRIVER_UI_MAP_CONTROLS_FIX_END
-
-
-
 /* IOS_DRIVER_ROUTE_LINK_NORMALIZER_START */
 function cleanDriverRouteIdForMobile(rawId) {
   return String(rawId || '')
@@ -798,6 +730,7 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
   @media(min-width:920px){.content{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}#driverMap{height:64vh}}
   @media print{@page{size:A4 portrait;margin:10mm}header{position:static}.buttons,.form-grid,.toast{display:none!important}.content{display:block}.card{break-inside:avoid;margin-bottom:1rem}#driverMap{height:6in}}
 </style>
+<link rel="stylesheet" href="/driver-controls.css?v=hard-reset-20260721">
 </head>
 <body>
 <header>${logo}<div><div class="eyebrow">${escapeHtml(settings.companyName || 'Point 2 Point')} • Driver route</div><h1>${escapeHtml(title)}</h1><div class="muted">${escapeHtml(metresToMiles(route.summary?.lengthInMeters || 0))} miles • ${escapeHtml(secondsToText(route.summary?.travelTimeInSeconds || 0))} • <span class="status" id="statusBadge">${escapeHtml(record.status || 'approved')}</span></div></div></header>
@@ -1511,6 +1444,7 @@ document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=
 })();
 </script>
 <!-- P2P_DRIVER_GPS_MAP_CONTROLS_END -->
+<script type="module" src="/driver-controls.js?v=hard-reset-20260721"></script>
 </body>
 </html>`;
 }
@@ -1570,6 +1504,7 @@ function buildRouteReportHtml(record) {
   @media(max-width:980px){.route-layout{grid-template-columns:1fr}.panel{max-height:none}#exportMap{height:65vh}}
   @media print{@page{size:A4 landscape;margin:10mm}html,body{width:auto;height:auto;overflow:visible;background:white!important;color:#111!important}header{padding:0 0 .35rem 0;border-bottom:1px solid #ddd;display:block;color:#111!important}h1{font-size:18pt;line-height:1.15;margin:.05rem 0}.eyebrow{color:#555!important}.meta,.muted,.map-note{color:#333!important}.route-layout{display:block;padding:0}.map-wrap{width:100%;margin:0 auto;border:1px solid #ccc;border-radius:0;box-shadow:none;overflow:hidden;page-break-inside:avoid;break-inside:avoid;background:white}#exportMap{width:100%!important;height:6.85in!important;min-height:0!important;max-height:none!important;display:block;background:#fff}.leaflet-container{width:100%!important}.map-note{padding:.35rem .5rem;border-top:1px solid #ddd;font-size:9pt}.panel{margin-top:1rem;padding:.75rem;max-height:none;page-break-before:always;break-before:page;border:1px solid #ccc;border-radius:0;box-shadow:none;background:white;color:#111!important}.stat,.warning,.approval{border-color:#ccc;background:white}.brand,.eyebrow,.stat strong{color:#111!important}ol,li{color:#111!important}.buttons,button,.live-nav-bar{display:none!important}}
 </style>
+<link rel="stylesheet" href="/driver-controls.css?v=hard-reset-20260721">
 </head>
 <body>
 <div class="live-nav-bar"><a href="${liveRouteUrl}">← Back to live route</a><span>Driver route pack</span></div>
@@ -2183,8 +2118,7 @@ function buildRouteReportHtml(record) {
 })();
 </script>
 <!-- P2P_DRIVER_GPS_MAP_CONTROLS_END -->
-<link rel="stylesheet" href="/driver-controls.css">
-<script src="/driver-controls.js" defer></script>
+<script type="module" src="/driver-controls.js?v=hard-reset-20260721"></script>
 </body>
 </html>`;
 }

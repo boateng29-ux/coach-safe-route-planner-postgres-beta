@@ -1,174 +1,155 @@
-/* Clean Driver Controls v1 - Point2Point Coach Safe */
-:root {
-  --driver-gold: #f2c94c;
-  --driver-gold-strong: #ffd966;
-  --driver-bg: rgba(8, 8, 8, 0.92);
-  --driver-border: rgba(242, 201, 76, 0.78);
-  --driver-text: #fff7d6;
-  --driver-danger: #ff5a5f;
-}
-
-/* Legacy controls/cards hidden by JS add this class */
-.driver-legacy-hidden {
+/* Clean Driver Controls - hard reset module */
+.clean-driver-controls-hidden {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
-/* Ensure the map can own absolutely positioned controls */
-.driver-clean-map-shell {
-  position: relative !important;
+#cleanDriverControlsDock {
+  position: absolute !important;
+  right: max(14px, env(safe-area-inset-right)) !important;
+  bottom: max(14px, calc(env(safe-area-inset-bottom) + 14px)) !important;
+  z-index: 7000 !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, 52px) !important;
+  gap: 10px !important;
+  padding: 12px !important;
+  border-radius: 22px !important;
+  background: rgba(6, 6, 6, 0.88) !important;
+  border: 1px solid rgba(236, 200, 89, 0.58) !important;
+  box-shadow: 0 18px 40px rgba(0,0,0,.48) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
-.driver-clean-dock {
-  position: absolute;
-  right: max(14px, env(safe-area-inset-right));
-  bottom: max(14px, calc(env(safe-area-inset-bottom) + 14px));
-  z-index: 5000;
-  display: grid;
-  grid-template-columns: repeat(4, 54px);
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(242, 201, 76, 0.36);
-  border-radius: 22px;
-  background: rgba(5, 5, 5, 0.78);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  pointer-events: auto;
-  touch-action: manipulation;
+#cleanDriverControlsDock .cdc-btn {
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  min-height: 52px !important;
+  max-width: 52px !important;
+  max-height: 52px !important;
+  border-radius: 999px !important;
+  border: 2px solid #f0ce62 !important;
+  background: rgba(2,2,2,.96) !important;
+  color: #f7d86b !important;
+  font-size: 25px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  box-shadow: 0 8px 18px rgba(0,0,0,.35) !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
-.driver-clean-btn {
-  width: 54px;
-  height: 54px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--driver-border);
-  border-radius: 999px;
-  background: var(--driver-bg);
-  color: var(--driver-gold-strong);
-  font-size: 23px;
-  line-height: 1;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
+#cleanDriverControlsDock .cdc-btn:active {
+  transform: scale(.95) !important;
 }
 
-.driver-clean-btn:active {
-  transform: translateY(1px) scale(0.98);
+#cleanDriverControlsDock .cdc-btn.is-active,
+#cleanDriverControlsDock .cdc-btn.cdc-primary.is-active {
+  background: #f0ce62 !important;
+  color: #080808 !important;
+  border-color: #f7d86b !important;
 }
 
-.driver-clean-btn.is-primary {
-  background: linear-gradient(135deg, #f5d76e, #d9a928);
-  color: #111;
-  border-color: #ffe599;
+#cleanDriverControlsDock .cdc-btn.cdc-primary {
+  background: #f0ce62 !important;
+  color: #070707 !important;
+  border-color: #f9e28a !important;
+  font-size: 27px !important;
+  animation: cdcGpsPulse 1.7s infinite !important;
 }
 
-.driver-clean-btn.is-active {
-  background: rgba(242, 201, 76, 0.96);
-  color: #111;
-  border-color: #ffe599;
+#cleanDriverControlsDock .cdc-btn.cdc-report {
+  color: #ffd164 !important;
 }
 
-.driver-clean-btn.is-danger {
-  background: rgba(120, 28, 31, 0.9);
-  color: #fff;
-  border-color: rgba(255, 90, 95, 0.95);
+@keyframes cdcGpsPulse {
+  0% { box-shadow: 0 0 0 0 rgba(240,206,98,.45); }
+  70% { box-shadow: 0 0 0 12px rgba(240,206,98,0); }
+  100% { box-shadow: 0 0 0 0 rgba(240,206,98,0); }
 }
 
-.driver-clean-toast {
-  position: absolute;
-  right: max(14px, env(safe-area-inset-right));
-  bottom: max(104px, calc(env(safe-area-inset-bottom) + 104px));
-  z-index: 5100;
-  max-width: min(360px, calc(100% - 28px));
-  padding: 12px 14px;
-  border: 1px solid rgba(242, 201, 76, 0.56);
-  border-radius: 16px;
-  background: rgba(5, 5, 5, 0.92);
-  color: var(--driver-text);
-  font-weight: 800;
-  font-size: 14px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+#cleanDriverControlsToast {
+  position: absolute !important;
+  right: max(14px, env(safe-area-inset-right)) !important;
+  bottom: max(104px, calc(env(safe-area-inset-bottom) + 104px)) !important;
+  z-index: 7100 !important;
+  max-width: min(360px, calc(100% - 28px)) !important;
+  background: rgba(10,10,10,.94) !important;
+  color: #fff2bb !important;
+  border: 1px solid rgba(240,206,98,.65) !important;
+  border-radius: 16px !important;
+  padding: 10px 14px !important;
+  font-weight: 700 !important;
+  font-size: 14px !important;
+  line-height: 1.25 !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45) !important;
+  display: none !important;
+  pointer-events: none !important;
 }
 
-.driver-clean-toast.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+#cleanDriverControlsToast.is-visible {
+  display: block !important;
 }
 
-/* Fullscreen/app fallback mode. On iOS, browser native fullscreen is limited, so this gives app-style fullscreen. */
-body.driver-clean-fullscreen {
-  overflow: hidden !important;
-}
-
-body.driver-clean-fullscreen .driver-clean-map-shell {
+.clean-driver-map-fullscreen {
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
   height: 100dvh !important;
-  z-index: 9998 !important;
-  background: #000 !important;
+  z-index: 99998 !important;
+  background: #080808 !important;
+  overflow: hidden !important;
 }
 
-body.driver-clean-fullscreen #map,
-body.driver-clean-fullscreen .leaflet-container {
-  height: 100dvh !important;
-  min-height: 100dvh !important;
+.clean-driver-map-fullscreen .leaflet-container {
+  height: 100% !important;
+  min-height: 100% !important;
 }
 
-body.driver-clean-fullscreen .driver-clean-dock {
-  z-index: 10001;
+.clean-driver-map-fullscreen #cleanDriverControlsDock {
+  z-index: 100000 !important;
 }
 
-body.driver-clean-fullscreen .driver-clean-toast {
-  z-index: 10002;
+.clean-driver-map-fullscreen #cleanDriverControlsToast {
+  z-index: 100001 !important;
 }
 
-/* Hide non-driving cards in fullscreen driving mode */
-body.driver-clean-fullscreen .driver-summary,
-body.driver-clean-fullscreen .driver-route-summary,
-body.driver-clean-fullscreen .driver-gps-card,
-body.driver-clean-fullscreen .live-gps-card,
-body.driver-clean-fullscreen .stops-card,
-body.driver-clean-fullscreen [data-driver-summary],
-body.driver-clean-fullscreen [data-live-gps-card] {
-  display: none !important;
-}
-
-@media (max-width: 700px) {
-  .driver-clean-dock {
-    grid-template-columns: repeat(4, 50px);
-    gap: 8px;
-    padding: 10px;
-    border-radius: 20px;
+@media (max-width: 720px) {
+  #cleanDriverControlsDock {
+    grid-template-columns: repeat(4, 48px) !important;
+    gap: 9px !important;
+    padding: 10px !important;
+    right: max(10px, env(safe-area-inset-right)) !important;
+    bottom: max(10px, calc(env(safe-area-inset-bottom) + 10px)) !important;
+    border-radius: 20px !important;
   }
-  .driver-clean-btn {
-    width: 50px;
-    height: 50px;
-    font-size: 21px;
+  #cleanDriverControlsDock .cdc-btn {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    font-size: 23px !important;
   }
-  .driver-clean-toast {
-    bottom: max(96px, calc(env(safe-area-inset-bottom) + 96px));
-    font-size: 13px;
+  #cleanDriverControlsToast {
+    bottom: max(98px, calc(env(safe-area-inset-bottom) + 98px)) !important;
+    right: max(10px, env(safe-area-inset-right)) !important;
   }
 }
 
 @media (max-width: 420px) {
-  .driver-clean-dock {
-    grid-template-columns: repeat(4, 46px);
-  }
-  .driver-clean-btn {
-    width: 46px;
-    height: 46px;
-    font-size: 20px;
+  #cleanDriverControlsDock {
+    grid-template-columns: repeat(3, 48px) !important;
   }
 }
