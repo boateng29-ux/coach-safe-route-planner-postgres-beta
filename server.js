@@ -42,7 +42,7 @@ app.use(function iosDriverRouteLinkNormalizer(req, res, next) {
       .trim();
 
     // Old public driver route link: /driver-route/:id
-    let match = decodedPath.match(/^/driver-route/([^/?#]+)(/route-pack)?/?$/i);
+    let match = decodedPath.match(/^/driver-route/([^/?#]+)(/route-pack)?\/?$/i);
     if (match) {
       const routeId = cleanDriverRouteIdForMobile(match[1]);
       const suffix = match[2] || '';
@@ -50,7 +50,7 @@ app.use(function iosDriverRouteLinkNormalizer(req, res, next) {
     }
 
     // Current public driver route link: /driver/route/:id
-    match = decodedPath.match(/^/driver/route/([^/?#]+)(/route-pack)?/?$/i);
+    match = decodedPath.match(/^/driver/route/([^/?#]+)(/route-pack)?\/?$/i);
     if (match) {
       const routeId = cleanDriverRouteIdForMobile(match[1]);
       const suffix = match[2] || '';
