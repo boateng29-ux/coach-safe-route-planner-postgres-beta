@@ -1,116 +1,135 @@
-/* Clean Driver Controls v1 - Point2Point Coach Safe */
+/* Point2Point Clean Driver Controls v4 */
 :root {
-  --driver-gold: #f2c94c;
-  --driver-gold-strong: #ffd966;
-  --driver-bg: rgba(8, 8, 8, 0.92);
-  --driver-border: rgba(242, 201, 76, 0.78);
-  --driver-text: #fff7d6;
-  --driver-danger: #ff5a5f;
+  --p2p-driver-gold: #f2c94c;
+  --p2p-driver-gold-strong: #ffd966;
+  --p2p-driver-bg: rgba(7, 7, 7, 0.92);
+  --p2p-driver-border: rgba(242, 201, 76, 0.78);
+  --p2p-driver-text: #fff7d6;
+  --p2p-driver-danger: #ff5a5f;
 }
 
-/* Legacy controls/cards hidden by JS add this class */
-.driver-legacy-hidden {
+.p2p-driver-legacy-hidden {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
 }
 
-/* Ensure the map can own absolutely positioned controls */
-.driver-clean-map-shell {
+.p2p-driver-map-shell {
   position: relative !important;
 }
 
-.driver-clean-dock {
+.p2p-driver-clean-dock {
   position: absolute;
   right: max(14px, env(safe-area-inset-right));
   bottom: max(14px, calc(env(safe-area-inset-bottom) + 14px));
-  z-index: 5000;
+  z-index: 50000;
   display: grid;
-  grid-template-columns: repeat(4, 54px);
+  grid-template-columns: repeat(4, 52px);
   gap: 10px;
   padding: 12px;
-  border: 1px solid rgba(242, 201, 76, 0.36);
+  border: 1px solid rgba(242, 201, 76, 0.34);
   border-radius: 22px;
-  background: rgba(5, 5, 5, 0.78);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+  background: rgba(5, 5, 5, 0.72);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
   pointer-events: auto;
   touch-action: manipulation;
 }
 
-.driver-clean-btn {
-  width: 54px;
-  height: 54px;
+.p2p-driver-control {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--driver-border);
+  border: 2px solid var(--p2p-driver-border);
   border-radius: 999px;
-  background: var(--driver-bg);
-  color: var(--driver-gold-strong);
+  background: var(--p2p-driver-bg);
+  color: var(--p2p-driver-gold-strong);
   font-size: 23px;
   line-height: 1;
-  font-weight: 800;
+  font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
-  -webkit-tap-highlight-color: transparent;
   user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.38);
 }
 
-.driver-clean-btn:active {
+.p2p-driver-control:active {
   transform: translateY(1px) scale(0.98);
 }
 
-.driver-clean-btn.is-primary {
-  background: linear-gradient(135deg, #f5d76e, #d9a928);
+.p2p-driver-control.is-primary {
+  background: linear-gradient(135deg, #f8db7c, #d7a728);
   color: #111;
   border-color: #ffe599;
 }
 
-.driver-clean-btn.is-active {
+.p2p-driver-control.is-active {
   background: rgba(242, 201, 76, 0.96);
   color: #111;
   border-color: #ffe599;
 }
 
-.driver-clean-btn.is-danger {
-  background: rgba(120, 28, 31, 0.9);
+.p2p-driver-control.is-danger {
+  background: rgba(120, 26, 30, 0.92);
   color: #fff;
   border-color: rgba(255, 90, 95, 0.95);
 }
 
-.driver-clean-toast {
+.p2p-driver-toast {
   position: absolute;
   right: max(14px, env(safe-area-inset-right));
-  bottom: max(104px, calc(env(safe-area-inset-bottom) + 104px));
-  z-index: 5100;
-  max-width: min(360px, calc(100% - 28px));
+  bottom: max(106px, calc(env(safe-area-inset-bottom) + 106px));
+  z-index: 51000;
+  max-width: min(380px, calc(100% - 28px));
   padding: 12px 14px;
-  border: 1px solid rgba(242, 201, 76, 0.56);
+  border: 1px solid rgba(242, 201, 76, 0.58);
   border-radius: 16px;
-  background: rgba(5, 5, 5, 0.92);
-  color: var(--driver-text);
-  font-weight: 800;
+  background: rgba(5, 5, 5, 0.94);
+  color: var(--p2p-driver-text);
+  font-weight: 850;
   font-size: 14px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
-  pointer-events: none;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
   opacity: 0;
   transform: translateY(10px);
+  pointer-events: none;
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-.driver-clean-toast.is-visible {
+.p2p-driver-toast.is-visible {
   opacity: 1;
   transform: translateY(0);
 }
 
-/* Fullscreen/app fallback mode. On iOS, browser native fullscreen is limited, so this gives app-style fullscreen. */
+.p2p-driver-toast.is-error {
+  border-color: rgba(255, 90, 95, 0.8);
+  color: #ffd4d4;
+}
+
+.p2p-driver-report-section.p2p-driver-report-collapsed {
+  display: none !important;
+}
+
+.p2p-driver-report-section.p2p-driver-report-open {
+  display: block !important;
+}
+
 body.driver-clean-fullscreen {
   overflow: hidden !important;
 }
 
-body.driver-clean-fullscreen .driver-clean-map-shell {
+body.driver-clean-fullscreen .p2p-driver-map-shell {
   position: fixed !important;
   inset: 0 !important;
   width: 100vw !important;
@@ -119,56 +138,52 @@ body.driver-clean-fullscreen .driver-clean-map-shell {
   background: #000 !important;
 }
 
-body.driver-clean-fullscreen #map,
+body.driver-clean-fullscreen #driverMap,
 body.driver-clean-fullscreen .leaflet-container {
   height: 100dvh !important;
   min-height: 100dvh !important;
 }
 
-body.driver-clean-fullscreen .driver-clean-dock {
+body.driver-clean-fullscreen .p2p-driver-clean-dock {
   z-index: 10001;
 }
 
-body.driver-clean-fullscreen .driver-clean-toast {
+body.driver-clean-fullscreen .p2p-driver-toast {
   z-index: 10002;
 }
 
-/* Hide non-driving cards in fullscreen driving mode */
-body.driver-clean-fullscreen .driver-summary,
-body.driver-clean-fullscreen .driver-route-summary,
-body.driver-clean-fullscreen .driver-gps-card,
-body.driver-clean-fullscreen .live-gps-card,
-body.driver-clean-fullscreen .stops-card,
-body.driver-clean-fullscreen [data-driver-summary],
-body.driver-clean-fullscreen [data-live-gps-card] {
-  display: none !important;
-}
-
 @media (max-width: 700px) {
-  .driver-clean-dock {
-    grid-template-columns: repeat(4, 50px);
+  .p2p-driver-clean-dock {
+    grid-template-columns: repeat(4, 48px);
     gap: 8px;
     padding: 10px;
     border-radius: 20px;
   }
-  .driver-clean-btn {
-    width: 50px;
-    height: 50px;
+
+  .p2p-driver-control {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
     font-size: 21px;
   }
-  .driver-clean-toast {
+
+  .p2p-driver-toast {
     bottom: max(96px, calc(env(safe-area-inset-bottom) + 96px));
     font-size: 13px;
   }
 }
 
 @media (max-width: 420px) {
-  .driver-clean-dock {
-    grid-template-columns: repeat(4, 46px);
+  .p2p-driver-clean-dock {
+    grid-template-columns: repeat(4, 44px);
   }
-  .driver-clean-btn {
-    width: 46px;
-    height: 46px;
+
+  .p2p-driver-control {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     font-size: 20px;
   }
 }
