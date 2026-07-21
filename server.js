@@ -21,7 +21,549 @@ app.use(function driverUiMapControlsFix(req, res, next) {
   const originalSend = res.send.bind(res);
   res.send = function patchedDriverSend(body) {
     try {
-      if (typeof body === 'string' && body.toLowerCase().includes('</body>') && !body.includes('driverUiMapControlsFixJs')) {
+      if (typeof body === 'string' && body.toLowerCase().includes('
+<!-- DRIVER_FLOATING_CONTROLS_BOTTOM_RIGHT_V4_START -->
+<style>
+  #driverFloatingControlDock {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+    z-index: 10050 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 54px) !important;
+    gap: 10px !important;
+    padding: 12px !important;
+    border: 1px solid rgba(245, 207, 94, 0.55) !important;
+    border-radius: 24px !important;
+    background: rgba(7, 8, 8, 0.86) !important;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.42) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    user-select: none !important;
+    max-width: 218px !important;
+  }
+  #driverFloatingControlDock .driver-float-btn {
+    width: 54px !important;
+    height: 54px !important;
+    min-width: 54px !important;
+    min-height: 54px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 1px solid rgba(245, 207, 94, 0.94) !important;
+    border-radius: 999px !important;
+    background: rgba(8, 8, 7, 0.96) !important;
+    color: #f5cf5e !important;
+    font-size: 23px !important;
+    line-height: 1 !important;
+    font-weight: 900 !important;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.36) !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  #driverFloatingControlDock .driver-float-btn:active,
+  #driverFloatingControlDock .driver-float-btn.driver-active {
+    transform: scale(0.96) !important;
+    background: linear-gradient(135deg, #ffe387, #d8a91e) !important;
+    color: #050505 !important;
+  }
+  #driverFloatingControlDock .driver-float-btn.driver-gps-active {
+    background: linear-gradient(135deg, #55efa6, #16a765) !important;
+    border-color: #83ffd0 !important;
+    color: #02150b !important;
+  }
+  #driverFloatingControlDock .driver-float-btn.driver-voice-active {
+    background: linear-gradient(135deg, #ffe387, #d8a91e) !important;
+    color: #050505 !important;
+  }
+  #driverControlToast {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: calc(248px + env(safe-area-inset-bottom)) !important;
+    z-index: 10060 !important;
+    max-width: min(360px, calc(100vw - 32px)) !important;
+    background: rgba(8,8,7,0.94) !important;
+    color: #ffeaa5 !important;
+    border: 1px solid rgba(245,207,94,0.58) !important;
+    border-radius: 16px !important;
+    padding: 10px 13px !important;
+    font: 700 13px/1.25 system-ui, -apple-system, Segoe UI, sans-serif !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.38) !important;
+    display: none !important;
+    pointer-events: none !important;
+  }
+  body.driver-pseudo-fullscreen .leaflet-container {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    z-index: 9990 !important;
+  }
+  body.driver-pseudo-fullscreen #driverFloatingControlDock {
+    position: fixed !important;
+    z-index: 10080 !important;
+  }
+  body.driver-pseudo-fullscreen #driverControlToast {
+    position: fixed !important;
+    z-index: 10090 !important;
+  }
+  body.driver-pseudo-fullscreen .leaflet-control-container {
+    z-index: 9995 !important;
+  }
+  .driver-hidden-old-controls {
+    display: none !important;
+  }
+  @media (max-width: 700px) {
+    #driverFloatingControlDock {
+      right: 12px !important;
+      bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+      grid-template-columns: repeat(3, 48px) !important;
+      gap: 8px !important;
+      padding: 10px !important;
+      border-radius: 22px !important;
+      max-width: 188px !important;
+    }
+    #driverFloatingControlDock .driver-float-btn {
+      width: 48px !important;
+      height: 48px !important;
+      min-width: 48px !important;
+      min-height: 48px !important;
+      font-size: 21px !important;
+    }
+    #driverControlToast {
+      right: 12px !important;
+      bottom: calc(220px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+</style>
+<script>
+(function () {
+  if (window.__driverFloatingControlsBottomRightV4) return;
+  window.__driverFloatingControlsBottomRightV4 = true;
+
+  var wakeLockRef = null;
+  var lastTapTime = 0;
+  var fallbackGpsWatchId = null;
+  var fallbackGpsActive = false;
+  var fallbackVoiceActive = false;
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function describe(el) {
+    if (!el) return '';
+    var bits = [];
+    bits.push(el.textContent || '');
+    bits.push(el.getAttribute ? el.getAttribute('aria-label') : '');
+    bits.push(el.getAttribute ? el.getAttribute('title') : '');
+    bits.push(el.id || '');
+    bits.push(typeof el.className === 'string' ? el.className : '');
+    bits.push(el.name || '');
+    return norm(bits.join(' '));
+  }
+
+  function isVisible(el) {
+    if (!el) return false;
+    var style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.pointerEvents !== 'none' && el.offsetWidth > 0 && el.offsetHeight > 0;
+  }
+
+  function allInteractives() {
+    return Array.prototype.slice.call(document.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"]'))
+      .filter(function (el) { return !el.closest('#driverFloatingControlDock'); });
+  }
+
+  function hasAny(text, words) {
+    for (var i = 0; i < words.length; i++) {
+      if (text.indexOf(words[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  function findActionElement(action) {
+    var items = allInteractives();
+    var preferred = [];
+    var fallback = [];
+
+    items.forEach(function (el) {
+      var d = describe(el);
+      if (!d) return;
+      if (action === 'gps') {
+        if (hasAny(d, ['start live gps', 'start gps', 'start location', 'start tracking', 'live gps', '📍'])) preferred.push(el);
+        else if (hasAny(d, ['stop live gps', 'stop gps', 'gps active', '📡'])) fallback.push(el);
+      }
+      if (action === 'centre') {
+        if (hasAny(d, ['centre position', 'center position', 'centre map', 'center map', 'my location', '⌖'])) preferred.push(el);
+      }
+      if (action === 'recalculate') {
+        if (hasAny(d, ['recalculate', 'reroute', 're-route', '↻'])) preferred.push(el);
+      }
+      if (action === 'fullscreen') {
+        if (hasAny(d, ['full screen', 'fullscreen', 'exit full screen', 'exit fullscreen', 'large map', '⛶', '↙'])) preferred.push(el);
+      }
+      if (action === 'wake') {
+        if (hasAny(d, ['keep screen on', 'wake lock', 'screen on', '☀'])) preferred.push(el);
+      }
+      if (action === 'voice') {
+        if (hasAny(d, ['voice on', 'voice off', 'voice', '🔊', '🔇'])) preferred.push(el);
+      }
+    });
+
+    preferred.sort(function (a, b) {
+      var av = isVisible(a) ? 0 : 1;
+      var bv = isVisible(b) ? 0 : 1;
+      return av - bv;
+    });
+
+    return preferred[0] || fallback[0] || null;
+  }
+
+  function findMapContainer() {
+    var byId = document.getElementById('driverMap') || document.getElementById('liveMap') || document.getElementById('map') || document.getElementById('routeMap');
+    if (byId && byId.classList && byId.classList.contains('leaflet-container')) return byId;
+    var maps = Array.prototype.slice.call(document.querySelectorAll('.leaflet-container'));
+    if (!maps.length) return null;
+    maps.sort(function (a, b) { return (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight); });
+    return maps[0];
+  }
+
+  function toast(message) {
+    var map = findMapContainer();
+    var el = document.getElementById('driverControlToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'driverControlToast';
+      el.setAttribute('aria-live', 'polite');
+      if (map) map.appendChild(el);
+      else document.body.appendChild(el);
+    } else if (map && el.parentNode !== map && !document.body.classList.contains('driver-pseudo-fullscreen')) {
+      map.appendChild(el);
+    }
+    el.textContent = message;
+    el.style.display = 'block';
+    clearTimeout(el.__hideTimer);
+    el.__hideTimer = setTimeout(function () { el.style.display = 'none'; }, 2600);
+  }
+
+  function callFirstFunction(names) {
+    for (var i = 0; i < names.length; i++) {
+      var fn = window[names[i]];
+      if (typeof fn === 'function') {
+        try { fn(); return true; } catch (err) { console.warn('Driver control function failed:', names[i], err); }
+      }
+    }
+    return false;
+  }
+
+  function clickOriginal(action) {
+    var original = findActionElement(action);
+    if (original) {
+      try {
+        original.click();
+        return true;
+      } catch (err) {
+        console.warn('Original driver button click failed:', action, err);
+      }
+    }
+    return false;
+  }
+
+  function fallbackFullscreen() {
+    var map = findMapContainer();
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen();
+      document.body.classList.remove('driver-pseudo-fullscreen');
+      setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      return true;
+    }
+    if (map && map.requestFullscreen) {
+      map.requestFullscreen().then(function () {
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      }).catch(function () {
+        document.body.classList.toggle('driver-pseudo-fullscreen');
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      });
+      return true;
+    }
+    document.body.classList.toggle('driver-pseudo-fullscreen');
+    setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+    return true;
+  }
+
+  function fallbackWakeLock(btn) {
+    if (wakeLockRef) {
+      try { wakeLockRef.release(); } catch (err) {}
+      wakeLockRef = null;
+      toast('Keep screen on stopped.');
+      return true;
+    }
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLockRef = lock;
+        if (btn) btn.classList.add('driver-active');
+        toast('Keep screen on active.');
+        lock.addEventListener('release', function () { wakeLockRef = null; if (btn) btn.classList.remove('driver-active'); });
+      }).catch(function () { toast('Screen wake lock was blocked by this browser.'); });
+      return true;
+    }
+    toast('Keep screen on is not supported in this browser.');
+    return true;
+  }
+
+  function speak(text) {
+    if (!('speechSynthesis' in window)) {
+      toast('Voice is not supported in this browser.');
+      return false;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-GB';
+      u.rate = 0.96;
+      u.pitch = 1;
+      u.volume = 1;
+      window.speechSynthesis.speak(u);
+      return true;
+    } catch (err) {
+      toast('Voice could not start. Check phone volume.');
+      return false;
+    }
+  }
+
+  function fallbackVoice(btn) {
+    fallbackVoiceActive = !fallbackVoiceActive;
+    if (btn) {
+      btn.textContent = fallbackVoiceActive ? '🔊' : '🔇';
+      btn.setAttribute('aria-label', fallbackVoiceActive ? 'Voice on' : 'Voice off');
+      btn.classList.toggle('driver-voice-active', fallbackVoiceActive);
+    }
+    if (fallbackVoiceActive) speak('Voice guidance is on.');
+    else if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    return true;
+  }
+
+  function fallbackGps(btn) {
+    if (!navigator.geolocation) {
+      toast('GPS is not supported in this browser.');
+      return true;
+    }
+    if (fallbackGpsActive) {
+      if (fallbackGpsWatchId !== null) navigator.geolocation.clearWatch(fallbackGpsWatchId);
+      fallbackGpsWatchId = null;
+      fallbackGpsActive = false;
+      if (btn) btn.classList.remove('driver-gps-active');
+      toast('Live GPS stopped.');
+      return true;
+    }
+    fallbackGpsWatchId = navigator.geolocation.watchPosition(function () {
+      fallbackGpsActive = true;
+      if (btn) btn.classList.add('driver-gps-active');
+      toast('Live GPS started.');
+    }, function (err) {
+      toast('Live GPS could not start: ' + (err && err.message ? err.message : 'permission blocked'));
+    }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 12000 });
+    return true;
+  }
+
+  function activate(action, btn) {
+    if (action === 'gps') {
+      if (clickOriginal('gps')) { toast('Live GPS control activated.'); setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['startLiveGps','startLiveGPS','toggleLiveGps','toggleLiveGPS','startDriverGps','startDriverGPS','toggleDriverGps','toggleDriverGPS','startTracking','toggleTracking','startGpsWatch'])) { toast('Live GPS control activated.'); setTimeout(syncButtons, 300); return; }
+      fallbackGps(btn);
+      return;
+    }
+    if (action === 'centre') {
+      if (clickOriginal('centre')) { setTimeout(syncButtons, 250); return; }
+      if (callFirstFunction(['centrePosition','centerPosition','centreMap','centerMap','centerOnDriver','centreOnDriver','panToDriverLocation'])) return;
+      toast('Centre position control was not found.');
+      return;
+    }
+    if (action === 'recalculate') {
+      if (clickOriginal('recalculate')) { toast('Recalculate requested.'); setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['recalculateRoute','recalculateDriverRoute','recalculateFromCurrentPosition','requestReroute','rerouteFromCurrentPosition'])) { toast('Recalculate requested.'); return; }
+      toast('Recalculate control was not found.');
+      return;
+    }
+    if (action === 'fullscreen') {
+      if (clickOriginal('fullscreen')) { setTimeout(syncButtons, 300); return; }
+      fallbackFullscreen();
+      setTimeout(syncButtons, 300);
+      return;
+    }
+    if (action === 'wake') {
+      if (clickOriginal('wake')) { setTimeout(syncButtons, 300); return; }
+      fallbackWakeLock(btn);
+      return;
+    }
+    if (action === 'voice') {
+      if (clickOriginal('voice')) { setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['toggleVoice','toggleVoiceGuidance','enableVoiceGuidance','driverToggleVoice'])) { setTimeout(syncButtons, 300); return; }
+      fallbackVoice(btn);
+      return;
+    }
+  }
+
+  function makeButton(action, icon, label) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'driver-float-btn';
+    btn.dataset.action = action;
+    btn.textContent = icon;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+    var handler = function (ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      var now = Date.now();
+      if (now - lastTapTime < 260) return false;
+      lastTapTime = now;
+      activate(action, btn);
+      return false;
+    };
+    btn.addEventListener('click', handler, true);
+    btn.addEventListener('touchend', handler, { capture: true, passive: false });
+    btn.addEventListener('pointerup', handler, true);
+    return btn;
+  }
+
+  function createDock() {
+    var dock = document.getElementById('driverFloatingControlDock');
+    if (dock) return dock;
+    dock = document.createElement('div');
+    dock.id = 'driverFloatingControlDock';
+    dock.setAttribute('aria-label', 'Driver map controls');
+    dock.appendChild(makeButton('gps', '📍', 'Start or stop live GPS'));
+    dock.appendChild(makeButton('centre', '⌖', 'Centre position'));
+    dock.appendChild(makeButton('recalculate', '↻', 'Recalculate route'));
+    dock.appendChild(makeButton('fullscreen', '⛶', 'Full screen'));
+    dock.appendChild(makeButton('wake', '☀', 'Keep screen on'));
+    dock.appendChild(makeButton('voice', '🔇', 'Voice guidance'));
+    return dock;
+  }
+
+  function hideTextCardByHeading(text) {
+    var headings = Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,h4,strong,b,legend'));
+    headings.forEach(function (h) {
+      if (norm(h.textContent).indexOf(text) === -1) return;
+      var p = h;
+      for (var i = 0; i < 5 && p && p !== document.body; i++) {
+        var d = describe(p);
+        if (p.offsetHeight > 50 || d.indexOf(text) !== -1) {
+          p.classList.add('driver-hidden-old-controls');
+          return;
+        }
+        p = p.parentElement;
+      }
+    });
+  }
+
+  function hideOldControlGroups() {
+    var controls = allInteractives().filter(function (el) {
+      var d = describe(el);
+      return hasAny(d, ['print','mark completed','completed route','start live gps','stop live gps','centre position','center position','recalculate','full screen','fullscreen','exit full screen','keep screen on','voice on','voice off','📍','📡','⌖','↻','⛶','☀','🔊','🔇']);
+    });
+
+    controls.forEach(function (el) {
+      var d = describe(el);
+      if (hasAny(d, ['print','mark completed','completed route'])) {
+        el.classList.add('driver-hidden-old-controls');
+      }
+    });
+
+    var groups = [];
+    controls.forEach(function (el) {
+      var p = el.parentElement;
+      for (var depth = 0; depth < 5 && p && p !== document.body; depth++) {
+        if (p.id === 'driverFloatingControlDock') break;
+        if (p.classList && p.classList.contains('leaflet-container')) break;
+        var childControls = Array.prototype.slice.call(p.querySelectorAll('button, a, [role="button"]')).filter(function (x) {
+          var dx = describe(x);
+          return hasAny(dx, ['start live gps','stop live gps','centre position','center position','recalculate','full screen','fullscreen','keep screen on','voice on','voice off','📍','📡','⌖','↻','⛶','☀','🔊','🔇']);
+        });
+        if (childControls.length >= 3 && groups.indexOf(p) === -1) groups.push(p);
+        p = p.parentElement;
+      }
+    });
+
+    groups.forEach(function (g) {
+      if (!g.closest('#driverFloatingControlDock') && !g.classList.contains('leaflet-container')) {
+        g.classList.add('driver-hidden-old-controls');
+      }
+    });
+
+    hideTextCardByHeading('driver summary');
+    hideTextCardByHeading('live gps driver mode');
+  }
+
+  function syncButtons() {
+    var dock = document.getElementById('driverFloatingControlDock');
+    if (!dock) return;
+    var gpsBtn = dock.querySelector('[data-action="gps"]');
+    var voiceBtn = dock.querySelector('[data-action="voice"]');
+    var fsBtn = dock.querySelector('[data-action="fullscreen"]');
+
+    var gpsOriginal = findActionElement('gps');
+    var gpsDesc = describe(gpsOriginal);
+    var gpsOn = fallbackGpsActive || hasAny(gpsDesc, ['stop live gps','stop gps','gps active','tracking active','📡']);
+    if (gpsBtn) {
+      gpsBtn.textContent = gpsOn ? '📡' : '📍';
+      gpsBtn.setAttribute('aria-label', gpsOn ? 'Stop live GPS' : 'Start live GPS');
+      gpsBtn.setAttribute('title', gpsOn ? 'Stop live GPS' : 'Start live GPS');
+      gpsBtn.classList.toggle('driver-gps-active', gpsOn);
+    }
+
+    var voiceOriginal = findActionElement('voice');
+    var voiceDesc = describe(voiceOriginal);
+    var voiceOn = fallbackVoiceActive || hasAny(voiceDesc, ['voice on','🔊']);
+    if (voiceBtn) {
+      voiceBtn.textContent = voiceOn ? '🔊' : '🔇';
+      voiceBtn.setAttribute('aria-label', voiceOn ? 'Voice on' : 'Voice off');
+      voiceBtn.setAttribute('title', voiceOn ? 'Voice on' : 'Voice off');
+      voiceBtn.classList.toggle('driver-voice-active', voiceOn);
+    }
+
+    if (fsBtn) {
+      var full = !!document.fullscreenElement || document.body.classList.contains('driver-pseudo-fullscreen');
+      fsBtn.textContent = full ? '↙' : '⛶';
+      fsBtn.setAttribute('aria-label', full ? 'Exit full screen' : 'Full screen');
+      fsBtn.setAttribute('title', full ? 'Exit full screen' : 'Full screen');
+    }
+  }
+
+  function install() {
+    var map = findMapContainer();
+    if (!map) return false;
+    if (window.getComputedStyle(map).position === 'static') map.style.position = 'relative';
+    var dock = createDock();
+    if (dock.parentNode !== map) map.appendChild(dock);
+    hideOldControlGroups();
+    syncButtons();
+    return true;
+  }
+
+  ready(function () {
+    var attempts = 0;
+    var timer = setInterval(function () {
+      attempts += 1;
+      if (install() || attempts > 50) clearInterval(timer);
+    }, 250);
+    document.addEventListener('fullscreenchange', syncButtons);
+    window.addEventListener('resize', function () { setTimeout(install, 150); });
+    setInterval(function () { install(); }, 3000);
+  });
+})();
+</script>
+<!-- DRIVER_FLOATING_CONTROLS_BOTTOM_RIGHT_V4_END -->
+</body>') && !body.includes('driverUiMapControlsFixJs')) {
         const css = '<style id="driverUiMapControlsFixCss">' +
           'body.driver-ui-map-controls-fixed .driver-ui-hidden{display:none!important;visibility:hidden!important;height:0!important;max-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:0!important;}' +
           'body.driver-ui-map-controls-fixed .driver-fixed-control-dock{position:fixed!important;left:50%!important;bottom:max(18px,env(safe-area-inset-bottom))!important;transform:translateX(-50%)!important;z-index:2147483647!important;display:grid!important;grid-template-columns:repeat(6,54px)!important;gap:10px!important;align-items:center!important;justify-content:center!important;pointer-events:auto!important;padding:10px!important;border-radius:28px!important;background:rgba(0,0,0,.35)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important;box-sizing:border-box!important;}' +
@@ -66,7 +608,549 @@ app.use(function driverUiMapControlsFix(req, res, next) {
 
         const headAt = body.toLowerCase().lastIndexOf('</head>');
         if (headAt >= 0) body = body.slice(0, headAt) + css + body.slice(headAt);
-        const bodyAt = body.toLowerCase().lastIndexOf('</body>');
+        const bodyAt = body.toLowerCase().lastIndexOf('
+<!-- DRIVER_FLOATING_CONTROLS_BOTTOM_RIGHT_V4_START -->
+<style>
+  #driverFloatingControlDock {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+    z-index: 10050 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 54px) !important;
+    gap: 10px !important;
+    padding: 12px !important;
+    border: 1px solid rgba(245, 207, 94, 0.55) !important;
+    border-radius: 24px !important;
+    background: rgba(7, 8, 8, 0.86) !important;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.42) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    user-select: none !important;
+    max-width: 218px !important;
+  }
+  #driverFloatingControlDock .driver-float-btn {
+    width: 54px !important;
+    height: 54px !important;
+    min-width: 54px !important;
+    min-height: 54px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 1px solid rgba(245, 207, 94, 0.94) !important;
+    border-radius: 999px !important;
+    background: rgba(8, 8, 7, 0.96) !important;
+    color: #f5cf5e !important;
+    font-size: 23px !important;
+    line-height: 1 !important;
+    font-weight: 900 !important;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.36) !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  #driverFloatingControlDock .driver-float-btn:active,
+  #driverFloatingControlDock .driver-float-btn.driver-active {
+    transform: scale(0.96) !important;
+    background: linear-gradient(135deg, #ffe387, #d8a91e) !important;
+    color: #050505 !important;
+  }
+  #driverFloatingControlDock .driver-float-btn.driver-gps-active {
+    background: linear-gradient(135deg, #55efa6, #16a765) !important;
+    border-color: #83ffd0 !important;
+    color: #02150b !important;
+  }
+  #driverFloatingControlDock .driver-float-btn.driver-voice-active {
+    background: linear-gradient(135deg, #ffe387, #d8a91e) !important;
+    color: #050505 !important;
+  }
+  #driverControlToast {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: calc(248px + env(safe-area-inset-bottom)) !important;
+    z-index: 10060 !important;
+    max-width: min(360px, calc(100vw - 32px)) !important;
+    background: rgba(8,8,7,0.94) !important;
+    color: #ffeaa5 !important;
+    border: 1px solid rgba(245,207,94,0.58) !important;
+    border-radius: 16px !important;
+    padding: 10px 13px !important;
+    font: 700 13px/1.25 system-ui, -apple-system, Segoe UI, sans-serif !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.38) !important;
+    display: none !important;
+    pointer-events: none !important;
+  }
+  body.driver-pseudo-fullscreen .leaflet-container {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    z-index: 9990 !important;
+  }
+  body.driver-pseudo-fullscreen #driverFloatingControlDock {
+    position: fixed !important;
+    z-index: 10080 !important;
+  }
+  body.driver-pseudo-fullscreen #driverControlToast {
+    position: fixed !important;
+    z-index: 10090 !important;
+  }
+  body.driver-pseudo-fullscreen .leaflet-control-container {
+    z-index: 9995 !important;
+  }
+  .driver-hidden-old-controls {
+    display: none !important;
+  }
+  @media (max-width: 700px) {
+    #driverFloatingControlDock {
+      right: 12px !important;
+      bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+      grid-template-columns: repeat(3, 48px) !important;
+      gap: 8px !important;
+      padding: 10px !important;
+      border-radius: 22px !important;
+      max-width: 188px !important;
+    }
+    #driverFloatingControlDock .driver-float-btn {
+      width: 48px !important;
+      height: 48px !important;
+      min-width: 48px !important;
+      min-height: 48px !important;
+      font-size: 21px !important;
+    }
+    #driverControlToast {
+      right: 12px !important;
+      bottom: calc(220px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+</style>
+<script>
+(function () {
+  if (window.__driverFloatingControlsBottomRightV4) return;
+  window.__driverFloatingControlsBottomRightV4 = true;
+
+  var wakeLockRef = null;
+  var lastTapTime = 0;
+  var fallbackGpsWatchId = null;
+  var fallbackGpsActive = false;
+  var fallbackVoiceActive = false;
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function describe(el) {
+    if (!el) return '';
+    var bits = [];
+    bits.push(el.textContent || '');
+    bits.push(el.getAttribute ? el.getAttribute('aria-label') : '');
+    bits.push(el.getAttribute ? el.getAttribute('title') : '');
+    bits.push(el.id || '');
+    bits.push(typeof el.className === 'string' ? el.className : '');
+    bits.push(el.name || '');
+    return norm(bits.join(' '));
+  }
+
+  function isVisible(el) {
+    if (!el) return false;
+    var style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.pointerEvents !== 'none' && el.offsetWidth > 0 && el.offsetHeight > 0;
+  }
+
+  function allInteractives() {
+    return Array.prototype.slice.call(document.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"]'))
+      .filter(function (el) { return !el.closest('#driverFloatingControlDock'); });
+  }
+
+  function hasAny(text, words) {
+    for (var i = 0; i < words.length; i++) {
+      if (text.indexOf(words[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  function findActionElement(action) {
+    var items = allInteractives();
+    var preferred = [];
+    var fallback = [];
+
+    items.forEach(function (el) {
+      var d = describe(el);
+      if (!d) return;
+      if (action === 'gps') {
+        if (hasAny(d, ['start live gps', 'start gps', 'start location', 'start tracking', 'live gps', '📍'])) preferred.push(el);
+        else if (hasAny(d, ['stop live gps', 'stop gps', 'gps active', '📡'])) fallback.push(el);
+      }
+      if (action === 'centre') {
+        if (hasAny(d, ['centre position', 'center position', 'centre map', 'center map', 'my location', '⌖'])) preferred.push(el);
+      }
+      if (action === 'recalculate') {
+        if (hasAny(d, ['recalculate', 'reroute', 're-route', '↻'])) preferred.push(el);
+      }
+      if (action === 'fullscreen') {
+        if (hasAny(d, ['full screen', 'fullscreen', 'exit full screen', 'exit fullscreen', 'large map', '⛶', '↙'])) preferred.push(el);
+      }
+      if (action === 'wake') {
+        if (hasAny(d, ['keep screen on', 'wake lock', 'screen on', '☀'])) preferred.push(el);
+      }
+      if (action === 'voice') {
+        if (hasAny(d, ['voice on', 'voice off', 'voice', '🔊', '🔇'])) preferred.push(el);
+      }
+    });
+
+    preferred.sort(function (a, b) {
+      var av = isVisible(a) ? 0 : 1;
+      var bv = isVisible(b) ? 0 : 1;
+      return av - bv;
+    });
+
+    return preferred[0] || fallback[0] || null;
+  }
+
+  function findMapContainer() {
+    var byId = document.getElementById('driverMap') || document.getElementById('liveMap') || document.getElementById('map') || document.getElementById('routeMap');
+    if (byId && byId.classList && byId.classList.contains('leaflet-container')) return byId;
+    var maps = Array.prototype.slice.call(document.querySelectorAll('.leaflet-container'));
+    if (!maps.length) return null;
+    maps.sort(function (a, b) { return (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight); });
+    return maps[0];
+  }
+
+  function toast(message) {
+    var map = findMapContainer();
+    var el = document.getElementById('driverControlToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'driverControlToast';
+      el.setAttribute('aria-live', 'polite');
+      if (map) map.appendChild(el);
+      else document.body.appendChild(el);
+    } else if (map && el.parentNode !== map && !document.body.classList.contains('driver-pseudo-fullscreen')) {
+      map.appendChild(el);
+    }
+    el.textContent = message;
+    el.style.display = 'block';
+    clearTimeout(el.__hideTimer);
+    el.__hideTimer = setTimeout(function () { el.style.display = 'none'; }, 2600);
+  }
+
+  function callFirstFunction(names) {
+    for (var i = 0; i < names.length; i++) {
+      var fn = window[names[i]];
+      if (typeof fn === 'function') {
+        try { fn(); return true; } catch (err) { console.warn('Driver control function failed:', names[i], err); }
+      }
+    }
+    return false;
+  }
+
+  function clickOriginal(action) {
+    var original = findActionElement(action);
+    if (original) {
+      try {
+        original.click();
+        return true;
+      } catch (err) {
+        console.warn('Original driver button click failed:', action, err);
+      }
+    }
+    return false;
+  }
+
+  function fallbackFullscreen() {
+    var map = findMapContainer();
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen();
+      document.body.classList.remove('driver-pseudo-fullscreen');
+      setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      return true;
+    }
+    if (map && map.requestFullscreen) {
+      map.requestFullscreen().then(function () {
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      }).catch(function () {
+        document.body.classList.toggle('driver-pseudo-fullscreen');
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      });
+      return true;
+    }
+    document.body.classList.toggle('driver-pseudo-fullscreen');
+    setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+    return true;
+  }
+
+  function fallbackWakeLock(btn) {
+    if (wakeLockRef) {
+      try { wakeLockRef.release(); } catch (err) {}
+      wakeLockRef = null;
+      toast('Keep screen on stopped.');
+      return true;
+    }
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLockRef = lock;
+        if (btn) btn.classList.add('driver-active');
+        toast('Keep screen on active.');
+        lock.addEventListener('release', function () { wakeLockRef = null; if (btn) btn.classList.remove('driver-active'); });
+      }).catch(function () { toast('Screen wake lock was blocked by this browser.'); });
+      return true;
+    }
+    toast('Keep screen on is not supported in this browser.');
+    return true;
+  }
+
+  function speak(text) {
+    if (!('speechSynthesis' in window)) {
+      toast('Voice is not supported in this browser.');
+      return false;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-GB';
+      u.rate = 0.96;
+      u.pitch = 1;
+      u.volume = 1;
+      window.speechSynthesis.speak(u);
+      return true;
+    } catch (err) {
+      toast('Voice could not start. Check phone volume.');
+      return false;
+    }
+  }
+
+  function fallbackVoice(btn) {
+    fallbackVoiceActive = !fallbackVoiceActive;
+    if (btn) {
+      btn.textContent = fallbackVoiceActive ? '🔊' : '🔇';
+      btn.setAttribute('aria-label', fallbackVoiceActive ? 'Voice on' : 'Voice off');
+      btn.classList.toggle('driver-voice-active', fallbackVoiceActive);
+    }
+    if (fallbackVoiceActive) speak('Voice guidance is on.');
+    else if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    return true;
+  }
+
+  function fallbackGps(btn) {
+    if (!navigator.geolocation) {
+      toast('GPS is not supported in this browser.');
+      return true;
+    }
+    if (fallbackGpsActive) {
+      if (fallbackGpsWatchId !== null) navigator.geolocation.clearWatch(fallbackGpsWatchId);
+      fallbackGpsWatchId = null;
+      fallbackGpsActive = false;
+      if (btn) btn.classList.remove('driver-gps-active');
+      toast('Live GPS stopped.');
+      return true;
+    }
+    fallbackGpsWatchId = navigator.geolocation.watchPosition(function () {
+      fallbackGpsActive = true;
+      if (btn) btn.classList.add('driver-gps-active');
+      toast('Live GPS started.');
+    }, function (err) {
+      toast('Live GPS could not start: ' + (err && err.message ? err.message : 'permission blocked'));
+    }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 12000 });
+    return true;
+  }
+
+  function activate(action, btn) {
+    if (action === 'gps') {
+      if (clickOriginal('gps')) { toast('Live GPS control activated.'); setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['startLiveGps','startLiveGPS','toggleLiveGps','toggleLiveGPS','startDriverGps','startDriverGPS','toggleDriverGps','toggleDriverGPS','startTracking','toggleTracking','startGpsWatch'])) { toast('Live GPS control activated.'); setTimeout(syncButtons, 300); return; }
+      fallbackGps(btn);
+      return;
+    }
+    if (action === 'centre') {
+      if (clickOriginal('centre')) { setTimeout(syncButtons, 250); return; }
+      if (callFirstFunction(['centrePosition','centerPosition','centreMap','centerMap','centerOnDriver','centreOnDriver','panToDriverLocation'])) return;
+      toast('Centre position control was not found.');
+      return;
+    }
+    if (action === 'recalculate') {
+      if (clickOriginal('recalculate')) { toast('Recalculate requested.'); setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['recalculateRoute','recalculateDriverRoute','recalculateFromCurrentPosition','requestReroute','rerouteFromCurrentPosition'])) { toast('Recalculate requested.'); return; }
+      toast('Recalculate control was not found.');
+      return;
+    }
+    if (action === 'fullscreen') {
+      if (clickOriginal('fullscreen')) { setTimeout(syncButtons, 300); return; }
+      fallbackFullscreen();
+      setTimeout(syncButtons, 300);
+      return;
+    }
+    if (action === 'wake') {
+      if (clickOriginal('wake')) { setTimeout(syncButtons, 300); return; }
+      fallbackWakeLock(btn);
+      return;
+    }
+    if (action === 'voice') {
+      if (clickOriginal('voice')) { setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['toggleVoice','toggleVoiceGuidance','enableVoiceGuidance','driverToggleVoice'])) { setTimeout(syncButtons, 300); return; }
+      fallbackVoice(btn);
+      return;
+    }
+  }
+
+  function makeButton(action, icon, label) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'driver-float-btn';
+    btn.dataset.action = action;
+    btn.textContent = icon;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+    var handler = function (ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      var now = Date.now();
+      if (now - lastTapTime < 260) return false;
+      lastTapTime = now;
+      activate(action, btn);
+      return false;
+    };
+    btn.addEventListener('click', handler, true);
+    btn.addEventListener('touchend', handler, { capture: true, passive: false });
+    btn.addEventListener('pointerup', handler, true);
+    return btn;
+  }
+
+  function createDock() {
+    var dock = document.getElementById('driverFloatingControlDock');
+    if (dock) return dock;
+    dock = document.createElement('div');
+    dock.id = 'driverFloatingControlDock';
+    dock.setAttribute('aria-label', 'Driver map controls');
+    dock.appendChild(makeButton('gps', '📍', 'Start or stop live GPS'));
+    dock.appendChild(makeButton('centre', '⌖', 'Centre position'));
+    dock.appendChild(makeButton('recalculate', '↻', 'Recalculate route'));
+    dock.appendChild(makeButton('fullscreen', '⛶', 'Full screen'));
+    dock.appendChild(makeButton('wake', '☀', 'Keep screen on'));
+    dock.appendChild(makeButton('voice', '🔇', 'Voice guidance'));
+    return dock;
+  }
+
+  function hideTextCardByHeading(text) {
+    var headings = Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,h4,strong,b,legend'));
+    headings.forEach(function (h) {
+      if (norm(h.textContent).indexOf(text) === -1) return;
+      var p = h;
+      for (var i = 0; i < 5 && p && p !== document.body; i++) {
+        var d = describe(p);
+        if (p.offsetHeight > 50 || d.indexOf(text) !== -1) {
+          p.classList.add('driver-hidden-old-controls');
+          return;
+        }
+        p = p.parentElement;
+      }
+    });
+  }
+
+  function hideOldControlGroups() {
+    var controls = allInteractives().filter(function (el) {
+      var d = describe(el);
+      return hasAny(d, ['print','mark completed','completed route','start live gps','stop live gps','centre position','center position','recalculate','full screen','fullscreen','exit full screen','keep screen on','voice on','voice off','📍','📡','⌖','↻','⛶','☀','🔊','🔇']);
+    });
+
+    controls.forEach(function (el) {
+      var d = describe(el);
+      if (hasAny(d, ['print','mark completed','completed route'])) {
+        el.classList.add('driver-hidden-old-controls');
+      }
+    });
+
+    var groups = [];
+    controls.forEach(function (el) {
+      var p = el.parentElement;
+      for (var depth = 0; depth < 5 && p && p !== document.body; depth++) {
+        if (p.id === 'driverFloatingControlDock') break;
+        if (p.classList && p.classList.contains('leaflet-container')) break;
+        var childControls = Array.prototype.slice.call(p.querySelectorAll('button, a, [role="button"]')).filter(function (x) {
+          var dx = describe(x);
+          return hasAny(dx, ['start live gps','stop live gps','centre position','center position','recalculate','full screen','fullscreen','keep screen on','voice on','voice off','📍','📡','⌖','↻','⛶','☀','🔊','🔇']);
+        });
+        if (childControls.length >= 3 && groups.indexOf(p) === -1) groups.push(p);
+        p = p.parentElement;
+      }
+    });
+
+    groups.forEach(function (g) {
+      if (!g.closest('#driverFloatingControlDock') && !g.classList.contains('leaflet-container')) {
+        g.classList.add('driver-hidden-old-controls');
+      }
+    });
+
+    hideTextCardByHeading('driver summary');
+    hideTextCardByHeading('live gps driver mode');
+  }
+
+  function syncButtons() {
+    var dock = document.getElementById('driverFloatingControlDock');
+    if (!dock) return;
+    var gpsBtn = dock.querySelector('[data-action="gps"]');
+    var voiceBtn = dock.querySelector('[data-action="voice"]');
+    var fsBtn = dock.querySelector('[data-action="fullscreen"]');
+
+    var gpsOriginal = findActionElement('gps');
+    var gpsDesc = describe(gpsOriginal);
+    var gpsOn = fallbackGpsActive || hasAny(gpsDesc, ['stop live gps','stop gps','gps active','tracking active','📡']);
+    if (gpsBtn) {
+      gpsBtn.textContent = gpsOn ? '📡' : '📍';
+      gpsBtn.setAttribute('aria-label', gpsOn ? 'Stop live GPS' : 'Start live GPS');
+      gpsBtn.setAttribute('title', gpsOn ? 'Stop live GPS' : 'Start live GPS');
+      gpsBtn.classList.toggle('driver-gps-active', gpsOn);
+    }
+
+    var voiceOriginal = findActionElement('voice');
+    var voiceDesc = describe(voiceOriginal);
+    var voiceOn = fallbackVoiceActive || hasAny(voiceDesc, ['voice on','🔊']);
+    if (voiceBtn) {
+      voiceBtn.textContent = voiceOn ? '🔊' : '🔇';
+      voiceBtn.setAttribute('aria-label', voiceOn ? 'Voice on' : 'Voice off');
+      voiceBtn.setAttribute('title', voiceOn ? 'Voice on' : 'Voice off');
+      voiceBtn.classList.toggle('driver-voice-active', voiceOn);
+    }
+
+    if (fsBtn) {
+      var full = !!document.fullscreenElement || document.body.classList.contains('driver-pseudo-fullscreen');
+      fsBtn.textContent = full ? '↙' : '⛶';
+      fsBtn.setAttribute('aria-label', full ? 'Exit full screen' : 'Full screen');
+      fsBtn.setAttribute('title', full ? 'Exit full screen' : 'Full screen');
+    }
+  }
+
+  function install() {
+    var map = findMapContainer();
+    if (!map) return false;
+    if (window.getComputedStyle(map).position === 'static') map.style.position = 'relative';
+    var dock = createDock();
+    if (dock.parentNode !== map) map.appendChild(dock);
+    hideOldControlGroups();
+    syncButtons();
+    return true;
+  }
+
+  ready(function () {
+    var attempts = 0;
+    var timer = setInterval(function () {
+      attempts += 1;
+      if (install() || attempts > 50) clearInterval(timer);
+    }, 250);
+    document.addEventListener('fullscreenchange', syncButtons);
+    window.addEventListener('resize', function () { setTimeout(install, 150); });
+    setInterval(function () { install(); }, 3000);
+  });
+})();
+</script>
+<!-- DRIVER_FLOATING_CONTROLS_BOTTOM_RIGHT_V4_END -->
+</body>');
         if (bodyAt >= 0) body = body.slice(0, bodyAt) + js + body.slice(bodyAt);
       }
     } catch (err) {
@@ -1511,6 +2595,548 @@ document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=
 })();
 </script>
 <!-- P2P_DRIVER_GPS_MAP_CONTROLS_END -->
+
+<!-- DRIVER_FLOATING_CONTROLS_BOTTOM_RIGHT_V4_START -->
+<style>
+  #driverFloatingControlDock {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+    z-index: 10050 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 54px) !important;
+    gap: 10px !important;
+    padding: 12px !important;
+    border: 1px solid rgba(245, 207, 94, 0.55) !important;
+    border-radius: 24px !important;
+    background: rgba(7, 8, 8, 0.86) !important;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.42) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    user-select: none !important;
+    max-width: 218px !important;
+  }
+  #driverFloatingControlDock .driver-float-btn {
+    width: 54px !important;
+    height: 54px !important;
+    min-width: 54px !important;
+    min-height: 54px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 1px solid rgba(245, 207, 94, 0.94) !important;
+    border-radius: 999px !important;
+    background: rgba(8, 8, 7, 0.96) !important;
+    color: #f5cf5e !important;
+    font-size: 23px !important;
+    line-height: 1 !important;
+    font-weight: 900 !important;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.36) !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  #driverFloatingControlDock .driver-float-btn:active,
+  #driverFloatingControlDock .driver-float-btn.driver-active {
+    transform: scale(0.96) !important;
+    background: linear-gradient(135deg, #ffe387, #d8a91e) !important;
+    color: #050505 !important;
+  }
+  #driverFloatingControlDock .driver-float-btn.driver-gps-active {
+    background: linear-gradient(135deg, #55efa6, #16a765) !important;
+    border-color: #83ffd0 !important;
+    color: #02150b !important;
+  }
+  #driverFloatingControlDock .driver-float-btn.driver-voice-active {
+    background: linear-gradient(135deg, #ffe387, #d8a91e) !important;
+    color: #050505 !important;
+  }
+  #driverControlToast {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: calc(248px + env(safe-area-inset-bottom)) !important;
+    z-index: 10060 !important;
+    max-width: min(360px, calc(100vw - 32px)) !important;
+    background: rgba(8,8,7,0.94) !important;
+    color: #ffeaa5 !important;
+    border: 1px solid rgba(245,207,94,0.58) !important;
+    border-radius: 16px !important;
+    padding: 10px 13px !important;
+    font: 700 13px/1.25 system-ui, -apple-system, Segoe UI, sans-serif !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.38) !important;
+    display: none !important;
+    pointer-events: none !important;
+  }
+  body.driver-pseudo-fullscreen .leaflet-container {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    z-index: 9990 !important;
+  }
+  body.driver-pseudo-fullscreen #driverFloatingControlDock {
+    position: fixed !important;
+    z-index: 10080 !important;
+  }
+  body.driver-pseudo-fullscreen #driverControlToast {
+    position: fixed !important;
+    z-index: 10090 !important;
+  }
+  body.driver-pseudo-fullscreen .leaflet-control-container {
+    z-index: 9995 !important;
+  }
+  .driver-hidden-old-controls {
+    display: none !important;
+  }
+  @media (max-width: 700px) {
+    #driverFloatingControlDock {
+      right: 12px !important;
+      bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+      grid-template-columns: repeat(3, 48px) !important;
+      gap: 8px !important;
+      padding: 10px !important;
+      border-radius: 22px !important;
+      max-width: 188px !important;
+    }
+    #driverFloatingControlDock .driver-float-btn {
+      width: 48px !important;
+      height: 48px !important;
+      min-width: 48px !important;
+      min-height: 48px !important;
+      font-size: 21px !important;
+    }
+    #driverControlToast {
+      right: 12px !important;
+      bottom: calc(220px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+</style>
+<script>
+(function () {
+  if (window.__driverFloatingControlsBottomRightV4) return;
+  window.__driverFloatingControlsBottomRightV4 = true;
+
+  var wakeLockRef = null;
+  var lastTapTime = 0;
+  var fallbackGpsWatchId = null;
+  var fallbackGpsActive = false;
+  var fallbackVoiceActive = false;
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function describe(el) {
+    if (!el) return '';
+    var bits = [];
+    bits.push(el.textContent || '');
+    bits.push(el.getAttribute ? el.getAttribute('aria-label') : '');
+    bits.push(el.getAttribute ? el.getAttribute('title') : '');
+    bits.push(el.id || '');
+    bits.push(typeof el.className === 'string' ? el.className : '');
+    bits.push(el.name || '');
+    return norm(bits.join(' '));
+  }
+
+  function isVisible(el) {
+    if (!el) return false;
+    var style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.pointerEvents !== 'none' && el.offsetWidth > 0 && el.offsetHeight > 0;
+  }
+
+  function allInteractives() {
+    return Array.prototype.slice.call(document.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"]'))
+      .filter(function (el) { return !el.closest('#driverFloatingControlDock'); });
+  }
+
+  function hasAny(text, words) {
+    for (var i = 0; i < words.length; i++) {
+      if (text.indexOf(words[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  function findActionElement(action) {
+    var items = allInteractives();
+    var preferred = [];
+    var fallback = [];
+
+    items.forEach(function (el) {
+      var d = describe(el);
+      if (!d) return;
+      if (action === 'gps') {
+        if (hasAny(d, ['start live gps', 'start gps', 'start location', 'start tracking', 'live gps', '📍'])) preferred.push(el);
+        else if (hasAny(d, ['stop live gps', 'stop gps', 'gps active', '📡'])) fallback.push(el);
+      }
+      if (action === 'centre') {
+        if (hasAny(d, ['centre position', 'center position', 'centre map', 'center map', 'my location', '⌖'])) preferred.push(el);
+      }
+      if (action === 'recalculate') {
+        if (hasAny(d, ['recalculate', 'reroute', 're-route', '↻'])) preferred.push(el);
+      }
+      if (action === 'fullscreen') {
+        if (hasAny(d, ['full screen', 'fullscreen', 'exit full screen', 'exit fullscreen', 'large map', '⛶', '↙'])) preferred.push(el);
+      }
+      if (action === 'wake') {
+        if (hasAny(d, ['keep screen on', 'wake lock', 'screen on', '☀'])) preferred.push(el);
+      }
+      if (action === 'voice') {
+        if (hasAny(d, ['voice on', 'voice off', 'voice', '🔊', '🔇'])) preferred.push(el);
+      }
+    });
+
+    preferred.sort(function (a, b) {
+      var av = isVisible(a) ? 0 : 1;
+      var bv = isVisible(b) ? 0 : 1;
+      return av - bv;
+    });
+
+    return preferred[0] || fallback[0] || null;
+  }
+
+  function findMapContainer() {
+    var byId = document.getElementById('driverMap') || document.getElementById('liveMap') || document.getElementById('map') || document.getElementById('routeMap');
+    if (byId && byId.classList && byId.classList.contains('leaflet-container')) return byId;
+    var maps = Array.prototype.slice.call(document.querySelectorAll('.leaflet-container'));
+    if (!maps.length) return null;
+    maps.sort(function (a, b) { return (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight); });
+    return maps[0];
+  }
+
+  function toast(message) {
+    var map = findMapContainer();
+    var el = document.getElementById('driverControlToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'driverControlToast';
+      el.setAttribute('aria-live', 'polite');
+      if (map) map.appendChild(el);
+      else document.body.appendChild(el);
+    } else if (map && el.parentNode !== map && !document.body.classList.contains('driver-pseudo-fullscreen')) {
+      map.appendChild(el);
+    }
+    el.textContent = message;
+    el.style.display = 'block';
+    clearTimeout(el.__hideTimer);
+    el.__hideTimer = setTimeout(function () { el.style.display = 'none'; }, 2600);
+  }
+
+  function callFirstFunction(names) {
+    for (var i = 0; i < names.length; i++) {
+      var fn = window[names[i]];
+      if (typeof fn === 'function') {
+        try { fn(); return true; } catch (err) { console.warn('Driver control function failed:', names[i], err); }
+      }
+    }
+    return false;
+  }
+
+  function clickOriginal(action) {
+    var original = findActionElement(action);
+    if (original) {
+      try {
+        original.click();
+        return true;
+      } catch (err) {
+        console.warn('Original driver button click failed:', action, err);
+      }
+    }
+    return false;
+  }
+
+  function fallbackFullscreen() {
+    var map = findMapContainer();
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen();
+      document.body.classList.remove('driver-pseudo-fullscreen');
+      setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      return true;
+    }
+    if (map && map.requestFullscreen) {
+      map.requestFullscreen().then(function () {
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      }).catch(function () {
+        document.body.classList.toggle('driver-pseudo-fullscreen');
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      });
+      return true;
+    }
+    document.body.classList.toggle('driver-pseudo-fullscreen');
+    setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+    return true;
+  }
+
+  function fallbackWakeLock(btn) {
+    if (wakeLockRef) {
+      try { wakeLockRef.release(); } catch (err) {}
+      wakeLockRef = null;
+      toast('Keep screen on stopped.');
+      return true;
+    }
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLockRef = lock;
+        if (btn) btn.classList.add('driver-active');
+        toast('Keep screen on active.');
+        lock.addEventListener('release', function () { wakeLockRef = null; if (btn) btn.classList.remove('driver-active'); });
+      }).catch(function () { toast('Screen wake lock was blocked by this browser.'); });
+      return true;
+    }
+    toast('Keep screen on is not supported in this browser.');
+    return true;
+  }
+
+  function speak(text) {
+    if (!('speechSynthesis' in window)) {
+      toast('Voice is not supported in this browser.');
+      return false;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-GB';
+      u.rate = 0.96;
+      u.pitch = 1;
+      u.volume = 1;
+      window.speechSynthesis.speak(u);
+      return true;
+    } catch (err) {
+      toast('Voice could not start. Check phone volume.');
+      return false;
+    }
+  }
+
+  function fallbackVoice(btn) {
+    fallbackVoiceActive = !fallbackVoiceActive;
+    if (btn) {
+      btn.textContent = fallbackVoiceActive ? '🔊' : '🔇';
+      btn.setAttribute('aria-label', fallbackVoiceActive ? 'Voice on' : 'Voice off');
+      btn.classList.toggle('driver-voice-active', fallbackVoiceActive);
+    }
+    if (fallbackVoiceActive) speak('Voice guidance is on.');
+    else if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    return true;
+  }
+
+  function fallbackGps(btn) {
+    if (!navigator.geolocation) {
+      toast('GPS is not supported in this browser.');
+      return true;
+    }
+    if (fallbackGpsActive) {
+      if (fallbackGpsWatchId !== null) navigator.geolocation.clearWatch(fallbackGpsWatchId);
+      fallbackGpsWatchId = null;
+      fallbackGpsActive = false;
+      if (btn) btn.classList.remove('driver-gps-active');
+      toast('Live GPS stopped.');
+      return true;
+    }
+    fallbackGpsWatchId = navigator.geolocation.watchPosition(function () {
+      fallbackGpsActive = true;
+      if (btn) btn.classList.add('driver-gps-active');
+      toast('Live GPS started.');
+    }, function (err) {
+      toast('Live GPS could not start: ' + (err && err.message ? err.message : 'permission blocked'));
+    }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 12000 });
+    return true;
+  }
+
+  function activate(action, btn) {
+    if (action === 'gps') {
+      if (clickOriginal('gps')) { toast('Live GPS control activated.'); setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['startLiveGps','startLiveGPS','toggleLiveGps','toggleLiveGPS','startDriverGps','startDriverGPS','toggleDriverGps','toggleDriverGPS','startTracking','toggleTracking','startGpsWatch'])) { toast('Live GPS control activated.'); setTimeout(syncButtons, 300); return; }
+      fallbackGps(btn);
+      return;
+    }
+    if (action === 'centre') {
+      if (clickOriginal('centre')) { setTimeout(syncButtons, 250); return; }
+      if (callFirstFunction(['centrePosition','centerPosition','centreMap','centerMap','centerOnDriver','centreOnDriver','panToDriverLocation'])) return;
+      toast('Centre position control was not found.');
+      return;
+    }
+    if (action === 'recalculate') {
+      if (clickOriginal('recalculate')) { toast('Recalculate requested.'); setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['recalculateRoute','recalculateDriverRoute','recalculateFromCurrentPosition','requestReroute','rerouteFromCurrentPosition'])) { toast('Recalculate requested.'); return; }
+      toast('Recalculate control was not found.');
+      return;
+    }
+    if (action === 'fullscreen') {
+      if (clickOriginal('fullscreen')) { setTimeout(syncButtons, 300); return; }
+      fallbackFullscreen();
+      setTimeout(syncButtons, 300);
+      return;
+    }
+    if (action === 'wake') {
+      if (clickOriginal('wake')) { setTimeout(syncButtons, 300); return; }
+      fallbackWakeLock(btn);
+      return;
+    }
+    if (action === 'voice') {
+      if (clickOriginal('voice')) { setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['toggleVoice','toggleVoiceGuidance','enableVoiceGuidance','driverToggleVoice'])) { setTimeout(syncButtons, 300); return; }
+      fallbackVoice(btn);
+      return;
+    }
+  }
+
+  function makeButton(action, icon, label) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'driver-float-btn';
+    btn.dataset.action = action;
+    btn.textContent = icon;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+    var handler = function (ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      var now = Date.now();
+      if (now - lastTapTime < 260) return false;
+      lastTapTime = now;
+      activate(action, btn);
+      return false;
+    };
+    btn.addEventListener('click', handler, true);
+    btn.addEventListener('touchend', handler, { capture: true, passive: false });
+    btn.addEventListener('pointerup', handler, true);
+    return btn;
+  }
+
+  function createDock() {
+    var dock = document.getElementById('driverFloatingControlDock');
+    if (dock) return dock;
+    dock = document.createElement('div');
+    dock.id = 'driverFloatingControlDock';
+    dock.setAttribute('aria-label', 'Driver map controls');
+    dock.appendChild(makeButton('gps', '📍', 'Start or stop live GPS'));
+    dock.appendChild(makeButton('centre', '⌖', 'Centre position'));
+    dock.appendChild(makeButton('recalculate', '↻', 'Recalculate route'));
+    dock.appendChild(makeButton('fullscreen', '⛶', 'Full screen'));
+    dock.appendChild(makeButton('wake', '☀', 'Keep screen on'));
+    dock.appendChild(makeButton('voice', '🔇', 'Voice guidance'));
+    return dock;
+  }
+
+  function hideTextCardByHeading(text) {
+    var headings = Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,h4,strong,b,legend'));
+    headings.forEach(function (h) {
+      if (norm(h.textContent).indexOf(text) === -1) return;
+      var p = h;
+      for (var i = 0; i < 5 && p && p !== document.body; i++) {
+        var d = describe(p);
+        if (p.offsetHeight > 50 || d.indexOf(text) !== -1) {
+          p.classList.add('driver-hidden-old-controls');
+          return;
+        }
+        p = p.parentElement;
+      }
+    });
+  }
+
+  function hideOldControlGroups() {
+    var controls = allInteractives().filter(function (el) {
+      var d = describe(el);
+      return hasAny(d, ['print','mark completed','completed route','start live gps','stop live gps','centre position','center position','recalculate','full screen','fullscreen','exit full screen','keep screen on','voice on','voice off','📍','📡','⌖','↻','⛶','☀','🔊','🔇']);
+    });
+
+    controls.forEach(function (el) {
+      var d = describe(el);
+      if (hasAny(d, ['print','mark completed','completed route'])) {
+        el.classList.add('driver-hidden-old-controls');
+      }
+    });
+
+    var groups = [];
+    controls.forEach(function (el) {
+      var p = el.parentElement;
+      for (var depth = 0; depth < 5 && p && p !== document.body; depth++) {
+        if (p.id === 'driverFloatingControlDock') break;
+        if (p.classList && p.classList.contains('leaflet-container')) break;
+        var childControls = Array.prototype.slice.call(p.querySelectorAll('button, a, [role="button"]')).filter(function (x) {
+          var dx = describe(x);
+          return hasAny(dx, ['start live gps','stop live gps','centre position','center position','recalculate','full screen','fullscreen','keep screen on','voice on','voice off','📍','📡','⌖','↻','⛶','☀','🔊','🔇']);
+        });
+        if (childControls.length >= 3 && groups.indexOf(p) === -1) groups.push(p);
+        p = p.parentElement;
+      }
+    });
+
+    groups.forEach(function (g) {
+      if (!g.closest('#driverFloatingControlDock') && !g.classList.contains('leaflet-container')) {
+        g.classList.add('driver-hidden-old-controls');
+      }
+    });
+
+    hideTextCardByHeading('driver summary');
+    hideTextCardByHeading('live gps driver mode');
+  }
+
+  function syncButtons() {
+    var dock = document.getElementById('driverFloatingControlDock');
+    if (!dock) return;
+    var gpsBtn = dock.querySelector('[data-action="gps"]');
+    var voiceBtn = dock.querySelector('[data-action="voice"]');
+    var fsBtn = dock.querySelector('[data-action="fullscreen"]');
+
+    var gpsOriginal = findActionElement('gps');
+    var gpsDesc = describe(gpsOriginal);
+    var gpsOn = fallbackGpsActive || hasAny(gpsDesc, ['stop live gps','stop gps','gps active','tracking active','📡']);
+    if (gpsBtn) {
+      gpsBtn.textContent = gpsOn ? '📡' : '📍';
+      gpsBtn.setAttribute('aria-label', gpsOn ? 'Stop live GPS' : 'Start live GPS');
+      gpsBtn.setAttribute('title', gpsOn ? 'Stop live GPS' : 'Start live GPS');
+      gpsBtn.classList.toggle('driver-gps-active', gpsOn);
+    }
+
+    var voiceOriginal = findActionElement('voice');
+    var voiceDesc = describe(voiceOriginal);
+    var voiceOn = fallbackVoiceActive || hasAny(voiceDesc, ['voice on','🔊']);
+    if (voiceBtn) {
+      voiceBtn.textContent = voiceOn ? '🔊' : '🔇';
+      voiceBtn.setAttribute('aria-label', voiceOn ? 'Voice on' : 'Voice off');
+      voiceBtn.setAttribute('title', voiceOn ? 'Voice on' : 'Voice off');
+      voiceBtn.classList.toggle('driver-voice-active', voiceOn);
+    }
+
+    if (fsBtn) {
+      var full = !!document.fullscreenElement || document.body.classList.contains('driver-pseudo-fullscreen');
+      fsBtn.textContent = full ? '↙' : '⛶';
+      fsBtn.setAttribute('aria-label', full ? 'Exit full screen' : 'Full screen');
+      fsBtn.setAttribute('title', full ? 'Exit full screen' : 'Full screen');
+    }
+  }
+
+  function install() {
+    var map = findMapContainer();
+    if (!map) return false;
+    if (window.getComputedStyle(map).position === 'static') map.style.position = 'relative';
+    var dock = createDock();
+    if (dock.parentNode !== map) map.appendChild(dock);
+    hideOldControlGroups();
+    syncButtons();
+    return true;
+  }
+
+  ready(function () {
+    var attempts = 0;
+    var timer = setInterval(function () {
+      attempts += 1;
+      if (install() || attempts > 50) clearInterval(timer);
+    }, 250);
+    document.addEventListener('fullscreenchange', syncButtons);
+    window.addEventListener('resize', function () { setTimeout(install, 150); });
+    setInterval(function () { install(); }, 3000);
+  });
+})();
+</script>
+<!-- DRIVER_FLOATING_CONTROLS_BOTTOM_RIGHT_V4_END -->
 </body>
 </html>`;
 }
@@ -2183,6 +3809,548 @@ function buildRouteReportHtml(record) {
 })();
 </script>
 <!-- P2P_DRIVER_GPS_MAP_CONTROLS_END -->
+
+<!-- DRIVER_FLOATING_CONTROLS_BOTTOM_RIGHT_V4_START -->
+<style>
+  #driverFloatingControlDock {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+    z-index: 10050 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 54px) !important;
+    gap: 10px !important;
+    padding: 12px !important;
+    border: 1px solid rgba(245, 207, 94, 0.55) !important;
+    border-radius: 24px !important;
+    background: rgba(7, 8, 8, 0.86) !important;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.42) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    user-select: none !important;
+    max-width: 218px !important;
+  }
+  #driverFloatingControlDock .driver-float-btn {
+    width: 54px !important;
+    height: 54px !important;
+    min-width: 54px !important;
+    min-height: 54px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border: 1px solid rgba(245, 207, 94, 0.94) !important;
+    border-radius: 999px !important;
+    background: rgba(8, 8, 7, 0.96) !important;
+    color: #f5cf5e !important;
+    font-size: 23px !important;
+    line-height: 1 !important;
+    font-weight: 900 !important;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.36) !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+  #driverFloatingControlDock .driver-float-btn:active,
+  #driverFloatingControlDock .driver-float-btn.driver-active {
+    transform: scale(0.96) !important;
+    background: linear-gradient(135deg, #ffe387, #d8a91e) !important;
+    color: #050505 !important;
+  }
+  #driverFloatingControlDock .driver-float-btn.driver-gps-active {
+    background: linear-gradient(135deg, #55efa6, #16a765) !important;
+    border-color: #83ffd0 !important;
+    color: #02150b !important;
+  }
+  #driverFloatingControlDock .driver-float-btn.driver-voice-active {
+    background: linear-gradient(135deg, #ffe387, #d8a91e) !important;
+    color: #050505 !important;
+  }
+  #driverControlToast {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: calc(248px + env(safe-area-inset-bottom)) !important;
+    z-index: 10060 !important;
+    max-width: min(360px, calc(100vw - 32px)) !important;
+    background: rgba(8,8,7,0.94) !important;
+    color: #ffeaa5 !important;
+    border: 1px solid rgba(245,207,94,0.58) !important;
+    border-radius: 16px !important;
+    padding: 10px 13px !important;
+    font: 700 13px/1.25 system-ui, -apple-system, Segoe UI, sans-serif !important;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.38) !important;
+    display: none !important;
+    pointer-events: none !important;
+  }
+  body.driver-pseudo-fullscreen .leaflet-container {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    z-index: 9990 !important;
+  }
+  body.driver-pseudo-fullscreen #driverFloatingControlDock {
+    position: fixed !important;
+    z-index: 10080 !important;
+  }
+  body.driver-pseudo-fullscreen #driverControlToast {
+    position: fixed !important;
+    z-index: 10090 !important;
+  }
+  body.driver-pseudo-fullscreen .leaflet-control-container {
+    z-index: 9995 !important;
+  }
+  .driver-hidden-old-controls {
+    display: none !important;
+  }
+  @media (max-width: 700px) {
+    #driverFloatingControlDock {
+      right: 12px !important;
+      bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+      grid-template-columns: repeat(3, 48px) !important;
+      gap: 8px !important;
+      padding: 10px !important;
+      border-radius: 22px !important;
+      max-width: 188px !important;
+    }
+    #driverFloatingControlDock .driver-float-btn {
+      width: 48px !important;
+      height: 48px !important;
+      min-width: 48px !important;
+      min-height: 48px !important;
+      font-size: 21px !important;
+    }
+    #driverControlToast {
+      right: 12px !important;
+      bottom: calc(220px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+</style>
+<script>
+(function () {
+  if (window.__driverFloatingControlsBottomRightV4) return;
+  window.__driverFloatingControlsBottomRightV4 = true;
+
+  var wakeLockRef = null;
+  var lastTapTime = 0;
+  var fallbackGpsWatchId = null;
+  var fallbackGpsActive = false;
+  var fallbackVoiceActive = false;
+
+  function ready(fn) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  function norm(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function describe(el) {
+    if (!el) return '';
+    var bits = [];
+    bits.push(el.textContent || '');
+    bits.push(el.getAttribute ? el.getAttribute('aria-label') : '');
+    bits.push(el.getAttribute ? el.getAttribute('title') : '');
+    bits.push(el.id || '');
+    bits.push(typeof el.className === 'string' ? el.className : '');
+    bits.push(el.name || '');
+    return norm(bits.join(' '));
+  }
+
+  function isVisible(el) {
+    if (!el) return false;
+    var style = window.getComputedStyle(el);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.pointerEvents !== 'none' && el.offsetWidth > 0 && el.offsetHeight > 0;
+  }
+
+  function allInteractives() {
+    return Array.prototype.slice.call(document.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"]'))
+      .filter(function (el) { return !el.closest('#driverFloatingControlDock'); });
+  }
+
+  function hasAny(text, words) {
+    for (var i = 0; i < words.length; i++) {
+      if (text.indexOf(words[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  function findActionElement(action) {
+    var items = allInteractives();
+    var preferred = [];
+    var fallback = [];
+
+    items.forEach(function (el) {
+      var d = describe(el);
+      if (!d) return;
+      if (action === 'gps') {
+        if (hasAny(d, ['start live gps', 'start gps', 'start location', 'start tracking', 'live gps', '📍'])) preferred.push(el);
+        else if (hasAny(d, ['stop live gps', 'stop gps', 'gps active', '📡'])) fallback.push(el);
+      }
+      if (action === 'centre') {
+        if (hasAny(d, ['centre position', 'center position', 'centre map', 'center map', 'my location', '⌖'])) preferred.push(el);
+      }
+      if (action === 'recalculate') {
+        if (hasAny(d, ['recalculate', 'reroute', 're-route', '↻'])) preferred.push(el);
+      }
+      if (action === 'fullscreen') {
+        if (hasAny(d, ['full screen', 'fullscreen', 'exit full screen', 'exit fullscreen', 'large map', '⛶', '↙'])) preferred.push(el);
+      }
+      if (action === 'wake') {
+        if (hasAny(d, ['keep screen on', 'wake lock', 'screen on', '☀'])) preferred.push(el);
+      }
+      if (action === 'voice') {
+        if (hasAny(d, ['voice on', 'voice off', 'voice', '🔊', '🔇'])) preferred.push(el);
+      }
+    });
+
+    preferred.sort(function (a, b) {
+      var av = isVisible(a) ? 0 : 1;
+      var bv = isVisible(b) ? 0 : 1;
+      return av - bv;
+    });
+
+    return preferred[0] || fallback[0] || null;
+  }
+
+  function findMapContainer() {
+    var byId = document.getElementById('driverMap') || document.getElementById('liveMap') || document.getElementById('map') || document.getElementById('routeMap');
+    if (byId && byId.classList && byId.classList.contains('leaflet-container')) return byId;
+    var maps = Array.prototype.slice.call(document.querySelectorAll('.leaflet-container'));
+    if (!maps.length) return null;
+    maps.sort(function (a, b) { return (b.offsetWidth * b.offsetHeight) - (a.offsetWidth * a.offsetHeight); });
+    return maps[0];
+  }
+
+  function toast(message) {
+    var map = findMapContainer();
+    var el = document.getElementById('driverControlToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'driverControlToast';
+      el.setAttribute('aria-live', 'polite');
+      if (map) map.appendChild(el);
+      else document.body.appendChild(el);
+    } else if (map && el.parentNode !== map && !document.body.classList.contains('driver-pseudo-fullscreen')) {
+      map.appendChild(el);
+    }
+    el.textContent = message;
+    el.style.display = 'block';
+    clearTimeout(el.__hideTimer);
+    el.__hideTimer = setTimeout(function () { el.style.display = 'none'; }, 2600);
+  }
+
+  function callFirstFunction(names) {
+    for (var i = 0; i < names.length; i++) {
+      var fn = window[names[i]];
+      if (typeof fn === 'function') {
+        try { fn(); return true; } catch (err) { console.warn('Driver control function failed:', names[i], err); }
+      }
+    }
+    return false;
+  }
+
+  function clickOriginal(action) {
+    var original = findActionElement(action);
+    if (original) {
+      try {
+        original.click();
+        return true;
+      } catch (err) {
+        console.warn('Original driver button click failed:', action, err);
+      }
+    }
+    return false;
+  }
+
+  function fallbackFullscreen() {
+    var map = findMapContainer();
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen();
+      document.body.classList.remove('driver-pseudo-fullscreen');
+      setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      return true;
+    }
+    if (map && map.requestFullscreen) {
+      map.requestFullscreen().then(function () {
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      }).catch(function () {
+        document.body.classList.toggle('driver-pseudo-fullscreen');
+        setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+      });
+      return true;
+    }
+    document.body.classList.toggle('driver-pseudo-fullscreen');
+    setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 150);
+    return true;
+  }
+
+  function fallbackWakeLock(btn) {
+    if (wakeLockRef) {
+      try { wakeLockRef.release(); } catch (err) {}
+      wakeLockRef = null;
+      toast('Keep screen on stopped.');
+      return true;
+    }
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLockRef = lock;
+        if (btn) btn.classList.add('driver-active');
+        toast('Keep screen on active.');
+        lock.addEventListener('release', function () { wakeLockRef = null; if (btn) btn.classList.remove('driver-active'); });
+      }).catch(function () { toast('Screen wake lock was blocked by this browser.'); });
+      return true;
+    }
+    toast('Keep screen on is not supported in this browser.');
+    return true;
+  }
+
+  function speak(text) {
+    if (!('speechSynthesis' in window)) {
+      toast('Voice is not supported in this browser.');
+      return false;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-GB';
+      u.rate = 0.96;
+      u.pitch = 1;
+      u.volume = 1;
+      window.speechSynthesis.speak(u);
+      return true;
+    } catch (err) {
+      toast('Voice could not start. Check phone volume.');
+      return false;
+    }
+  }
+
+  function fallbackVoice(btn) {
+    fallbackVoiceActive = !fallbackVoiceActive;
+    if (btn) {
+      btn.textContent = fallbackVoiceActive ? '🔊' : '🔇';
+      btn.setAttribute('aria-label', fallbackVoiceActive ? 'Voice on' : 'Voice off');
+      btn.classList.toggle('driver-voice-active', fallbackVoiceActive);
+    }
+    if (fallbackVoiceActive) speak('Voice guidance is on.');
+    else if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    return true;
+  }
+
+  function fallbackGps(btn) {
+    if (!navigator.geolocation) {
+      toast('GPS is not supported in this browser.');
+      return true;
+    }
+    if (fallbackGpsActive) {
+      if (fallbackGpsWatchId !== null) navigator.geolocation.clearWatch(fallbackGpsWatchId);
+      fallbackGpsWatchId = null;
+      fallbackGpsActive = false;
+      if (btn) btn.classList.remove('driver-gps-active');
+      toast('Live GPS stopped.');
+      return true;
+    }
+    fallbackGpsWatchId = navigator.geolocation.watchPosition(function () {
+      fallbackGpsActive = true;
+      if (btn) btn.classList.add('driver-gps-active');
+      toast('Live GPS started.');
+    }, function (err) {
+      toast('Live GPS could not start: ' + (err && err.message ? err.message : 'permission blocked'));
+    }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 12000 });
+    return true;
+  }
+
+  function activate(action, btn) {
+    if (action === 'gps') {
+      if (clickOriginal('gps')) { toast('Live GPS control activated.'); setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['startLiveGps','startLiveGPS','toggleLiveGps','toggleLiveGPS','startDriverGps','startDriverGPS','toggleDriverGps','toggleDriverGPS','startTracking','toggleTracking','startGpsWatch'])) { toast('Live GPS control activated.'); setTimeout(syncButtons, 300); return; }
+      fallbackGps(btn);
+      return;
+    }
+    if (action === 'centre') {
+      if (clickOriginal('centre')) { setTimeout(syncButtons, 250); return; }
+      if (callFirstFunction(['centrePosition','centerPosition','centreMap','centerMap','centerOnDriver','centreOnDriver','panToDriverLocation'])) return;
+      toast('Centre position control was not found.');
+      return;
+    }
+    if (action === 'recalculate') {
+      if (clickOriginal('recalculate')) { toast('Recalculate requested.'); setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['recalculateRoute','recalculateDriverRoute','recalculateFromCurrentPosition','requestReroute','rerouteFromCurrentPosition'])) { toast('Recalculate requested.'); return; }
+      toast('Recalculate control was not found.');
+      return;
+    }
+    if (action === 'fullscreen') {
+      if (clickOriginal('fullscreen')) { setTimeout(syncButtons, 300); return; }
+      fallbackFullscreen();
+      setTimeout(syncButtons, 300);
+      return;
+    }
+    if (action === 'wake') {
+      if (clickOriginal('wake')) { setTimeout(syncButtons, 300); return; }
+      fallbackWakeLock(btn);
+      return;
+    }
+    if (action === 'voice') {
+      if (clickOriginal('voice')) { setTimeout(syncButtons, 300); return; }
+      if (callFirstFunction(['toggleVoice','toggleVoiceGuidance','enableVoiceGuidance','driverToggleVoice'])) { setTimeout(syncButtons, 300); return; }
+      fallbackVoice(btn);
+      return;
+    }
+  }
+
+  function makeButton(action, icon, label) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'driver-float-btn';
+    btn.dataset.action = action;
+    btn.textContent = icon;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
+    var handler = function (ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      var now = Date.now();
+      if (now - lastTapTime < 260) return false;
+      lastTapTime = now;
+      activate(action, btn);
+      return false;
+    };
+    btn.addEventListener('click', handler, true);
+    btn.addEventListener('touchend', handler, { capture: true, passive: false });
+    btn.addEventListener('pointerup', handler, true);
+    return btn;
+  }
+
+  function createDock() {
+    var dock = document.getElementById('driverFloatingControlDock');
+    if (dock) return dock;
+    dock = document.createElement('div');
+    dock.id = 'driverFloatingControlDock';
+    dock.setAttribute('aria-label', 'Driver map controls');
+    dock.appendChild(makeButton('gps', '📍', 'Start or stop live GPS'));
+    dock.appendChild(makeButton('centre', '⌖', 'Centre position'));
+    dock.appendChild(makeButton('recalculate', '↻', 'Recalculate route'));
+    dock.appendChild(makeButton('fullscreen', '⛶', 'Full screen'));
+    dock.appendChild(makeButton('wake', '☀', 'Keep screen on'));
+    dock.appendChild(makeButton('voice', '🔇', 'Voice guidance'));
+    return dock;
+  }
+
+  function hideTextCardByHeading(text) {
+    var headings = Array.prototype.slice.call(document.querySelectorAll('h1,h2,h3,h4,strong,b,legend'));
+    headings.forEach(function (h) {
+      if (norm(h.textContent).indexOf(text) === -1) return;
+      var p = h;
+      for (var i = 0; i < 5 && p && p !== document.body; i++) {
+        var d = describe(p);
+        if (p.offsetHeight > 50 || d.indexOf(text) !== -1) {
+          p.classList.add('driver-hidden-old-controls');
+          return;
+        }
+        p = p.parentElement;
+      }
+    });
+  }
+
+  function hideOldControlGroups() {
+    var controls = allInteractives().filter(function (el) {
+      var d = describe(el);
+      return hasAny(d, ['print','mark completed','completed route','start live gps','stop live gps','centre position','center position','recalculate','full screen','fullscreen','exit full screen','keep screen on','voice on','voice off','📍','📡','⌖','↻','⛶','☀','🔊','🔇']);
+    });
+
+    controls.forEach(function (el) {
+      var d = describe(el);
+      if (hasAny(d, ['print','mark completed','completed route'])) {
+        el.classList.add('driver-hidden-old-controls');
+      }
+    });
+
+    var groups = [];
+    controls.forEach(function (el) {
+      var p = el.parentElement;
+      for (var depth = 0; depth < 5 && p && p !== document.body; depth++) {
+        if (p.id === 'driverFloatingControlDock') break;
+        if (p.classList && p.classList.contains('leaflet-container')) break;
+        var childControls = Array.prototype.slice.call(p.querySelectorAll('button, a, [role="button"]')).filter(function (x) {
+          var dx = describe(x);
+          return hasAny(dx, ['start live gps','stop live gps','centre position','center position','recalculate','full screen','fullscreen','keep screen on','voice on','voice off','📍','📡','⌖','↻','⛶','☀','🔊','🔇']);
+        });
+        if (childControls.length >= 3 && groups.indexOf(p) === -1) groups.push(p);
+        p = p.parentElement;
+      }
+    });
+
+    groups.forEach(function (g) {
+      if (!g.closest('#driverFloatingControlDock') && !g.classList.contains('leaflet-container')) {
+        g.classList.add('driver-hidden-old-controls');
+      }
+    });
+
+    hideTextCardByHeading('driver summary');
+    hideTextCardByHeading('live gps driver mode');
+  }
+
+  function syncButtons() {
+    var dock = document.getElementById('driverFloatingControlDock');
+    if (!dock) return;
+    var gpsBtn = dock.querySelector('[data-action="gps"]');
+    var voiceBtn = dock.querySelector('[data-action="voice"]');
+    var fsBtn = dock.querySelector('[data-action="fullscreen"]');
+
+    var gpsOriginal = findActionElement('gps');
+    var gpsDesc = describe(gpsOriginal);
+    var gpsOn = fallbackGpsActive || hasAny(gpsDesc, ['stop live gps','stop gps','gps active','tracking active','📡']);
+    if (gpsBtn) {
+      gpsBtn.textContent = gpsOn ? '📡' : '📍';
+      gpsBtn.setAttribute('aria-label', gpsOn ? 'Stop live GPS' : 'Start live GPS');
+      gpsBtn.setAttribute('title', gpsOn ? 'Stop live GPS' : 'Start live GPS');
+      gpsBtn.classList.toggle('driver-gps-active', gpsOn);
+    }
+
+    var voiceOriginal = findActionElement('voice');
+    var voiceDesc = describe(voiceOriginal);
+    var voiceOn = fallbackVoiceActive || hasAny(voiceDesc, ['voice on','🔊']);
+    if (voiceBtn) {
+      voiceBtn.textContent = voiceOn ? '🔊' : '🔇';
+      voiceBtn.setAttribute('aria-label', voiceOn ? 'Voice on' : 'Voice off');
+      voiceBtn.setAttribute('title', voiceOn ? 'Voice on' : 'Voice off');
+      voiceBtn.classList.toggle('driver-voice-active', voiceOn);
+    }
+
+    if (fsBtn) {
+      var full = !!document.fullscreenElement || document.body.classList.contains('driver-pseudo-fullscreen');
+      fsBtn.textContent = full ? '↙' : '⛶';
+      fsBtn.setAttribute('aria-label', full ? 'Exit full screen' : 'Full screen');
+      fsBtn.setAttribute('title', full ? 'Exit full screen' : 'Full screen');
+    }
+  }
+
+  function install() {
+    var map = findMapContainer();
+    if (!map) return false;
+    if (window.getComputedStyle(map).position === 'static') map.style.position = 'relative';
+    var dock = createDock();
+    if (dock.parentNode !== map) map.appendChild(dock);
+    hideOldControlGroups();
+    syncButtons();
+    return true;
+  }
+
+  ready(function () {
+    var attempts = 0;
+    var timer = setInterval(function () {
+      attempts += 1;
+      if (install() || attempts > 50) clearInterval(timer);
+    }, 250);
+    document.addEventListener('fullscreenchange', syncButtons);
+    window.addEventListener('resize', function () { setTimeout(install, 150); });
+    setInterval(function () { install(); }, 3000);
+  });
+})();
+</script>
+<!-- DRIVER_FLOATING_CONTROLS_BOTTOM_RIGHT_V4_END -->
 </body>
 </html>`;
 }
