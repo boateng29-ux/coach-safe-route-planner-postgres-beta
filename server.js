@@ -14,10 +14,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 
-
-
-
-
 /* IOS_DRIVER_ROUTE_LINK_NORMALIZER_START */
 function cleanDriverRouteIdForMobile(rawId) {
   return String(rawId || '')
@@ -736,7 +732,7 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
   @media(min-width:920px){.content{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}#driverMap{height:64vh}}
   @media print{@page{size:A4 portrait;margin:10mm}header{position:static}.buttons,.form-grid,.toast{display:none!important}.content{display:block}.card{break-inside:avoid;margin-bottom:1rem}#driverMap{height:6in}}
 </style>
-<link rel="stylesheet" href="/driver-controls.css?v=clean4" />
+<link rel="stylesheet" href="/driver-controls.css?v=clean6" />
 </head>
 <body>
 <header>${logo}<div><div class="eyebrow">${escapeHtml(settings.companyName || 'Point 2 Point')} • Driver route</div><h1>${escapeHtml(title)}</h1><div class="muted">${escapeHtml(metresToMiles(route.summary?.lengthInMeters || 0))} miles • ${escapeHtml(secondsToText(route.summary?.travelTimeInSeconds || 0))} • <span class="status" id="statusBadge">${escapeHtml(record.status || 'approved')}</span></div></div></header>
@@ -877,13 +873,7 @@ document.getElementById('completeBtn')?.addEventListener('click',async()=>{const
 document.getElementById('journeyCompleteBtn')?.addEventListener('click',()=>document.getElementById('completeBtn')?.click());
 document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget;updateReportGpsFields();const payload=Object.fromEntries(new FormData(form));try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not save report.');form.reset();toast('Road report sent to operations.','success');logEvent('Road report sent to operations.');}catch(err){toast(err.message,'error');}});
 </script>
-
-
-
-
-
-
-<script src="/driver-controls.js?v=clean4" defer></script>
+<script src="/driver-controls.js?v=clean6" defer></script>
 </body>
 </html>`;
 }
@@ -943,6 +933,7 @@ function buildRouteReportHtml(record) {
   @media(max-width:980px){.route-layout{grid-template-columns:1fr}.panel{max-height:none}#exportMap{height:65vh}}
   @media print{@page{size:A4 landscape;margin:10mm}html,body{width:auto;height:auto;overflow:visible;background:white!important;color:#111!important}header{padding:0 0 .35rem 0;border-bottom:1px solid #ddd;display:block;color:#111!important}h1{font-size:18pt;line-height:1.15;margin:.05rem 0}.eyebrow{color:#555!important}.meta,.muted,.map-note{color:#333!important}.route-layout{display:block;padding:0}.map-wrap{width:100%;margin:0 auto;border:1px solid #ccc;border-radius:0;box-shadow:none;overflow:hidden;page-break-inside:avoid;break-inside:avoid;background:white}#exportMap{width:100%!important;height:6.85in!important;min-height:0!important;max-height:none!important;display:block;background:#fff}.leaflet-container{width:100%!important}.map-note{padding:.35rem .5rem;border-top:1px solid #ddd;font-size:9pt}.panel{margin-top:1rem;padding:.75rem;max-height:none;page-break-before:always;break-before:page;border:1px solid #ccc;border-radius:0;box-shadow:none;background:white;color:#111!important}.stat,.warning,.approval{border-color:#ccc;background:white}.brand,.eyebrow,.stat strong{color:#111!important}ol,li{color:#111!important}.buttons,button,.live-nav-bar{display:none!important}}
 </style>
+<link rel="stylesheet" href="/driver-controls.css?v=clean6" />
 </head>
 <body>
 <div class="live-nav-bar"><a href="${liveRouteUrl}">← Back to live route</a><span>Driver route pack</span></div>
@@ -983,10 +974,10 @@ function buildRouteReportHtml(record) {
   if((data.points||[]).length){L.marker(data.points[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);(data.waypoints||[]).forEach((w,i)=>{if(Number.isFinite(Number(w.lat))&&Number.isFinite(Number(w.lon)))L.marker([Number(w.lat),Number(w.lon)],{icon:stopPin(i)}).bindPopup('Stop '+(i+1)+': '+(w.label||'Planned stop')).bindTooltip('Stop '+(i+1),{permanent:true,direction:'top',offset:[0,-18],className:'stop-label'}).addTo(map)});L.marker(data.points[data.points.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);[250,800,1500].forEach((delay)=>setTimeout(fitExportMap,delay))}
   window.addEventListener('beforeprint',()=>{fitExportMap();setTimeout(fitExportMap,350)});if(window.matchMedia){const mq=window.matchMedia('print');if(mq.addEventListener)mq.addEventListener('change',(event)=>{if(event.matches){fitExportMap();setTimeout(fitExportMap,350)}})}
 </script>
+<script src="/driver-controls.js?v=clean6" defer></script>
 </body>
 </html>`;
 }
-
 
 
 function toApiStatus(value = 'APPROVED') {
@@ -1275,7 +1266,6 @@ const ROUTE_SELECT_SQL = `
 `;
 
 
-
 app.post('/api/auth/login', async (req, res) => {
   try {
     const companyId = await ensureCompany();
@@ -1445,7 +1435,6 @@ app.get('/driver/route/:id/route-pack', async (req, res) => {
     res.status(500).send(error.message || 'Route report failed.');
   }
 });
-
 
 
 app.post('/driver/route/:id/event', async (req, res) => {
