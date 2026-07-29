@@ -323,6 +323,45 @@ function parseCoordinateInput(value) {
   };
 }
 
+
+// Landmark override list for places where generic geocoders often pick a nearby road,
+// roundabout, postcode centroid or airport area instead of the station entrance.
+// This is deliberately small and safe: it only triggers on clear station-name matches.
+const KNOWN_LONDON_STATION_OVERRIDES = [
+  { patterns: [/^hatton\s+cross(?:\s+(?:underground|tube))?\s+station$/i, /^hatton\s+cross$/i], label: 'Hatton Cross Underground Station, Great South-West Road, Hounslow TW6', lat: 51.46676, lon: -0.42305 },
+  { patterns: [/^hounslow\s+west(?:\s+(?:underground|tube))?\s+station$/i, /^hounslow\s+west$/i], label: 'Hounslow West Underground Station, Bath Road, Hounslow TW3', lat: 51.47342, lon: -0.38553 },
+  { patterns: [/^hounslow\s+central(?:\s+(?:underground|tube))?\s+station$/i, /^hounslow\s+central$/i], label: 'Hounslow Central Underground Station, Lampton Road, Hounslow TW3', lat: 51.47129, lon: -0.36691 },
+  { patterns: [/^hounslow\s+east(?:\s+(?:underground|tube))?\s+station$/i, /^hounslow\s+east$/i], label: 'Hounslow East Underground Station, Kingsley Road, Hounslow TW3', lat: 51.47354, lon: -0.35654 },
+  { patterns: [/^hounslow(?:\s+(?:railway|train))?\s+station$/i], label: 'Hounslow railway station, Hounslow TW3', lat: 51.46265, lon: -0.36123 }
+];
+
+function normalisePlaceTextForOverride(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[,()]/g, ' ')
+    .replace(/\b(london|uk|england|greater london)\b/g, ' ')
+    .replace(/\b(tfl|piccadilly line)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function knownStationOverride(query) {
+  const text = normalisePlaceTextForOverride(query);
+  if (!text) return null;
+  const found = KNOWN_LONDON_STATION_OVERRIDES.find((entry) => entry.patterns.some((pattern) => pattern.test(text)));
+  if (!found) return null;
+  return {
+    label: found.label,
+    lat: found.lat,
+    lon: found.lon,
+    raw: {
+      source: 'known-station-override',
+      query: String(query || '').trim(),
+      note: 'Matched internal station override to avoid postcode/road/roundabout centroid.'
+    }
+  };
+}
+
 function routePointLabel(result, fallback = '') {
   const poiName = result?.poi?.name || '';
   const address = result?.address?.freeformAddress || '';
@@ -435,6 +474,9 @@ async function tomtomGeocode(query, context = {}) {
 
   const text = String(query || '').trim();
   if (!text) throw new Error('Empty route point.');
+
+  const stationOverride = knownStationOverride(text);
+  if (stationOverride) return stationOverride;
 
   const fuzzy = await tomtomFuzzySearch(text, context).catch(() => null);
   if (fuzzy) return fuzzy;
@@ -642,6 +684,34 @@ function geocodeReviewWarnings(points = []) {
     }
   }
   return warnings;
+}
+
+
+function routeOrderReviewWarnings(origin, destination, waypoints = []) {
+  const safeWaypoints = Array.isArray(waypoints)
+    ? waypoints.filter((point) => point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lon)))
+    : [];
+  if (!origin || !destination || !safeWaypoints.length) return [];
+
+  const directM = haversineMeters([origin.lat, origin.lon], [destination.lat, destination.lon]);
+  let viaM = 0;
+  let previous = origin;
+  for (const waypoint of safeWaypoints) {
+    viaM += haversineMeters([previous.lat, previous.lon], [waypoint.lat, waypoint.lon]);
+    previous = waypoint;
+  }
+  viaM += haversineMeters([previous.lat, previous.lon], [destination.lat, destination.lon]);
+
+  if (!Number.isFinite(directM) || !Number.isFinite(viaM) || directM < 300) return [];
+  const excessM = viaM - directM;
+  if (excessM > 1600 && viaM > directM * 1.65) {
+    return [{
+      level: 'medium',
+      title: 'Stop order may be causing a detour',
+      message: 'The planner visits points exactly in this order: Start → Stop 1 → Stop 2 → Destination. Your intermediate stop order adds about ' + Math.round(excessM / 1609.344 * 10) / 10 + ' extra miles compared with the straight start-to-destination direction. Reorder the stops or make the final stop the destination if this was not intended.'
+    }];
+  }
+  return [];
 }
 
 function buildLaneGuidance(section = {}) {
@@ -1872,7 +1942,10 @@ app.post('/api/route', async (req, res) => {
     const dest = await tomtomGeocode(destination, { kind: 'destination', near: previousPoint, radiusM: 80000 });
 
     const result = await tomtomRoute(origin, dest, vehicle, options || {}, waypoints);
-    const reviewWarnings = geocodeReviewWarnings(waypoints);
+    const reviewWarnings = [
+      ...geocodeReviewWarnings([origin, ...waypoints, dest]),
+      ...routeOrderReviewWarnings(origin, dest, waypoints)
+    ];
     if (reviewWarnings.length) {
       result.warnings = [...reviewWarnings, ...(result.warnings || [])];
       result.risk = calculateRisk(result, vehicle, options || {});
