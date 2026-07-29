@@ -290,6 +290,19 @@ async function fetchTomTomJson(url, failureLabel) {
   return response.json();
 }
 
+function verifiedCoordinateInputLabel(value, lat, lon) {
+  const fallback = 'Manual pin ' + Number(lat).toFixed(6) + ', ' + Number(lon).toFixed(6);
+  const text = String(value || '').trim();
+  if (!text) return fallback;
+  const pipeLabel = text.includes('|') ? text.split('|').slice(1).join('|').trim() : '';
+  const withoutCoords = text
+    .replace(/@?-?\d{1,2}\.\d{3,}\s*,\s*-?\d{1,3}\.\d{3,}/, '')
+    .replace(/[|\-–—,]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return String(pipeLabel || withoutCoords || fallback).slice(0, 220);
+}
+
 function parseCoordinateInput(value) {
   if (value && typeof value === 'object') {
     const lat = Number(value.lat ?? value.latitude);
@@ -316,7 +329,7 @@ function parseCoordinateInput(value) {
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
 
   return {
-    label: 'Manual pin ' + lat.toFixed(6) + ', ' + lon.toFixed(6),
+    label: verifiedCoordinateInputLabel(text, lat, lon),
     lat,
     lon,
     raw: { source: 'manual-coordinate', original: text }
@@ -1388,6 +1401,7 @@ function isPublicApiRequest(req) {
   if (req.path === '/test-provider') return true;
   if (req.path === '/presets' && req.method === 'GET') return true;
   if (req.path === '/settings' && req.method === 'GET') return true;
+  if (req.path === '/geocode-candidates' && req.method === 'GET') return true;
   return false;
 }
 
@@ -1866,6 +1880,63 @@ app.post('/driver/route/:id/report', async (req, res) => {
     res.status(500).json({ error: error.message || 'Could not save road report.' });
   }
 });
+
+/* VERIFIED_PINS_GEOCODE_CANDIDATES_V1_START */
+function verifiedPinResultLabel(result, fallback = '') {
+  const poiName = result?.poi?.name || '';
+  const address = result?.address?.freeformAddress || '';
+  if (poiName && address && !address.toLowerCase().includes(poiName.toLowerCase())) return poiName + ', ' + address;
+  return poiName || address || String(fallback || '').trim();
+}
+
+function verifiedPinCandidateFromTomTom(result, query = '') {
+  const lat = Number(result?.position?.lat);
+  const lon = Number(result?.position?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return {
+    label: verifiedPinResultLabel(result, query).slice(0, 220),
+    lat,
+    lon,
+    type: result?.type || '',
+    score: result?.score || null,
+    poiName: result?.poi?.name || '',
+    freeformAddress: result?.address?.freeformAddress || '',
+    postalCode: result?.address?.postalCode || ''
+  };
+}
+
+app.get('/api/geocode-candidates', async (req, res) => {
+  try {
+    if (!HAS_LIVE_TOMTOM_KEY) return res.status(400).json({ ok: false, error: 'Live TomTom search is not enabled.' });
+    const q = String(req.query.q || '').trim();
+    if (!q) return res.status(400).json({ ok: false, error: 'Search text is required.' });
+
+    const manual = typeof parseCoordinateInput === 'function' ? parseCoordinateInput(q) : null;
+    if (manual) return res.json({ ok: true, candidates: [{ label: manual.label, lat: manual.lat, lon: manual.lon, type: 'MANUAL_COORDINATE', score: 999 }] });
+
+    const url = new URL('https://api.tomtom.com/search/2/search/' + encodeURIComponent(q) + '.json');
+    url.searchParams.set('key', TOMTOM_API_KEY);
+    url.searchParams.set('limit', '8');
+    url.searchParams.set('countrySet', DEFAULT_COUNTRY_SET);
+    url.searchParams.set('language', 'en-GB');
+    url.searchParams.set('typeahead', 'false');
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(response.status).json({ ok: false, error: 'TomTom search failed. ' + cleanTomTomError(text) });
+    }
+
+    const data = await response.json();
+    const candidates = (Array.isArray(data.results) ? data.results : [])
+      .map((result) => verifiedPinCandidateFromTomTom(result, q))
+      .filter(Boolean);
+    res.json({ ok: true, candidates });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message || 'Could not search locations.' });
+  }
+});
+/* VERIFIED_PINS_GEOCODE_CANDIDATES_V1_END */
 
 app.get('/api/health', async (req, res) => {
   let databaseReady = false;
