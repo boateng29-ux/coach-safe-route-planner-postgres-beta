@@ -281,30 +281,171 @@ function cleanDriver(driver = {}) {
   };
 }
 
-async function tomtomGeocode(query) {
-  const url = new URL(`https://api.tomtom.com/search/2/geocode/${encodeURIComponent(query)}.json`);
+async function fetchTomTomJson(url, failureLabel) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(String(failureLabel) + ' failed (' + response.status + '). ' + cleanTomTomError(text));
+  }
+  return response.json();
+}
+
+function parseCoordinateInput(value) {
+  if (value && typeof value === 'object') {
+    const lat = Number(value.lat ?? value.latitude);
+    const lon = Number(value.lon ?? value.lng ?? value.longitude);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      return {
+        label: String(value.label || value.name || ('Manual pin ' + lat.toFixed(6) + ', ' + lon.toFixed(6))).trim().slice(0, 220),
+        lat,
+        lon,
+        raw: { source: 'manual-coordinate', original: value }
+      };
+    }
+  }
+
+  const text = String(value || '').trim();
+  if (!text) return null;
+
+  const match = text.match(/@?(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/);
+  if (!match) return null;
+
+  const lat = Number(match[1]);
+  const lon = Number(match[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+
+  return {
+    label: 'Manual pin ' + lat.toFixed(6) + ', ' + lon.toFixed(6),
+    lat,
+    lon,
+    raw: { source: 'manual-coordinate', original: text }
+  };
+}
+
+function routePointLabel(result, fallback = '') {
+  const poiName = result?.poi?.name || '';
+  const address = result?.address?.freeformAddress || '';
+  if (poiName && address && !address.toLowerCase().includes(poiName.toLowerCase())) return poiName + ', ' + address;
+  return poiName || address || String(fallback || '').trim();
+}
+
+function routePointFromTomTomResult(result, query, source) {
+  const lat = Number(result?.position?.lat);
+  const lon = Number(result?.position?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return {
+    label: routePointLabel(result, query).slice(0, 220),
+    lat,
+    lon,
+    raw: {
+      source,
+      query: String(query || '').trim(),
+      type: result?.type || '',
+      score: result?.score || null,
+      poiName: result?.poi?.name || '',
+      freeformAddress: result?.address?.freeformAddress || '',
+      postalCode: result?.address?.postalCode || '',
+      result
+    }
+  };
+}
+
+function normaliseSearchWords(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((w) => !['the', 'and', 'road', 'street', 'london', 'uk'].includes(w));
+}
+
+function scoreTomTomResult(result, query, near) {
+  let score = Number(result?.score || 0) * 10;
+  const words = normaliseSearchWords(query);
+  const label = routePointLabel(result, '').toLowerCase();
+  const type = String(result?.type || '').toUpperCase();
+  const hasPoi = Boolean(result?.poi?.name);
+
+  for (const word of words) {
+    if (label.includes(word)) score += 8;
+  }
+
+  if (hasPoi) score += 22;
+  if (/\bstation\b|\brail\b|\bunderground\b|\btube\b|\bhotel\b|\bschool\b|\bairport\b|\bcoach\b|\bbus\b/i.test(String(query || '')) && hasPoi) score += 35;
+  if (type === 'POI') score += 18;
+  if (type === 'POINT_ADDRESS') score += 10;
+  if (type === 'ADDRESS') score += 6;
+
+  const postcode = String(result?.address?.postalCode || '').replace(/\s+/g, '').toLowerCase();
+  const queryPostcode = String(query || '').match(/[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i)?.[0]?.replace(/\s+/g, '').toLowerCase();
+  if (postcode && queryPostcode && postcode === queryPostcode) score += 30;
+
+  if (near && Number.isFinite(Number(near.lat)) && Number.isFinite(Number(near.lon))) {
+    const p = routePointFromTomTomResult(result, query, 'score-only');
+    if (p) {
+      const metres = haversineMeters([Number(near.lat), Number(near.lon)], [p.lat, p.lon]);
+      if (metres < 500) score += 12;
+      else if (metres < 3000) score += 8;
+      else if (metres < 15000) score += 3;
+    }
+  }
+
+  return score;
+}
+
+async function tomtomFuzzySearch(query, context = {}) {
+  const url = new URL('https://api.tomtom.com/search/2/search/' + encodeURIComponent(String(query || '').trim()) + '.json');
+  url.searchParams.set('key', TOMTOM_API_KEY);
+  url.searchParams.set('limit', '7');
+  url.searchParams.set('countrySet', DEFAULT_COUNTRY_SET);
+  url.searchParams.set('language', 'en-GB');
+  url.searchParams.set('typeahead', 'false');
+
+  if (context.near && Number.isFinite(Number(context.near.lat)) && Number.isFinite(Number(context.near.lon))) {
+    url.searchParams.set('lat', String(Number(context.near.lat)));
+    url.searchParams.set('lon', String(Number(context.near.lon)));
+    url.searchParams.set('radius', String(Number(context.radiusM || 50000)));
+  }
+
+  const data = await fetchTomTomJson(url, 'TomTom search');
+  const results = Array.isArray(data.results) ? data.results : [];
+  if (!results.length) return null;
+  const chosen = results
+    .map((result) => ({ result, _score: scoreTomTomResult(result, query, context.near) }))
+    .sort((a, b) => b._score - a._score)[0]?.result;
+  return routePointFromTomTomResult(chosen, query, 'tomtom-fuzzy-search');
+}
+
+async function tomtomAddressGeocode(query) {
+  const url = new URL('https://api.tomtom.com/search/2/geocode/' + encodeURIComponent(String(query || '').trim()) + '.json');
   url.searchParams.set('key', TOMTOM_API_KEY);
   url.searchParams.set('limit', '1');
   url.searchParams.set('countrySet', DEFAULT_COUNTRY_SET);
   url.searchParams.set('language', 'en-GB');
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`TomTom geocoding failed (${response.status}). ${cleanTomTomError(text)}`);
-  }
-  const data = await response.json();
-  if (!data.results?.length) throw new Error(`No geocoding result found for: ${query}`);
-  const result = data.results[0];
-  return {
-    label: result.address?.freeformAddress || query,
-    lat: result.position.lat,
-    lon: result.position.lon,
-    raw: result
-  };
+  const data = await fetchTomTomJson(url, 'TomTom geocoding');
+  if (!data.results?.length) return null;
+  return routePointFromTomTomResult(data.results[0], query, 'tomtom-address-geocode');
 }
 
-function routeWarnings(route, vehicle, options = {}) {
+async function tomtomGeocode(query, context = {}) {
+  const manualPoint = parseCoordinateInput(query);
+  if (manualPoint) return manualPoint;
+
+  const text = String(query || '').trim();
+  if (!text) throw new Error('Empty route point.');
+
+  const fuzzy = await tomtomFuzzySearch(text, context).catch(() => null);
+  if (fuzzy) return fuzzy;
+
+  const geocoded = await tomtomAddressGeocode(text);
+  if (geocoded) return geocoded;
+
+  throw new Error('No geocoding result found for: ' + text);
+}
+
+function routeWarnings(route, vehicle, options = {}) {function routeWarnings(route, vehicle, options = {}) {
   const warnings = [];
   const summary = route?.summary || {};
 
@@ -403,6 +544,104 @@ function routeOffsetForPointIndex(routePoints = [], pointIndex = 0) {
     if (Array.isArray(a) && Array.isArray(b)) total += haversineMeters(a, b);
   }
   return Math.round(total);
+}
+
+function routeCumulativeMeters(routePoints = []) {
+  const cumulative = [0];
+  for (let i = 1; i < routePoints.length; i += 1) {
+    cumulative[i] = cumulative[i - 1] + haversineMeters(routePoints[i - 1], routePoints[i]);
+  }
+  return cumulative;
+}
+
+function projectAroundRoutePoint(p, origin) {
+  const lat = Array.isArray(p) ? Number(p[0]) : Number(p.lat ?? p.latitude);
+  const lon = Array.isArray(p) ? Number(p[1]) : Number(p.lon ?? p.lng ?? p.longitude);
+  const originLat = Array.isArray(origin) ? Number(origin[0]) : Number(origin.lat ?? origin.latitude);
+  const originLon = Array.isArray(origin) ? Number(origin[1]) : Number(origin.lon ?? origin.lng ?? origin.longitude);
+  const R = 6371000;
+  const latRad = originLat * Math.PI / 180;
+  return {
+    x: (lon - originLon) * Math.PI / 180 * Math.cos(latRad) * R,
+    y: (lat - originLat) * Math.PI / 180 * R
+  };
+}
+
+function nearestRouteProgressMeters(routePoints = [], point) {
+  if (!Array.isArray(routePoints) || routePoints.length < 2 || !point) return 0;
+  const cumulative = routeCumulativeMeters(routePoints);
+  const p = Array.isArray(point) ? point : [Number(point.lat ?? point.latitude), Number(point.lon ?? point.lng ?? point.longitude)];
+  if (!p.every(Number.isFinite)) return 0;
+
+  let bestDistance = Infinity;
+  let bestProgress = 0;
+  for (let i = 0; i < routePoints.length - 1; i += 1) {
+    const a = routePoints[i];
+    const b = routePoints[i + 1];
+    const P = projectAroundRoutePoint(p, p);
+    const A = projectAroundRoutePoint(a, p);
+    const B = projectAroundRoutePoint(b, p);
+    const dx = B.x - A.x;
+    const dy = B.y - A.y;
+    const lenSq = dx * dx + dy * dy;
+    let t = lenSq ? ((P.x - A.x) * dx + (P.y - A.y) * dy) / lenSq : 0;
+    t = Math.max(0, Math.min(1, t));
+    const x = A.x + t * dx;
+    const y = A.y + t * dy;
+    const d = Math.hypot(P.x - x, P.y - y);
+    if (d < bestDistance) {
+      bestDistance = d;
+      bestProgress = (cumulative[i] || 0) + t * haversineMeters(a, b);
+    }
+  }
+  return bestProgress;
+}
+
+function remainingWaypointsFromGps(existingRoute = {}, lat, lng) {
+  const waypoints = Array.isArray(existingRoute.waypoints) ? existingRoute.waypoints : [];
+  const routePoints = Array.isArray(existingRoute.points) ? existingRoute.points : [];
+  const validWaypoints = waypoints
+    .filter((point) => point && Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lon)))
+    .map((point) => ({ ...point, lat: Number(point.lat), lon: Number(point.lon) }));
+
+  if (!validWaypoints.length) return [];
+  if (!Array.isArray(routePoints) || routePoints.length < 2) return validWaypoints.slice(0, 8);
+
+  const gpsProgress = nearestRouteProgressMeters(routePoints, [lat, lng]);
+  return validWaypoints
+    .map((point) => ({ ...point, _progressM: nearestRouteProgressMeters(routePoints, [point.lat, point.lon]) }))
+    .filter((point) => point._progressM > gpsProgress + 80 || haversineMeters([lat, lng], [point.lat, point.lon]) > 120)
+    .sort((a, b) => a._progressM - b._progressM)
+    .map(({ _progressM, ...point }) => point)
+    .slice(0, 8);
+}
+
+function geocodeReviewWarnings(points = []) {
+  const warnings = [];
+  for (const point of points) {
+    if (!point || !point.raw) continue;
+    const query = String(point.raw.query || '').trim();
+    if (!query) continue;
+    const source = point.raw.source || '';
+    const type = point.raw.type || '';
+    const selected = point.label || '';
+    const isManual = source === 'manual-coordinate';
+    if (!isManual) {
+      warnings.push({
+        level: 'notice',
+        title: 'Stop pin verification',
+        message: 'Requested "' + query + '" was placed at "' + selected + '". Check the stop pin before approving if this is a station, hotel, school, private road or coach drop-off point.'
+      });
+    }
+    if (/POSTCODE|GEOGRAPHY|MUNICIPALITY|COUNTRY_SUBDIVISION/i.test(type)) {
+      warnings.push({
+        level: 'medium',
+        title: 'Approximate stop location',
+        message: '"' + query + '" may have resolved to an approximate area rather than a precise entrance/drop-off point. Use pasted coordinates for the exact coach-safe stop if the pin is wrong.'
+      });
+    }
+  }
+  return warnings;
 }
 
 function buildLaneGuidance(section = {}) {
@@ -1461,7 +1700,7 @@ app.post('/driver/route/:id/reroute', async (req, res) => {
   try {
     if (!HAS_LIVE_TOMTOM_KEY) return res.status(400).json({ error: 'Live TomTom routing is not enabled.' });
     const companyId = await ensureCompany();
-    const routeResult = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
+    const routeResult = await dbRequired().query(ROUTE_SELECT_SQL + ' WHERE r.id=$1 AND r."companyId"=$2', [req.params.id, companyId]);
     if (!routeResult.rows.length) return res.status(404).json({ error: 'Route not found.' });
 
     const lat = Number(req.body?.lat);
@@ -1471,7 +1710,7 @@ app.post('/driver/route/:id/reroute', async (req, res) => {
       return res.status(400).json({ error: 'Current GPS latitude/longitude is required before recalculating.' });
     }
     if (Number.isFinite(accuracyM) && accuracyM > 150) {
-      return res.status(400).json({ error: `GPS accuracy is ${Math.round(accuracyM)}m. Move to a clearer location and try again.` });
+      return res.status(400).json({ error: 'GPS accuracy is ' + Math.round(accuracyM) + 'm. Move to a clearer location and try again.' });
     }
 
     const record = apiRoute(routeResult.rows[0]);
@@ -1482,27 +1721,39 @@ app.post('/driver/route/:id/reroute', async (req, res) => {
     }
 
     const origin = {
-      label: `Driver GPS position (${lat.toFixed(5)}, ${lng.toFixed(5)})`,
+      label: 'Driver GPS position (' + lat.toFixed(5) + ', ' + lng.toFixed(5) + ')',
       lat,
       lon: lng,
       raw: { source: 'driver-gps', accuracyM: Number.isFinite(accuracyM) ? Math.round(accuracyM) : null }
     };
     const vehicle = cleanVehicle(existingRoute.vehicle || record.vehicleRecord || {});
     const options = existingRoute.options || { avoidFerries: true, avoidUnpaved: true };
-    const reroute = await tomtomRoute(origin, destination, vehicle, options);
+    const remainingWaypoints = remainingWaypointsFromGps(existingRoute, lat, lng);
+    const reroute = await tomtomRoute(origin, destination, vehicle, options, remainingWaypoints);
     reroute.warnings = [
-      { level: 'medium', title: 'Rerouted from driver GPS', message: 'This is a live recovery route from the driver location. Driver must still follow road signs, coach access restrictions and operator instructions.' },
+      {
+        level: 'medium',
+        title: 'Rerouted from driver GPS',
+        message: remainingWaypoints.length
+          ? 'This live recovery route keeps ' + remainingWaypoints.length + ' remaining planned stop' + (remainingWaypoints.length === 1 ? '' : 's') + ' before the final destination. Driver must still follow road signs, coach access restrictions and operator instructions.'
+          : 'This is a live recovery route from the driver location to the final destination. Driver must still follow road signs, coach access restrictions and operator instructions.'
+      },
       ...(reroute.warnings || [])
     ];
     reroute.risk = calculateRisk(reroute, vehicle, options);
-    await logJourneyEvent(companyId, req.params.id, 'reroute_calculated', 'Driver recalculated a coach-safe route from live GPS.', { lat, lng, accuracyM: Number.isFinite(accuracyM) ? Math.round(accuracyM) : null });
+    await logJourneyEvent(companyId, req.params.id, 'reroute_calculated', 'Driver recalculated a coach-safe route from live GPS.', {
+      lat,
+      lng,
+      accuracyM: Number.isFinite(accuracyM) ? Math.round(accuracyM) : null,
+      remainingStopCount: remainingWaypoints.length
+    });
     res.json({ ok: true, route: stripRouteForStorage(reroute) });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Could not recalculate coach-safe route.' });
   }
 });
 
-app.post('/driver/route/:id/complete', async (req, res) => {
+app.post('/driver/route/:id/complete', async (req, res) => {app.post('/driver/route/:id/complete', async (req, res) => {
   try {
     const companyId = await ensureCompany();
     const result = await dbRequired().query(
@@ -1601,8 +1852,8 @@ app.post('/api/route', async (req, res) => {
   try {
     const { start, destination, vehicle: rawVehicle, options } = req.body || {};
     if (!start || !destination) return res.status(400).json({ error: 'Start and destination are required.' });
-    const stopQueries = Array.isArray(req.body?.stops)
-      ? req.body.stops.map((stop) => String(stop || '').trim()).filter(Boolean).slice(0, 8)
+    const stopInputs = Array.isArray(req.body?.stops)
+      ? req.body.stops.map((stop) => (typeof stop === 'string' ? stop.trim() : stop)).filter(Boolean).slice(0, 8)
       : [];
     const vehicle = cleanVehicle(rawVehicle);
     if (!HAS_LIVE_TOMTOM_KEY) {
@@ -1611,12 +1862,23 @@ app.post('/api/route', async (req, res) => {
         error: 'Live TomTom routing is not enabled. Add TOMTOM_API_KEY to the .env file in this exact project folder, restart with npm.cmd start, then recalculate. Mock mode is disabled so the map will not draw an approximate straight route.'
       });
     }
-    const [origin, dest, ...waypoints] = await Promise.all([
-      tomtomGeocode(start),
-      tomtomGeocode(destination),
-      ...stopQueries.map((stop) => tomtomGeocode(stop))
-    ]);
+
+    const origin = await tomtomGeocode(start, { kind: 'origin' });
+    const waypoints = [];
+    let previousPoint = origin;
+    for (const stop of stopInputs) {
+      const waypoint = await tomtomGeocode(stop, { kind: 'stop', near: previousPoint, radiusM: 50000 });
+      waypoints.push(waypoint);
+      previousPoint = waypoint;
+    }
+    const dest = await tomtomGeocode(destination, { kind: 'destination', near: previousPoint, radiusM: 80000 });
+
     const result = await tomtomRoute(origin, dest, vehicle, options || {}, waypoints);
+    const reviewWarnings = geocodeReviewWarnings(waypoints);
+    if (reviewWarnings.length) {
+      result.warnings = [...reviewWarnings, ...(result.warnings || [])];
+      result.risk = calculateRisk(result, vehicle, options || {});
+    }
     res.json(result);
   } catch (error) {
     console.error(error);
@@ -1624,7 +1886,7 @@ app.post('/api/route', async (req, res) => {
   }
 });
 
-app.get('/api/vehicles', async (req, res) => {
+app.get('/api/vehicles', async (req, res) => {app.get('/api/vehicles', async (req, res) => {
   try {
     const companyId = await ensureCompany();
     const result = await dbRequired().query('SELECT * FROM "Vehicle" WHERE "companyId"=$1 ORDER BY "createdAt" DESC', [companyId]);
