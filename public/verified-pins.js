@@ -1,4 +1,4 @@
-/* Verified Pins v1 - operator route planning helper */
+/* Verified Pins v2 - operator route planning helper with approval safeguard */
 (function () {
   'use strict';
 
@@ -12,7 +12,8 @@
     modalMap: null,
     modalMarker: null,
     candidateLayer: null,
-    routeFetchWarned: false
+    routeFetchWarned: false,
+    strictApprovalBlock: true
   };
 
   const STORE_KEY = 'coachSafeVerifiedPinsV1';
@@ -114,7 +115,7 @@
     panel = document.createElement('div');
     panel.id = 'verifiedPinsPanel';
     panel.className = 'verified-pins-panel';
-    panel.innerHTML = '<div class="verified-pins-head"><strong>Verified stop pins</strong><span id="verifiedPinsCount">0 verified</span></div><div id="verifiedPinsList" class="verified-pins-list"></div><p>Use this when landmarks or addresses land in the wrong place. Route calculation will use the verified pin coordinates.</p>';
+    panel.innerHTML = '<div class="verified-pins-head"><strong>Verified stop pins</strong><span id="verifiedPinsCount">0 verified</span></div><div id="verifiedPinsList" class="verified-pins-list"></div><p>Use this when landmarks or addresses land in the wrong place. Route calculation will use the verified pin coordinates. Route approval is blocked until start, stops and destination are verified.</p>';
     document.body.appendChild(panel);
     return panel;
   }
@@ -348,7 +349,32 @@
     }
 
     payload.verifiedPins = Object.values(STATE.points).map((p) => ({ kind: p.kind, index: p.index, label: p.label, lat: p.lat, lon: p.lon }));
+    payload.verifiedPinsComplete = missing.length === 0;
+    payload.verifiedPinsMissing = missing;
     return missing;
+  }
+
+  function isCoordinateLike(value) {
+    return /@?-?\d{1,2}\.\d{3,}\s*,\s*-?\d{1,3}\.\d{3,}/.test(String(value || ''));
+  }
+
+  function missingVerifiedRoutePoints() {
+    const points = findPointInputs();
+    const missing = [];
+    points.forEach((point) => {
+      const text = String(point.input && point.input.value || '').trim();
+      if (!text) return;
+      if (isCoordinateLike(text)) return;
+      if (!verifiedForInput(point)) missing.push(pointLabel(point.kind, point.index).toLowerCase());
+    });
+    return Array.from(new Set(missing));
+  }
+
+  function blockUnverifiedApproval() {
+    const missing = missingVerifiedRoutePoints();
+    if (!missing.length) return false;
+    alert('Route approval blocked. Verify these route pins first:\n\n- ' + missing.join('\n- ') + '\n\nThis prevents the app saving a coach route based on a wrong landmark, postcode centre or nearby road.');
+    return true;
   }
 
   function installFetchHook() {
@@ -365,10 +391,15 @@
           if (missing.length && !STATE.routeFetchWarned) {
             STATE.routeFetchWarned = true;
             setTimeout(() => { STATE.routeFetchWarned = false; }, 3000);
-            const proceed = confirm('Some route points are not verified: ' + missing.join(', ') + '.\n\nProceed using address search for those points?');
+            const proceed = confirm('Some route points are not verified: ' + missing.join(', ') + '.\n\nYou can calculate for review, but approval will be blocked until all pins are verified. Proceed with address search just to preview?');
             if (!proceed) return Promise.reject(new Error('Route calculation cancelled: unverified pins.'));
           }
           init = Object.assign({}, init, { body: JSON.stringify(payload) });
+        }
+        if (method === 'POST' && /\/api\/routes\b/.test(url) && init && typeof init.body === 'string') {
+          if (STATE.strictApprovalBlock && blockUnverifiedApproval()) {
+            return Promise.reject(new Error('Route approval blocked: unverified route pins.'));
+          }
         }
       } catch (err) {
         console.warn('Verified pins could not adjust route payload:', err);
