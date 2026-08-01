@@ -95,3 +95,35 @@
       0 6px 16px rgba(0,0,0,.28);
   }
 }
+
+
+/* ==========================================================
+   DRIVER V2.8 ROUTE SNAPPING AND GPS QUALITY
+   ========================================================== */
+
+.current-road{
+  bottom:7.1rem;
+}
+
+.app[data-mode="live"] .vehicle-arrow{
+  top:75%;
+}
+
+.app[data-mode="live"] .leaflet-overlay-pane path{
+  transition:opacity .2s ease;
+}
+
+/* Increase road and label definition without over-sharpening. */
+.leaflet-tile-pane{
+  filter:saturate(1.12) contrast(1.08) brightness(.99);
+}
+
+@media(max-width:699px){
+  .current-road{
+    bottom:5.8rem;
+  }
+
+  .app[data-mode="live"] .vehicle-arrow{
+    top:74%;
+  }
+}

@@ -136,6 +136,13 @@ export class MapController {
         fillOpacity: 0
       });
     }
+
+    if (this.accuracyCircle) {
+      this.accuracyCircle.setStyle({
+        opacity: 0,
+        fillOpacity: 0
+      });
+    }
   }
 
   leaveLive() {
@@ -152,6 +159,13 @@ export class MapController {
       this.gpsMarker.setStyle({
         opacity: 1,
         fillOpacity: 1
+      });
+    }
+
+    if (this.accuracyCircle) {
+      this.accuracyCircle.setStyle({
+        opacity: 0.22,
+        fillOpacity: 0.035
       });
     }
   }
@@ -177,8 +191,8 @@ export class MapController {
         radius: visibleAccuracy,
         weight: 1,
         color: '#2979ff',
-        opacity: 0.22,
-        fillOpacity: 0.035,
+        opacity: this.liveMode ? 0 : 0.22,
+        fillOpacity: this.liveMode ? 0 : 0.035,
         interactive: false
       }).addTo(this.map);
     } else {
@@ -199,8 +213,8 @@ export class MapController {
     const projected = this.map.project(point, zoom);
 
     const lookAheadPixels = Math.max(
-      80,
-      Math.min(size.y * 0.21, 190)
+      95,
+      Math.min(size.y * 0.25, 220)
     );
 
     return this.map.unproject(
