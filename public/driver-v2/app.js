@@ -1,4 +1,4 @@
-import{MapController}from'./map-controller.js?v=24';
+﻿import{MapController}from'./map-controller.js?v=24';
 import{GpsController}from'./gps-controller.js?v=24';
 import{CameraController}from'./camera-controller.js?v=24';
 import{VoiceController}from'./voice-controller.js?v=24';
@@ -20,10 +20,10 @@ function smoothAngle(prev,next,w=.28){if(!Number.isFinite(prev))return next;cons
 function buildMeasures(points){const out=[0];for(let i=1;i<points.length;i++)out[i]=out[i-1]+haversine(points[i-1],points[i]);return out}
 function project(point,origin){const R=6371000;return{x:rad(point[1]-origin[1])*Math.cos(rad(origin[0]))*R,y:rad(point[0]-origin[0])*R}}
 function nearestProgress(point){let best={progress:0,distance:Infinity,index:0};for(let i=0;i<state.points.length-1;i++){const A=project(state.points[i],point),B=project(state.points[i+1],point),dx=B.x-A.x,dy=B.y-A.y,len=dx*dx+dy*dy,t=len?clamp(((-A.x)*dx+(-A.y)*dy)/len,0,1):0,x=A.x+t*dx,y=A.y+t*dy,d=Math.hypot(x,y);if(d<best.distance)best={distance:d,index:i,progress:(state.measures[i]||0)+t*haversine(state.points[i],state.points[i+1])}}return best}
-function metresText(m){if(!Number.isFinite(m))return'—';if(m<950)return Math.max(0,Math.round(m/10)*10)+'m';return(m/1609.344).toFixed(1)+' miles'}
+function metresText(m){if(!Number.isFinite(m))return'â€”';if(m<950)return Math.max(0,Math.round(m/10)*10)+'m';return(m/1609.344).toFixed(1)+' miles'}
 function durationText(s){const mins=Math.max(0,Math.round(s/60)),h=Math.floor(mins/60),m=mins%60;return h?`${h}h ${m}m`:`${m}m`}
 function etaText(s){return new Date(Date.now()+Math.max(0,s)*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
-function iconFor(i){const t=((i?.maneuver||'')+' '+(i?.instruction||'')).toLowerCase();if(t.includes('roundabout'))return'↻';if(t.includes('left'))return'←';if(t.includes('right'))return'→';if(t.includes('exit'))return'↗';return'↑'}
+function iconFor(i){const t=((i?.maneuver||'')+' '+(i?.instruction||'')).toLowerCase();if(t.includes('roundabout'))return'â†»';if(t.includes('left'))return'â†';if(t.includes('right'))return'â†’';if(t.includes('exit'))return'â†—';return'â†‘'}
 function setMode(mode){
   state.mode=mode;
   $('app').dataset.mode=mode;
@@ -35,7 +35,7 @@ function setMode(mode){
     mapCtl.leaveLive?.();
   }
 }
-function updateGuidance(progress,offRoute){if(!state.instructions.length)return;let idx=state.instructions.findIndex(i=>Number(i.distanceM||0)>=progress+5);if(idx<0)idx=state.instructions.length-1;state.currentInstruction=idx;const ins=state.instructions[idx],nextM=Math.max(0,Number(ins.distanceM||0)-progress),remaining=Math.max(0,state.totalM-progress),totalS=Number(state.route.summary?.travelTimeInSeconds||0),remainingS=state.totalM?totalS*(remaining/state.totalM):0;$('turnIcon').textContent=iconFor(ins);$('instruction').textContent=ins.instruction||'Continue on route';$('turnDistance').textContent=nextM<=35?'Now':'Next in '+metresText(nextM);$('laneText').textContent=ins.laneGuidance?.text||'Follow road signs. Lane guidance not returned.';$('eta').textContent=etaText(remainingS);$('timeLeft').textContent=durationText(remainingS);$('distanceLeft').textContent=metresText(remaining);$('roadStatus').textContent=ins.street||ins.roadNumbers?.join(' · ')||'Route';$('speedLimit').textContent=ins.speedLimit?.maxSpeedLimitMph?ins.speedLimit.maxSpeedLimitMph+' mph':'Limit —';$('routeStatus').textContent=offRoute>120?'Off route':'On route';$('routeStatus').className='status '+(offRoute>120?'bad':'good');voice.maybeSpeak(ins,nextM,idx);
+function updateGuidance(progress,offRoute){if(!state.instructions.length)return;let idx=state.instructions.findIndex(i=>Number(i.distanceM||0)>=progress+5);if(idx<0)idx=state.instructions.length-1;state.currentInstruction=idx;const ins=state.instructions[idx],nextM=Math.max(0,Number(ins.distanceM||0)-progress),remaining=Math.max(0,state.totalM-progress),totalS=Number(state.route.summary?.travelTimeInSeconds||0),remainingS=state.totalM?totalS*(remaining/state.totalM):0;$('turnIcon').textContent=iconFor(ins);$('instruction').textContent=ins.instruction||'Continue on route';$('turnDistance').textContent=nextM<=35?'Now':'Next in '+metresText(nextM);$('laneText').textContent=ins.laneGuidance?.text||'Follow road signs. Lane guidance not returned.';$('eta').textContent=etaText(remainingS);$('timeLeft').textContent=durationText(remainingS);$('distanceLeft').textContent=metresText(remaining);$('roadStatus').textContent=ins.street||ins.roadNumbers?.join(' Â· ')||'Route';$('speedLimit').textContent=ins.speedLimit?.maxSpeedLimitMph?ins.speedLimit.maxSpeedLimitMph+' mph':'Limit â€”';$('routeStatus').textContent=offRoute>120?'Off route':'On route';$('routeStatus').className='status '+(offRoute>120?'bad':'good');voice.maybeSpeak(ins,nextM,idx);
   if(state.mode==='live'&&state.gps){
     camera.focus(state.gps,{nextTurnM:nextM});
   }
@@ -104,9 +104,9 @@ function toggleGps(){
     setMode('live');
     camera.follow=true;
     gps.start();
-    $('gpsStatus').textContent='Acquiring GPS…';
+    $('gpsStatus').textContent='Acquiring GPSâ€¦';
     $('gpsStatus').className='status';
-    toast('Starting live navigation…');
+    toast('Starting live navigationâ€¦');
   }
   updateButtons();
 }
@@ -117,8 +117,8 @@ async function reroute(){if(!state.gps){toast('Start GPS first');return}const b=
     toast('Route recalculated')}catch(e){toast(e.message)}finally{b.disabled=false}}
 async function toggleWake(){if(state.wakeLock){await state.wakeLock.release().catch(()=>{});state.wakeLock=null}else if('wakeLock'in navigator){state.wakeLock=await navigator.wakeLock.request('screen').catch(()=>null)}toast(state.wakeLock?'Screen will stay on':'Wake lock off');updateButtons()}
 function toggleFullscreen(){document.body.classList.toggle('fullscreen');setTimeout(()=>{mapCtl.refresh();if(state.mode==='live')camera.focus(state.gps,{force:true});else mapCtl.overview()},180);updateButtons()}
-function updateButtons(){$('gpsBtn').textContent=gps?.active?'📡':'📍';$('gpsBtn').classList.toggle('active',!!gps?.active);$('voiceBtn').textContent=voice.enabled?'🔊':'🔇';$('voiceBtn').classList.toggle('active',voice.enabled);$('wakeBtn').classList.toggle('active',!!state.wakeLock);$('fullscreenBtn').textContent=document.body.classList.contains('fullscreen')?'↙':'⛶'}
-async function load(){state.id=routeId();if(!state.id)throw new Error('Route ID is missing');mapCtl.init();gps=new GpsController(onGps,onGpsError);const r=await fetch(`/api/driver-v2/route/${encodeURIComponent(state.id)}`,{cache:'no-store'});const p=await r.json();if(!r.ok)throw new Error(p.error||'Could not load route');drawRoute(p.route||{},true);$('loading').classList.add('hidden');$('routeStatus').textContent='Route ready';updateButtons()}
+function updateButtons(){$('gpsBtn').textContent=gps?.active?'ðŸ“¡':'ðŸ“';$('gpsBtn').classList.toggle('active',!!gps?.active);$('voiceBtn').textContent=voice.enabled?'ðŸ”Š':'ðŸ”‡';$('voiceBtn').classList.toggle('active',voice.enabled);$('wakeBtn').classList.toggle('active',!!state.wakeLock);$('fullscreenBtn').textContent=document.body.classList.contains('fullscreen')?'â†™':'â›¶'}
+async function load(){state.id=routeId();if(!state.id)throw new Error('Route ID is missing');mapCtl.init();gps=new GpsController(onGps,onGpsError);const r=await fetch(`/driver-v2/data/${encodeURIComponent(state.id)}`,{cache:'no-store'});const p=await r.json();if(!r.ok)throw new Error(p.error||'Could not load route');drawRoute(p.route||{},true);$('loading').classList.add('hidden');$('routeStatus').textContent='Route ready';updateButtons()}
 
 $('gpsBtn').addEventListener('click',toggleGps);
 $('centreBtn').addEventListener('click',()=>{
@@ -145,3 +145,4 @@ window.addEventListener('resize',()=>setTimeout(()=>{
   }
 },180));
 load().catch(e=>{$('loading').textContent=e.message;toast(e.message)});
+

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -17,46 +17,47 @@
     <div id="map" class="map" aria-label="Coach Safe navigation map"></div>
 
     <section class="nav-card" aria-live="polite">
-      <div id="turnIcon" class="turn-icon">↑</div>
+      <div id="turnIcon" class="turn-icon">â†‘</div>
       <div class="turn-copy">
         <span class="eyebrow">Next manoeuvre</span>
-        <strong id="instruction">Loading approved route…</strong>
+        <strong id="instruction">Loading approved routeâ€¦</strong>
         <span id="laneText" class="lane-text">Lane guidance appears when available.</span>
       </div>
-      <div id="turnDistance" class="distance-pill">—</div>
+      <div id="turnDistance" class="distance-pill">â€”</div>
 
       <div class="metrics">
-        <div><span>ETA</span><strong id="eta">—</strong></div>
-        <div><span>Time left</span><strong id="timeLeft">—</strong></div>
-        <div><span>Distance</span><strong id="distanceLeft">—</strong></div>
+        <div><span>ETA</span><strong id="eta">â€”</strong></div>
+        <div><span>Time left</span><strong id="timeLeft">â€”</strong></div>
+        <div><span>Distance</span><strong id="distanceLeft">â€”</strong></div>
         <div><span>Speed</span><strong id="speed">0 mph</strong></div>
       </div>
 
       <div class="status-row">
         <span id="routeStatus" class="status good">Loading</span>
         <span id="gpsStatus" class="status">GPS off</span>
-        <span id="roadStatus" class="status">—</span>
-        <span id="speedLimit" class="status">Limit —</span>
+        <span id="roadStatus" class="status">â€”</span>
+        <span id="speedLimit" class="status">Limit â€”</span>
       </div>
     </section>
 
     <div id="vehicleArrow" class="vehicle-arrow" aria-hidden="true"></div>
 
     <nav class="dock" aria-label="Driver controls">
-      <button id="gpsBtn" class="primary" type="button" aria-label="Start GPS">📍</button>
-      <button id="centreBtn" type="button" aria-label="Centre position">⌖</button>
-      <button id="rerouteBtn" type="button" aria-label="Recalculate route">↻</button>
-      <button id="fullscreenBtn" type="button" aria-label="Full screen">⛶</button>
-      <button id="wakeBtn" type="button" aria-label="Keep screen on">☀</button>
-      <button id="voiceBtn" type="button" aria-label="Voice off">🔇</button>
-      <button id="reportBtn" class="danger" type="button" aria-label="Report road issue">⚠</button>
+      <button id="gpsBtn" class="primary" type="button" aria-label="Start GPS">ðŸ“</button>
+      <button id="centreBtn" type="button" aria-label="Centre position">âŒ–</button>
+      <button id="rerouteBtn" type="button" aria-label="Recalculate route">â†»</button>
+      <button id="fullscreenBtn" type="button" aria-label="Full screen">â›¶</button>
+      <button id="wakeBtn" type="button" aria-label="Keep screen on">â˜€</button>
+      <button id="voiceBtn" type="button" aria-label="Voice off">ðŸ”‡</button>
+      <button id="reportBtn" class="danger" type="button" aria-label="Report road issue">âš </button>
     </nav>
 
     <div id="toast" class="toast" role="status"></div>
-    <div id="loading" class="loading">Loading approved route…</div>
+    <div id="loading" class="loading">Loading approved routeâ€¦</div>
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="/driver-v2/app.js?v=24"></script>
+  <script type="module" src="/driver-v2/app.js?v=25"></script>
 </body>
 </html>
+
