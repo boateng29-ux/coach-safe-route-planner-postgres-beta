@@ -2576,6 +2576,48 @@ app.patch('/api/routes/:id', async (req, res) => {
   }
 });
 
+/* COACH_SAFE_DRIVER_V2_BETA */
+app.get('/api/driver-v2/route/:id', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const result = await dbRequired().query(
+      `${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`,
+      [req.params.id, companyId]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Driver route not found.' });
+    res.set('Cache-Control', 'no-store');
+    res.json(apiRoute(result.rows[0]));
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Driver route failed.' });
+  }
+});
+
+app.get('/driver-v2/route/:id', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+    const result = await dbRequired().query(
+      'SELECT id FROM "Route" WHERE id=$1 AND "companyId"=$2',
+      [req.params.id, companyId]
+    );
+    if (!result.rows.length) return res.status(404).send('Driver route not found.');
+    await logJourneyEvent(
+      companyId,
+      req.params.id,
+      'driver_v2_opened',
+      'Driver opened the isolated V2 navigation page.',
+      { userAgent: req.headers['user-agent'] || '' }
+    );
+    res.set('Cache-Control', 'no-store');
+    res.sendFile(path.join(__dirname, 'public', 'driver-v2', 'index.html'));
+  } catch (error) {
+    res.status(500).send(error.message || 'Driver V2 page failed.');
+  }
+});
+
+app.get('/drive-v2/:id', (req, res) => {
+  res.redirect(302, '/driver-v2/route/' + encodeURIComponent(req.params.id));
+});
+
 async function sendDriverRoutePage(req, res) {
   try {
     const companyId = await ensureCompany();
