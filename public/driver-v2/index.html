@@ -1,63 +1,77 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#101418">
+  <meta name="theme-color" content="#0b0f14">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Coach Safe">
   <title>Coach Safe Driver</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/driver-v2/driver-v2.css?v=24">
+  <link rel="stylesheet" href="/driver-v2/driver-v2.css?v=26">
 </head>
 <body>
   <main id="app" class="app" data-mode="overview">
     <div id="map" class="map" aria-label="Coach Safe navigation map"></div>
 
     <section class="nav-card" aria-live="polite">
-      <div id="turnIcon" class="turn-icon">â†‘</div>
+      <div id="turnIcon" class="turn-icon">↑</div>
       <div class="turn-copy">
         <span class="eyebrow">Next manoeuvre</span>
-        <strong id="instruction">Loading approved routeâ€¦</strong>
+        <strong id="instruction">Loading approved route…</strong>
         <span id="laneText" class="lane-text">Lane guidance appears when available.</span>
       </div>
-      <div id="turnDistance" class="distance-pill">â€”</div>
-
+      <div id="turnDistance" class="distance-pill">—</div>
       <div class="metrics">
-        <div><span>ETA</span><strong id="eta">â€”</strong></div>
-        <div><span>Time left</span><strong id="timeLeft">â€”</strong></div>
-        <div><span>Distance</span><strong id="distanceLeft">â€”</strong></div>
+        <div><span>ETA</span><strong id="eta">—</strong></div>
+        <div><span>Time left</span><strong id="timeLeft">—</strong></div>
+        <div><span>Distance</span><strong id="distanceLeft">—</strong></div>
         <div><span>Speed</span><strong id="speed">0 mph</strong></div>
       </div>
-
       <div class="status-row">
         <span id="routeStatus" class="status good">Loading</span>
         <span id="gpsStatus" class="status">GPS off</span>
-        <span id="roadStatus" class="status">â€”</span>
-        <span id="speedLimit" class="status">Limit â€”</span>
+        <span id="speedLimit" class="status speed-limit-chip">Limit —</span>
+        <span id="roadStatus" class="status road-chip">—</span>
       </div>
     </section>
 
+    <section class="speed-card" aria-label="Speed and GPS">
+      <div class="speed-sign"><span id="speedLimitLarge">30</span></div>
+      <div class="live-speed"><strong id="speedLarge">0</strong><span>mph</span></div>
+      <div class="signal"><span>GPS</span><strong id="gpsSignal">—</strong></div>
+    </section>
+
+    <button id="compassBtn" class="map-side-btn compass-btn" type="button" aria-label="Centre map">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l3 8-3 12-3-12 3-8z"/><path d="M12 2v8"/></svg>
+    </button>
+
+    <div class="map-zoom">
+      <button id="zoomInBtn" type="button" aria-label="Zoom in">+</button>
+      <button id="zoomOutBtn" type="button" aria-label="Zoom out">−</button>
+    </div>
+
     <div id="vehicleArrow" class="vehicle-arrow" aria-hidden="true"></div>
+    <div id="currentRoad" class="current-road">Route ready</div>
 
     <nav class="dock" aria-label="Driver controls">
-      <button id="gpsBtn" class="primary" type="button" aria-label="Start GPS">ðŸ“</button>
-      <button id="centreBtn" type="button" aria-label="Centre position">âŒ–</button>
-      <button id="rerouteBtn" type="button" aria-label="Recalculate route">â†»</button>
-      <button id="fullscreenBtn" type="button" aria-label="Full screen">â›¶</button>
-      <button id="wakeBtn" type="button" aria-label="Keep screen on">â˜€</button>
-      <button id="voiceBtn" type="button" aria-label="Voice off">ðŸ”‡</button>
-      <button id="reportBtn" class="danger" type="button" aria-label="Report road issue">âš </button>
+      <button id="voiceBtn" type="button" aria-label="Voice guidance"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M16 9c1 .8 1.5 1.8 1.5 3S17 14.2 16 15"/><path d="M18.5 6.5C20.2 8 21 9.8 21 12s-.8 4-2.5 5.5"/></svg><span>Voice</span></button>
+      <button id="centreBtn" type="button" aria-label="Centre position"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span>Centre</span></button>
+      <button id="rerouteBtn" type="button" aria-label="Recalculate route"><svg viewBox="0 0 24 24"><path d="M4 4v6h6"/><path d="M20 20v-6h-6"/><path d="M5.5 15A7 7 0 0 0 18 17"/><path d="M18.5 9A7 7 0 0 0 6 7"/></svg><span>Recalculate</span></button>
+      <button id="gpsBtn" class="primary" type="button" aria-label="Start GPS"><svg viewBox="0 0 24 24"><path d="M12 22s7-6 7-13a7 7 0 1 0-14 0c0 7 7 13 7 13z"/><circle cx="12" cy="9" r="2"/></svg><span>Start</span></button>
+      <button id="fullscreenBtn" type="button" aria-label="Full screen"><svg viewBox="0 0 24 24"><path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/></svg><span>Fullscreen</span></button>
+      <button id="wakeBtn" type="button" aria-label="Keep screen on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg><span>Screen on</span></button>
+      <button id="reportBtn" class="danger" type="button" aria-label="Report road issue"><svg viewBox="0 0 24 24"><path d="M12 3L2 21h20L12 3z"/><path d="M12 9v5M12 18h.01"/></svg><span>Report issue</span></button>
     </nav>
 
     <div id="toast" class="toast" role="status"></div>
-    <div id="loading" class="loading">Loading approved routeâ€¦</div>
+    <div id="loading" class="loading">Loading approved route…</div>
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="/driver-v2/app.js?v=25"></script>
+  <script type="module" src="/driver-v2/app.js?v=26"></script>
 </body>
 </html>
-
