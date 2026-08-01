@@ -331,9 +331,30 @@ async function load(){
   state.id=routeId();
   if(!state.id)throw new Error('Route ID is missing.');
   state.map=L.map('map',{zoomControl:true,attributionControl:true,preferCanvas:true});
-  state.tileLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    maxZoom:20,attribution:'© OpenStreetMap contributors',crossOrigin:true
-  }).addTo(state.map);
+  state.tileLayer=L.tileLayer('/driver-v2/tiles/{z}/{x}/{y}.png',{
+    maxZoom:20,
+    minZoom:2,
+    attribution:'© HERE',
+    updateWhenIdle:false,
+    updateWhenZooming:false,
+    keepBuffer:4,
+    noWrap:false
+  });
+
+  state.tileLayer.on('tileerror',(event)=>{
+    console.warn('HERE map tile failed',event?.tile?.src||event);
+    el('routeStatus').textContent='Map loading issue';
+    el('routeStatus').className='status warn';
+  });
+
+  state.tileLayer.on('load',()=>{
+    if(el('routeStatus').textContent==='Map loading issue'){
+      el('routeStatus').textContent='Route ready';
+      el('routeStatus').className='status good';
+    }
+  });
+
+  state.tileLayer.addTo(state.map);
 
   const response=await fetch(`/api/driver-v2/route/${encodeURIComponent(state.id)}`,{cache:'no-store'});
   const payload=await response.json();
