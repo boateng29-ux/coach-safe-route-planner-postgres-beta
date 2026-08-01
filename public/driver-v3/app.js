@@ -1,4 +1,4 @@
-import { HereMapController } from './here-map-controller.js?v=31';
+import { HereMapController } from './here-map-controller.js?v=32';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -412,7 +412,7 @@ function onGps(position) {
     );
   }
 
-  course = smoothAngle(state.lastHeading, course, 0.3);
+  course = smoothAngle(state.lastHeading, course, 0.22);
   if (Number.isFinite(course)) state.lastHeading = course;
 
   const firstFix = !state.gps;
@@ -468,7 +468,7 @@ function onGps(position) {
   const cameraHeading = smoothAngle(
     mapCtl.lastHeading,
     navigationBearing(nearest, course, Number(speed)),
-    firstFix ? 1 : 0.22
+    firstFix ? 1 : 0.14
   );
 
   setMode('live');
@@ -508,6 +508,7 @@ function toggleGps() {
       state.viewMode = state.previousNavigationView;
     }
     setMode('live');
+    mapCtl.setViewMode(state.viewMode);
     gps.start();
     $('gpsStatus').textContent = 'Acquiring GPS…';
     $('gpsStatus').className = 'status';
@@ -656,7 +657,12 @@ async function load() {
 }
 
 $('gpsBtn').addEventListener('click', toggleGps);
-$('centreBtn').addEventListener('click', () => {
+$('centreBtn').addEventListener('click', (event) => {
+  if (event.detail === 2 && (state.snappedGps || state.gps)) {
+    applyViewMode(state.previousNavigationView, { immediate: false });
+    return;
+  }
+
   $('viewMenu').hidden = !$('viewMenu').hidden;
 });
 

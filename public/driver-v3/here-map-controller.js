@@ -88,8 +88,8 @@ export class HereMapController {
 
     const shadow = new H.map.Polyline(lineString, {
       style: {
-        strokeColor: 'rgba(4, 30, 76, 0.62)',
-        lineWidth: 13,
+        strokeColor: 'rgba(255,255,255,0.94)',
+        lineWidth: 15,
         lineCap: 'round',
         lineJoin: 'round'
       },
@@ -98,8 +98,8 @@ export class HereMapController {
 
     this.routeLine = new H.map.Polyline(lineString, {
       style: {
-        strokeColor: '#1476ff',
-        lineWidth: 8,
+        strokeColor: '#0f6ff4',
+        lineWidth: 9,
         lineCap: 'round',
         lineJoin: 'round'
       },
@@ -179,17 +179,19 @@ export class HereMapController {
   }
 
   zoomForSpeed(speedMps, nextTurnM = Infinity) {
-    if (Number.isFinite(nextTurnM) && nextTurnM <= 70) return 19;
-    if (Number.isFinite(nextTurnM) && nextTurnM <= 180) return 18.6;
+    if (Number.isFinite(nextTurnM) && nextTurnM <= 45) return 19.4;
+    if (Number.isFinite(nextTurnM) && nextTurnM <= 110) return 19.0;
+    if (Number.isFinite(nextTurnM) && nextTurnM <= 240) return 18.5;
 
     const mph = Number.isFinite(speedMps) && speedMps >= 0
       ? speedMps * 2.23694
       : 0;
 
-    if (mph < 18) return 18.4;
-    if (mph < 35) return 17.8;
-    if (mph < 52) return 17.2;
-    return 16.7;
+    if (mph < 12) return 18.8;
+    if (mph < 25) return 18.3;
+    if (mph < 40) return 17.7;
+    if (mph < 55) return 17.1;
+    return 16.6;
   }
 
   focus(position, {
@@ -209,12 +211,39 @@ export class HereMapController {
     const desiredHeading = isNorth ? 0 : heading;
     const zoom = this.zoomForSpeed(speedMps, nextTurnM);
 
-    let tilt = 52;
-    let lookAheadM = nextTurnM <= 70 ? 28 : speedMps > 15 ? 100 : 62;
+    const mph = Number.isFinite(speedMps) && speedMps >= 0
+      ? speedMps * 2.23694
+      : 0;
+
+    let tilt = 58;
+    let lookAheadM = 72;
+
+    if (nextTurnM <= 45) {
+      tilt = 48;
+      lookAheadM = 26;
+    } else if (nextTurnM <= 110) {
+      tilt = 52;
+      lookAheadM = 42;
+    } else if (nextTurnM <= 240) {
+      tilt = 55;
+      lookAheadM = 60;
+    } else if (mph >= 55) {
+      tilt = 62;
+      lookAheadM = 145;
+    } else if (mph >= 40) {
+      tilt = 60;
+      lookAheadM = 118;
+    } else if (mph >= 25) {
+      tilt = 58;
+      lookAheadM = 95;
+    } else if (mph < 12) {
+      tilt = 55;
+      lookAheadM = 58;
+    }
 
     if (is2d) {
       tilt = 0;
-      lookAheadM = nextTurnM <= 70 ? 18 : speedMps > 15 ? 68 : 42;
+      lookAheadM = nextTurnM <= 70 ? 24 : mph >= 40 ? 82 : 50;
     } else if (isNorth) {
       tilt = 0;
       lookAheadM = 0;
@@ -230,7 +259,7 @@ export class HereMapController {
     this.map.getViewModel().setLookAtData(
       {
         position: target,
-        zoom: isNorth ? Math.min(zoom, 17.8) : zoom,
+        zoom: isNorth ? Math.min(zoom, 17.7) : zoom,
         tilt,
         heading: desiredHeading
       },

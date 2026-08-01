@@ -368,3 +368,87 @@
     padding:.62rem .7rem;
   }
 }
+
+
+/* ==========================================================
+   DRIVER V3.2 — CAMERA AND ROUTE POLISH
+   ========================================================== */
+
+/* Keep the navigation arrow clearly in the lower quarter. */
+.app[data-mode="live"] .vehicle-arrow{
+  top:77%;
+  width:3.25rem;
+  height:3.25rem;
+  filter:drop-shadow(0 12px 20px rgba(0,0,0,.62));
+}
+
+.vehicle-arrow::before{
+  border-left:.96rem solid transparent;
+  border-right:.96rem solid transparent;
+  border-bottom:2.45rem solid #0f6ff4;
+}
+
+.vehicle-arrow::after{
+  top:.9rem;
+  width:1.05rem;
+  height:1.05rem;
+  background:#0f6ff4;
+  border:4px solid white;
+  box-shadow:0 0 0 10px rgba(15,111,244,.2);
+}
+
+/* Raise road label so it never collides with the toolbar. */
+.current-road{
+  bottom:7.25rem;
+  min-width:17rem;
+  font-size:1.02rem;
+}
+
+/* Reduce visual competition between panels and map. */
+.nav-card{
+  background:rgba(8,12,17,.965);
+}
+
+.speed-card{
+  background:rgba(8,12,17,.96);
+}
+
+/* Make the centre/view control easier to identify. */
+#centreBtn.active,
+#gpsBtn.active{
+  box-shadow:
+    0 0 0 2px rgba(255,225,132,.28),
+    0 10px 25px rgba(0,0,0,.36);
+}
+
+/* Subtle fade at the bottom for control legibility. */
+.app::before{
+  content:"";
+  position:absolute;
+  z-index:740;
+  left:0;
+  right:0;
+  bottom:0;
+  height:10rem;
+  background:linear-gradient(
+    to bottom,
+    transparent,
+    rgba(5,8,12,.12) 55%,
+    rgba(5,8,12,.28)
+  );
+  pointer-events:none;
+}
+
+@media(max-width:699px){
+  .app[data-mode="live"] .vehicle-arrow{
+    top:75%;
+    width:2.75rem;
+    height:2.75rem;
+  }
+
+  .current-road{
+    bottom:5.95rem;
+    min-width:12rem;
+    font-size:.8rem;
+  }
+}
