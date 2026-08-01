@@ -1,6 +1,6 @@
-﻿import{MapController}from'./map-controller.js?v=24';
+﻿import{MapController}from'./map-controller.js?v=25';
 import{GpsController}from'./gps-controller.js?v=24';
-import{CameraController}from'./camera-controller.js?v=24';
+import{CameraController}from'./camera-controller.js?v=25';
 import{VoiceController}from'./voice-controller.js?v=24';
 
 const $=id=>document.getElementById(id);
@@ -145,4 +145,5 @@ window.addEventListener('resize',()=>setTimeout(()=>{
   }
 },180));
 load().catch(e=>{$('loading').textContent=e.message;toast(e.message)});
+
 
