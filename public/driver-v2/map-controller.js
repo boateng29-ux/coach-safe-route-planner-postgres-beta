@@ -34,6 +34,11 @@ export class MapController{
     if(this.startMarker&&this.map.hasLayer(this.startMarker))this.map.removeLayer(this.startMarker);
     if(this.endMarker&&this.map.hasLayer(this.endMarker))this.map.removeLayer(this.endMarker);
   }
+
+  leaveLive(){
+    if(this.startMarker&&!this.map.hasLayer(this.startMarker))this.startMarker.addTo(this.map);
+    if(this.endMarker&&!this.map.hasLayer(this.endMarker))this.endMarker.addTo(this.map);
+  }
   setGps(point,accuracy){
     if(!this.gpsMarker){
       this.gpsMarker=L.circleMarker(point,{radius:7,color:'#fff',weight:3,fillColor:'#2979ff',fillOpacity:1}).addTo(this.map);
@@ -46,11 +51,25 @@ export class MapController{
   lowerThirdCentre(point,zoom){
     const size=this.map.getSize();
     const projected=this.map.project(point,zoom);
-    return this.map.unproject(L.point(projected.x,projected.y-(size.y*.2)),zoom);
+
+    /*
+     * The camera centre is shifted ahead of the vehicle.
+     * This leaves the vehicle at roughly 71% down the display.
+     */
+    const verticalLookAhead=Math.max(90,size.y*.21);
+    return this.map.unproject(
+      L.point(projected.x,projected.y-verticalLookAhead),
+      zoom
+    );
   }
-  focus(point,zoom=17.5,animate=true){
+
+  focus(point,zoom=18,animate=true){
     this.map.invalidateSize(false);
-    this.map.setView(this.lowerThirdCentre(point,zoom),zoom,{animate});
+    const centre=this.lowerThirdCentre(point,zoom);
+    this.map.setView(centre,zoom,{
+      animate,
+      duration:animate?.45:0
+    });
   }
   overview(){
     if(this.routeLine)this.map.fitBounds(this.routeLine.getBounds(),{padding:[70,40],maxZoom:15});

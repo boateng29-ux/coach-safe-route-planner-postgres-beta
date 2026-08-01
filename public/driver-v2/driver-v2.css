@@ -43,3 +43,15 @@ button{font:inherit}
 .leaflet-control-zoom{margin-top:10rem!important}
 .leaflet-control-attribution{font-size:.52rem!important}
 @media(min-width:760px){.nav-card{max-width:29rem;right:auto}.dock{left:auto;width:30rem}}
+
+
+/* DRIVER V2.4 LIVE NAVIGATION */
+.app[data-mode="live"] .leaflet-control-zoom{
+  opacity:.4;
+}
+.app[data-mode="live"] .vehicle-arrow{
+  display:block;
+}
+.app[data-mode="overview"] .vehicle-arrow{
+  display:none;
+}

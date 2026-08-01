@@ -1,7 +1,7 @@
-import{MapController}from'./map-controller.js?v=23';
-import{GpsController}from'./gps-controller.js?v=23';
-import{CameraController}from'./camera-controller.js?v=23';
-import{VoiceController}from'./voice-controller.js?v=23';
+import{MapController}from'./map-controller.js?v=24';
+import{GpsController}from'./gps-controller.js?v=24';
+import{CameraController}from'./camera-controller.js?v=24';
+import{VoiceController}from'./voice-controller.js?v=24';
 
 const $=id=>document.getElementById(id);
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
@@ -24,24 +24,124 @@ function metresText(m){if(!Number.isFinite(m))return'—';if(m<950)return Math.m
 function durationText(s){const mins=Math.max(0,Math.round(s/60)),h=Math.floor(mins/60),m=mins%60;return h?`${h}h ${m}m`:`${m}m`}
 function etaText(s){return new Date(Date.now()+Math.max(0,s)*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}
 function iconFor(i){const t=((i?.maneuver||'')+' '+(i?.instruction||'')).toLowerCase();if(t.includes('roundabout'))return'↻';if(t.includes('left'))return'←';if(t.includes('right'))return'→';if(t.includes('exit'))return'↗';return'↑'}
-function setMode(mode){state.mode=mode;$('app').dataset.mode=mode;if(mode==='live')mapCtl.enterLive()}
-function updateGuidance(progress,offRoute){if(!state.instructions.length)return;let idx=state.instructions.findIndex(i=>Number(i.distanceM||0)>=progress+5);if(idx<0)idx=state.instructions.length-1;state.currentInstruction=idx;const ins=state.instructions[idx],nextM=Math.max(0,Number(ins.distanceM||0)-progress),remaining=Math.max(0,state.totalM-progress),totalS=Number(state.route.summary?.travelTimeInSeconds||0),remainingS=state.totalM?totalS*(remaining/state.totalM):0;$('turnIcon').textContent=iconFor(ins);$('instruction').textContent=ins.instruction||'Continue on route';$('turnDistance').textContent=nextM<=35?'Now':'Next in '+metresText(nextM);$('laneText').textContent=ins.laneGuidance?.text||'Follow road signs. Lane guidance not returned.';$('eta').textContent=etaText(remainingS);$('timeLeft').textContent=durationText(remainingS);$('distanceLeft').textContent=metresText(remaining);$('roadStatus').textContent=ins.street||ins.roadNumbers?.join(' · ')||'Route';$('speedLimit').textContent=ins.speedLimit?.maxSpeedLimitMph?ins.speedLimit.maxSpeedLimitMph+' mph':'Limit —';$('routeStatus').textContent=offRoute>120?'Off route':'On route';$('routeStatus').className='status '+(offRoute>120?'bad':'good');voice.maybeSpeak(ins,nextM,idx);if(nextM<180&&state.mode==='live')camera.focus(state.gps,{zoom:nextM<60?19:18.5})}
+function setMode(mode){
+  state.mode=mode;
+  $('app').dataset.mode=mode;
+
+  if(mode==='live'){
+    mapCtl.enterLive();
+    camera.follow=true;
+  }else{
+    mapCtl.leaveLive?.();
+  }
+}
+function updateGuidance(progress,offRoute){if(!state.instructions.length)return;let idx=state.instructions.findIndex(i=>Number(i.distanceM||0)>=progress+5);if(idx<0)idx=state.instructions.length-1;state.currentInstruction=idx;const ins=state.instructions[idx],nextM=Math.max(0,Number(ins.distanceM||0)-progress),remaining=Math.max(0,state.totalM-progress),totalS=Number(state.route.summary?.travelTimeInSeconds||0),remainingS=state.totalM?totalS*(remaining/state.totalM):0;$('turnIcon').textContent=iconFor(ins);$('instruction').textContent=ins.instruction||'Continue on route';$('turnDistance').textContent=nextM<=35?'Now':'Next in '+metresText(nextM);$('laneText').textContent=ins.laneGuidance?.text||'Follow road signs. Lane guidance not returned.';$('eta').textContent=etaText(remainingS);$('timeLeft').textContent=durationText(remainingS);$('distanceLeft').textContent=metresText(remaining);$('roadStatus').textContent=ins.street||ins.roadNumbers?.join(' · ')||'Route';$('speedLimit').textContent=ins.speedLimit?.maxSpeedLimitMph?ins.speedLimit.maxSpeedLimitMph+' mph':'Limit —';$('routeStatus').textContent=offRoute>120?'Off route':'On route';$('routeStatus').className='status '+(offRoute>120?'bad':'good');voice.maybeSpeak(ins,nextM,idx);
+  if(state.mode==='live'&&state.gps){
+    camera.focus(state.gps,{nextTurnM:nextM});
+  }
+}
 function drawRoute(route,overview=true){state.route=route;state.points=(route.points||[]).map(p=>[Number(p[0]),Number(p[1])]).filter(p=>p.every(Number.isFinite));state.instructions=(route.instructions||[]).slice().sort((a,b)=>Number(a.distanceM||0)-Number(b.distanceM||0));state.measures=buildMeasures(state.points);state.totalM=Number(route.summary?.lengthInMeters||state.measures.at(-1)||0);mapCtl.drawRoute(state.points,overview);setMode(overview?'overview':'live');updateGuidance(0,Infinity)}
-function onGps(pos){const{latitude:lat,longitude:lng,accuracy,speed,heading}=pos.coords;let h=Number(heading);if(state.gps&&haversine([state.gps.lat,state.gps.lng],[lat,lng])>5)h=bearing([state.gps.lat,state.gps.lng],[lat,lng]);h=smoothAngle(state.lastHeading,h,.3);if(Number.isFinite(h))state.lastHeading=h;state.gps={lat,lng,accuracy:Number(accuracy||0),speed:Number(speed),heading:h};mapCtl.setGps([lat,lng],accuracy);$('gpsStatus').textContent='GPS '+Math.round(accuracy||0)+'m';$('gpsStatus').className='status good';$('speed').textContent=Number.isFinite(speed)&&speed>=0?Math.round(speed*2.23694)+' mph':'0 mph';if(Number.isFinite(h))$('vehicleArrow').style.setProperty('--heading',h+'deg');const near=nearestProgress([lat,lng]);updateGuidance(near.progress,near.distance);setMode('live');camera.focus(state.gps,{force:true,zoom:18});updateButtons()}
+function onGps(pos){
+  const{latitude:lat,longitude:lng,accuracy,speed,heading}=pos.coords;
+
+  let h=Number(heading);
+  if(state.gps&&haversine([state.gps.lat,state.gps.lng],[lat,lng])>5){
+    h=bearing([state.gps.lat,state.gps.lng],[lat,lng]);
+  }
+
+  h=smoothAngle(state.lastHeading,h,.3);
+  if(Number.isFinite(h))state.lastHeading=h;
+
+  const firstFix=!state.gps;
+
+  state.gps={
+    lat,
+    lng,
+    accuracy:Number(accuracy||0),
+    speed:Number(speed),
+    heading:h
+  };
+
+  mapCtl.setGps([lat,lng],accuracy);
+
+  $('gpsStatus').textContent='GPS '+Math.round(accuracy||0)+'m';
+  $('gpsStatus').className='status good';
+  $('speed').textContent=Number.isFinite(speed)&&speed>=0
+    ?Math.round(speed*2.23694)+' mph'
+    :'0 mph';
+
+  if(Number.isFinite(h)){
+    $('vehicleArrow').style.setProperty('--heading',h+'deg');
+  }
+
+  const near=nearestProgress([lat,lng]);
+  updateGuidance(near.progress,near.distance);
+
+  setMode('live');
+
+  const ins=state.instructions[state.currentInstruction];
+  const nextTurnM=ins
+    ?Math.max(0,Number(ins.distanceM||0)-near.progress)
+    :Infinity;
+
+  camera.focus(state.gps,{
+    force:firstFix,
+    nextTurnM
+  });
+
+  updateButtons();
+}
 function onGpsError(err){toast(err.message||'GPS permission failed');$('gpsStatus').textContent='GPS error';$('gpsStatus').className='status bad';updateButtons()}
-function toggleGps(){if(gps.active){gps.stop();$('gpsStatus').textContent='GPS off';setMode('overview');mapCtl.overview()}else{camera.follow=true;gps.start();toast('Starting live GPS…')}updateButtons()}
-async function reroute(){if(!state.gps){toast('Start GPS first');return}const b=$('rerouteBtn');b.disabled=true;try{const r=await fetch(`/driver/route/${encodeURIComponent(state.id)}/reroute`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:state.gps.lat,lng:state.gps.lng,accuracyM:state.gps.accuracy})});const p=await r.json();if(!r.ok)throw new Error(p.error||'Reroute failed');voice.reset();drawRoute(p.route,false);camera.focus(state.gps,{force:true,zoom:18});toast('Route recalculated')}catch(e){toast(e.message)}finally{b.disabled=false}}
+function toggleGps(){
+  if(gps.active){
+    gps.stop();
+    $('gpsStatus').textContent='GPS off';
+    $('gpsStatus').className='status';
+    camera.pause();
+    setMode('overview');
+    mapCtl.overview();
+  }else{
+    setMode('live');
+    camera.follow=true;
+    gps.start();
+    $('gpsStatus').textContent='Acquiring GPS…';
+    $('gpsStatus').className='status';
+    toast('Starting live navigation…');
+  }
+  updateButtons();
+}
+async function reroute(){if(!state.gps){toast('Start GPS first');return}const b=$('rerouteBtn');b.disabled=true;try{const r=await fetch(`/driver/route/${encodeURIComponent(state.id)}/reroute`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:state.gps.lat,lng:state.gps.lng,accuracyM:state.gps.accuracy})});const p=await r.json();if(!r.ok)throw new Error(p.error||'Reroute failed');voice.reset();
+    drawRoute(p.route,false);
+    setMode('live');
+    camera.resume(state.gps);
+    toast('Route recalculated')}catch(e){toast(e.message)}finally{b.disabled=false}}
 async function toggleWake(){if(state.wakeLock){await state.wakeLock.release().catch(()=>{});state.wakeLock=null}else if('wakeLock'in navigator){state.wakeLock=await navigator.wakeLock.request('screen').catch(()=>null)}toast(state.wakeLock?'Screen will stay on':'Wake lock off');updateButtons()}
 function toggleFullscreen(){document.body.classList.toggle('fullscreen');setTimeout(()=>{mapCtl.refresh();if(state.mode==='live')camera.focus(state.gps,{force:true});else mapCtl.overview()},180);updateButtons()}
 function updateButtons(){$('gpsBtn').textContent=gps?.active?'📡':'📍';$('gpsBtn').classList.toggle('active',!!gps?.active);$('voiceBtn').textContent=voice.enabled?'🔊':'🔇';$('voiceBtn').classList.toggle('active',voice.enabled);$('wakeBtn').classList.toggle('active',!!state.wakeLock);$('fullscreenBtn').textContent=document.body.classList.contains('fullscreen')?'↙':'⛶'}
-async function load(){state.id=routeId();if(!state.id)throw new Error('Route ID is missing');mapCtl.init();gps=new GpsController(onGps,onGpsError);const r=await fetch(`/driver-v2/data/${encodeURIComponent(state.id)}`,{cache:'no-store',credentials:'same-origin'});const p=await r.json();if(!r.ok)throw new Error(p.error||'Could not load route');drawRoute(p.route||{},true);$('loading').classList.add('hidden');$('routeStatus').textContent='Route ready';updateButtons()}
+async function load(){state.id=routeId();if(!state.id)throw new Error('Route ID is missing');mapCtl.init();gps=new GpsController(onGps,onGpsError);const r=await fetch(`/api/driver-v2/route/${encodeURIComponent(state.id)}`,{cache:'no-store'});const p=await r.json();if(!r.ok)throw new Error(p.error||'Could not load route');drawRoute(p.route||{},true);$('loading').classList.add('hidden');$('routeStatus').textContent='Route ready';updateButtons()}
 
 $('gpsBtn').addEventListener('click',toggleGps);
-$('centreBtn').addEventListener('click',()=>{camera.follow=true;camera.focus(state.gps,{force:true,zoom:18})});
+$('centreBtn').addEventListener('click',()=>{
+  if(!state.gps){
+    toast('Start GPS first');
+    return;
+  }
+  setMode('live');
+  camera.resume(state.gps);
+  toast('Following your position');
+});
 $('rerouteBtn').addEventListener('click',reroute);
 $('fullscreenBtn').addEventListener('click',toggleFullscreen);
 $('wakeBtn').addEventListener('click',toggleWake);
 $('voiceBtn').addEventListener('click',()=>{voice.toggle();updateButtons();toast(voice.enabled?'Voice guidance on':'Voice guidance off')});
 $('reportBtn').addEventListener('click',()=>window.open(`/driver/route/${encodeURIComponent(state.id)}#driverReportForm`,'_blank'));
-window.addEventListener('resize',()=>setTimeout(()=>{mapCtl.refresh();if(state.mode==='live')camera.focus(state.gps,{force:true})},180));
+window.addEventListener('resize',()=>setTimeout(()=>{
+  mapCtl.refresh();
+  if(gps?.active&&state.gps){
+    setMode('live');
+    camera.focus(state.gps,{force:true});
+  }else if(state.mode==='overview'){
+    mapCtl.overview();
+  }
+},180));
 load().catch(e=>{$('loading').textContent=e.message;toast(e.message)});
