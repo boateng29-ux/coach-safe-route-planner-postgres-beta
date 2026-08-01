@@ -179,21 +179,34 @@
   }
 
   function centrePosition() {
-    if (!safeClick($('mapCenterBtn'))) safeClick($('centerGpsBtn'));
-    showToast('Centre position.');
+    if (typeof window.coachSafeCentrePosition === 'function') {
+      window.coachSafeCentrePosition();
+    } else {
+      safeClick($('centerGpsBtn'));
+    }
   }
 
   function recalculateRoute() {
-    safeClick($('mapRecalcBtn'));
+    if (typeof window.coachSafeRecalculate === 'function') {
+      window.coachSafeRecalculate();
+    }
     showToast('Recalculate route.');
   }
 
   function toggleFullscreen() {
-    safeClick($('mapFullscreenBtn'));
+    if (typeof window.coachSafeToggleFullscreen === 'function') {
+      window.coachSafeToggleFullscreen();
+    }
     invalidateMap();
   }
 
   async function toggleWake() {
+    if (typeof window.coachSafeToggleWake === 'function') {
+      await window.coachSafeToggleWake();
+      state.keepScreenOn = !state.keepScreenOn;
+      updateButtons();
+      return;
+    }
     state.keepScreenOn = !state.keepScreenOn;
     if (state.keepScreenOn) {
       const ok = await requestWakeLock();
@@ -207,9 +220,10 @@
   }
 
   function toggleVoice() {
-    safeClick($('mapVoiceBtn'));
+    if (typeof window.coachSafeToggleVoice === 'function') {
+      window.coachSafeToggleVoice();
+    }
     setTimeout(function () {
-      if (isVoiceActive()) speak(currentInstructionText());
       updateButtons();
     }, 250);
   }
