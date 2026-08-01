@@ -1,7 +1,7 @@
-import{MapController}from'./map-controller.js?v=28';
-import{GpsController}from'./gps-controller.js?v=28';
-import{CameraController}from'./camera-controller.js?v=28';
-import{VoiceController}from'./voice-controller.js?v=28';
+import{MapController}from'./map-controller.js?v=29';
+import{GpsController}from'./gps-controller.js?v=29';
+import{CameraController}from'./camera-controller.js?v=29';
+import{VoiceController}from'./voice-controller.js?v=29';
 
 const $=id=>document.getElementById(id);
 const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
@@ -30,6 +30,47 @@ function toast(message){const n=$('toast');n.textContent=message;n.classList.add
 function routeId(){const m=location.pathname.match(/\/driver-v2\/route\/([^/?#]+)/i);return m?decodeURIComponent(m[1]):''}
 function haversine(a,b){const R=6371000,dLat=rad(b[0]-a[0]),dLon=rad(b[1]-a[1]),p1=rad(a[0]),p2=rad(b[0]);const h=Math.sin(dLat/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dLon/2)**2;return 2*R*Math.atan2(Math.sqrt(h),Math.sqrt(1-h))}
 function bearing(a,b){const p1=rad(a[0]),p2=rad(b[0]),dl=rad(b[1]-a[1]);const y=Math.sin(dl)*Math.cos(p2),x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);return( Math.atan2(y,x)*180/Math.PI+360)%360}
+function routeSegmentBearing(index){
+  if(!state.points.length)return 0;
+
+  const startIndex=clamp(
+    Number(index||0),
+    0,
+    Math.max(0,state.points.length-2)
+  );
+
+  /*
+   * Look several points ahead to avoid reacting to tiny polyline bends.
+   */
+  const endIndex=clamp(
+    startIndex+Math.min(8,state.points.length-startIndex-1),
+    startIndex+1,
+    state.points.length-1
+  );
+
+  return bearing(
+    state.points[startIndex],
+    state.points[endIndex]
+  );
+}
+
+function navigationBearing(nearest,gpsHeading,speedMps){
+  const routeBearing=routeSegmentBearing(nearest.index);
+  const moving=
+    Number.isFinite(speedMps)&&
+    speedMps>=2.5&&
+    Number.isFinite(gpsHeading);
+
+  if(!moving)return routeBearing;
+
+  /*
+   * Blend GPS course toward the route direction. This dampens unreliable
+   * mobile headings while still responding to genuine vehicle movement.
+   */
+  const delta=((gpsHeading-routeBearing+540)%360)-180;
+  return(routeBearing+delta*.7+360)%360;
+}
+
 function smoothAngle(prev,next,w=.28){if(!Number.isFinite(prev))return next;const d=((next-prev+540)%360)-180;return(prev+d*w+360)%360}
 function buildMeasures(points){const out=[0];for(let i=1;i<points.length;i++)out[i]=out[i-1]+haversine(points[i-1],points[i]);return out}
 function project(point,origin){const R=6371000;return{x:rad(point[1]-origin[1])*Math.cos(rad(origin[0]))*R,y:rad(point[0]-origin[0])*R}}
@@ -124,6 +165,23 @@ function onGps(pos){
 
   const nearest=nearestProgress([lat,lng]);
 
+  const cameraBearing=navigationBearing(
+    nearest,
+    h,
+    Number(speed)
+  );
+
+  mapCtl.setBearing(
+    cameraBearing,
+    { immediate:firstFix }
+  );
+
+  /*
+   * The map rotates beneath the vehicle. Keep the vehicle arrow pointing
+   * toward the top instead of rotating it independently.
+   */
+  $('vehicleArrow').style.setProperty('--heading','0deg');
+
   /*
    * Only trust route snapping when the GPS fix is good enough and
    * the route is reasonably close to the raw position.
@@ -167,12 +225,6 @@ function onGps(pos){
       ?Math.round(speed*2.23694)
       :0;
 
-  if(Number.isFinite(h)){
-    $('vehicleArrow').style.setProperty(
-      '--heading',
-      h+'deg'
-    );
-  }
 
   /*
    * While GPS is poor, keep the route progress conservative.

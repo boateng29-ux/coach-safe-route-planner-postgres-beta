@@ -127,3 +127,66 @@
     top:74%;
   }
 }
+
+
+/* ==========================================================
+   DRIVER V2.9 HEADING-UP NAVIGATION
+   ========================================================== */
+
+#map{
+  --coach-map-bearing:0deg;
+}
+
+/*
+ * Rotate and slightly enlarge only the visual map panes.
+ * Driver UI, instruction card, speed panel, road banner and dock remain fixed.
+ */
+#map .leaflet-tile-pane,
+#map .leaflet-overlay-pane,
+#map .leaflet-shadow-pane,
+#map .leaflet-marker-pane{
+  transform-origin:50% 50%!important;
+  transform:
+    rotate(var(--coach-map-bearing))
+    scale(1.42)!important;
+  transition:transform .12s linear;
+}
+
+/* Leaflet popups are not used in live navigation; keep them unrotated. */
+#map .leaflet-popup-pane,
+#map .leaflet-tooltip-pane{
+  transform:none!important;
+}
+
+/* The vehicle arrow stays forward/up while the map rotates underneath. */
+.app[data-mode="live"] .vehicle-arrow{
+  transform:rotate(0deg)!important;
+}
+
+/* Hide default attribution while the visual map is rotated. */
+.leaflet-control-attribution{
+  display:none!important;
+}
+
+.app::after{
+  content:"HERE";
+  position:absolute;
+  z-index:760;
+  right:.35rem;
+  bottom:.25rem;
+  padding:.1rem .25rem;
+  border-radius:.2rem;
+  background:rgba(255,255,255,.75);
+  color:#344;
+  font-size:.5rem;
+  pointer-events:none;
+}
+
+@media(max-width:699px){
+  #map .leaflet-tile-pane,
+  #map .leaflet-overlay-pane,
+  #map .leaflet-shadow-pane,
+  #map .leaflet-marker-pane{
+    scale:1.5;
+  }
+}

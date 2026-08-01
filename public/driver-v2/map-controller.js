@@ -11,6 +11,9 @@ export class MapController {
     this.tileErrors = 0;
     this.fallbackUsed = false;
     this.liveMode = false;
+    this.currentBearing = 0;
+    this.targetBearing = 0;
+    this.rotationFrame = null;
   }
 
   init() {
@@ -253,8 +256,71 @@ export class MapController {
     return true;
   }
 
+  normaliseBearing(value) {
+    return ((Number(value || 0) % 360) + 360) % 360;
+  }
+
+  shortestBearingDelta(from, to) {
+    return ((to - from + 540) % 360) - 180;
+  }
+
+  setBearing(bearing, { immediate = false } = {}) {
+    if (!this.map) return;
+
+    this.targetBearing = this.normaliseBearing(bearing);
+
+    if (immediate) {
+      this.currentBearing = this.targetBearing;
+      this.applyBearing();
+      return;
+    }
+
+    if (this.rotationFrame) return;
+
+    const animate = () => {
+      const delta = this.shortestBearingDelta(
+        this.currentBearing,
+        this.targetBearing
+      );
+
+      if (Math.abs(delta) < 0.3) {
+        this.currentBearing = this.targetBearing;
+        this.applyBearing();
+        this.rotationFrame = null;
+        return;
+      }
+
+      this.currentBearing = this.normaliseBearing(
+        this.currentBearing + delta * 0.16
+      );
+
+      this.applyBearing();
+      this.rotationFrame = requestAnimationFrame(animate);
+    };
+
+    this.rotationFrame = requestAnimationFrame(animate);
+  }
+
+  applyBearing() {
+    const mapNode = this.map.getContainer();
+
+    /*
+     * Rotate the map opposite to the travel bearing so the route ahead
+     * points toward the top of the display. Scale prevents black corners.
+     */
+    mapNode.style.setProperty(
+      '--coach-map-bearing',
+      `${-this.currentBearing}deg`
+    );
+  }
+
+  resetBearing() {
+    this.setBearing(0, { immediate: true });
+  }
+
   refresh() {
     if (!this.map) return;
     this.map.invalidateSize(true);
+    this.applyBearing();
   }
 }
