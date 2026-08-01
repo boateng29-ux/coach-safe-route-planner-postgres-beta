@@ -1318,7 +1318,6 @@ function setMapBearing(deg){
   },d));
   }}
   drawRouteOnMap();
-  setNavigationMode('overview');
   ensureSatnavArrow();removeDirectionToggleArtifacts();setInterval(removeDirectionToggleArtifacts,1500);window.addEventListener('resize',()=>{
   setTimeout(()=>{
     map.invalidateSize(true);
@@ -1345,7 +1344,9 @@ let navigationMode='overview';
 let forceGpsCameraFocus=true;
 window.__COACH_SAFE_FOLLOW_ACTIVE__=false;
 let watchId=null,currentGps=null,driverMarker=null,accuracyCircle=null,followDriver=false,journeyStarted=false,currentInstructionIndex=0,lastLoggedInstruction=-1,wakeLock=null,voiceEnabled=false,lastSpokenInstruction=-1,offRouteVoiceLastAt=0;
-let junctionZoomLevel=17,lastJunctionZoomLevel=17,lastFullscreenExitAt=0;const gpsIcon=L.divIcon({className:'driver-location-marker',html:'<span class="driver-location-dot"></span>',iconSize:[28,28],iconAnchor:[14,14]});
+let junctionZoomLevel=17,lastJunctionZoomLevel=17,lastFullscreenExitAt=0;
+setNavigationMode('overview');
+const gpsIcon=L.divIcon({className:'driver-location-marker',html:'<span class="driver-location-dot"></span>',iconSize:[28,28],iconAnchor:[14,14]});
 // SATNAV_FOLLOW_BEHAVIOUR_V1_JS_START
 function ensureSatnavArrow(){try{const shell=document.getElementById('driverMapShell');if(!shell||document.getElementById('satnavFixedDriverArrow'))return;const arrow=document.createElement('div');arrow.id='satnavFixedDriverArrow';arrow.className='satnav-fixed-driver-arrow';arrow.setAttribute('aria-hidden','true');shell.appendChild(arrow);}catch(e){}}
 function bearingFromRouteProgress(progressM){try{if(!routePoints||routePoints.length<2)return routeInitialBearing()||0;const measures=routeMeasures&&routeMeasures.length?routeMeasures:buildRouteMeasures(routePoints);let idx=0;for(let i=1;i<measures.length;i++){if(Number(measures[i])>=Number(progressM||0)){idx=Math.max(0,i-1);break;}}const a=routePoints[idx]||routePoints[0];let b=routePoints[Math.min(routePoints.length-1,idx+1)]||routePoints[routePoints.length-1];for(let j=idx+1;j<routePoints.length;j++){if(haversine(a,routePoints[j])>12){b=routePoints[j];break;}}return bearingBetween(a,b)||routeInitialBearing()||0;}catch(e){return routeInitialBearing()||0;}}
