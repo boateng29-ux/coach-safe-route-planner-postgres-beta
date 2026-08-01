@@ -327,56 +327,31 @@ function updateButtons(){
   el('fullscreenBtn').textContent=document.body.classList.contains('fullscreen')?'↙':'⛶';
 }
 
-async function clearOldDriverCaches(){
-  try{
-    if('caches' in window){
-      const keys=await caches.keys();
-      await Promise.all(
-        keys
-          .filter((key)=>key.startsWith('coach-safe-shell-'))
-          .map((key)=>caches.delete(key))
-      );
-    }
-    if('serviceWorker' in navigator){
-      const registrations=await navigator.serviceWorker.getRegistrations();
-      for(const registration of registrations){
-        await registration.update().catch(()=>{});
-      }
-    }
-  }catch(error){
-    console.warn('Driver V2 cache cleanup skipped',error);
-  }
-}
-
 async function load(){
   state.id=routeId();
   if(!state.id)throw new Error('Route ID is missing.');
   state.map=L.map('map',{zoomControl:true,attributionControl:true,preferCanvas:true});
-  state.tileLayer=L.tileLayer('/driver-v2/tiles/{z}/{x}/{y}.png?v=22',{
-    tileSize:256,
-    zoomOffset:0,
-    minZoom:2,
+  state.tileLayer=L.tileLayer('/driver-v2/tiles/{z}/{x}/{y}.png',{
     maxZoom:20,
-    detectRetina:false,
+    minZoom:2,
+    attribution:'© HERE',
     updateWhenIdle:false,
     updateWhenZooming:false,
-    keepBuffer:3,
-    attribution:'© HERE'
-  });
-
-  let loadedTileCount=0;
-  state.tileLayer.on('tileload',()=>{
-    loadedTileCount+=1;
-    if(loadedTileCount===1){
-      el('routeStatus').textContent='Map ready';
-      el('routeStatus').className='status good';
-    }
+    keepBuffer:4,
+    noWrap:false
   });
 
   state.tileLayer.on('tileerror',(event)=>{
-    console.warn('Driver V2 HERE tile error',event?.tile?.src||event);
-    el('routeStatus').textContent='Map tile error';
-    el('routeStatus').className='status bad';
+    console.warn('HERE map tile failed',event?.tile?.src||event);
+    el('routeStatus').textContent='Map loading issue';
+    el('routeStatus').className='status warn';
+  });
+
+  state.tileLayer.on('load',()=>{
+    if(el('routeStatus').textContent==='Map loading issue'){
+      el('routeStatus').textContent='Route ready';
+      el('routeStatus').className='status good';
+    }
   });
 
   state.tileLayer.addTo(state.map);
@@ -401,9 +376,7 @@ el('reportBtn').addEventListener('click',()=>window.open(`/driver/route/${encode
 window.addEventListener('resize',()=>setTimeout(()=>{state.map?.invalidateSize(true);if(state.mode==='live')focusGps({force:true})},160));
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.wakeLock===null&&el('wakeBtn').classList.contains('active'))toggleWake()});
 
-clearOldDriverCaches()
-  .finally(()=>load())
-  .catch(error=>{
-    el('loading').textContent=error.message;
-    toast(error.message);
-  });
+load().catch(error=>{
+  el('loading').textContent=error.message;
+  toast(error.message);
+});
