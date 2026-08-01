@@ -1453,6 +1453,93 @@ body.coach-map-fullscreen{
     }
   }
 
+
+  /* COACH_SAFE_TRUE_PAGE_FULLSCREEN_V1 */
+
+  body.coach-map-fullscreen{
+    margin:0!important;
+    padding:0!important;
+    overflow:hidden!important;
+    position:fixed!important;
+    inset:0!important;
+    width:100vw!important;
+    height:100dvh!important;
+    min-height:100dvh!important;
+    background:#101418!important;
+  }
+
+  /* Hide the complete driver-route page around the map. */
+  body.coach-map-fullscreen > header,
+  body.coach-map-fullscreen > main,
+  body.coach-map-fullscreen > footer{
+    display:none!important;
+    visibility:hidden!important;
+  }
+
+  /*
+   * The map shell normally sits between the header and main content.
+   * Keep only this element visible and attach it directly to the viewport.
+   */
+  body.coach-map-fullscreen #driverMapShell{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:fixed!important;
+    inset:0!important;
+    top:0!important;
+    left:0!important;
+    right:0!important;
+    bottom:0!important;
+    width:100vw!important;
+    height:100dvh!important;
+    min-width:100vw!important;
+    min-height:100dvh!important;
+    max-width:none!important;
+    max-height:none!important;
+    margin:0!important;
+    padding:0!important;
+    border:0!important;
+    z-index:2147483000!important;
+    background:#101418!important;
+  }
+
+  body.coach-map-fullscreen #driverMapShell #driverMap{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+    position:absolute!important;
+    inset:0!important;
+    width:100%!important;
+    height:100%!important;
+    min-width:100%!important;
+    min-height:100%!important;
+    margin:0!important;
+    padding:0!important;
+  }
+
+  /* The instruction card and icon dock remain the only overlays. */
+  body.coach-map-fullscreen #driverMapShell .map-nav-overlay{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+
+  body.coach-map-fullscreen #driverMapShell #driverCleanDockV7{
+    display:grid!important;
+    visibility:visible!important;
+    opacity:1!important;
+    pointer-events:auto!important;
+  }
+
+
+  html.coach-map-fullscreen-root{
+    overflow:hidden!important;
+    width:100vw!important;
+    height:100dvh!important;
+    min-height:100dvh!important;
+    background:#101418!important;
+  }
+
 </style>
 
 </head>
@@ -1861,13 +1948,18 @@ window.coachSafeCentrePosition=function(){
       const turningOn=!shell.classList.contains('large-map-mode');
 
       if(turningOn){
+        window.__coachSafeScrollY=window.scrollY||0;
         shell.classList.add('large-map-mode');
         document.body.classList.add('coach-map-fullscreen');
+        document.documentElement.classList.add('coach-map-fullscreen-root');
         document.body.style.overflow='hidden';
+        document.body.style.touchAction='none';
       }else{
         shell.classList.remove('large-map-mode');
         document.body.classList.remove('coach-map-fullscreen');
+        document.documentElement.classList.remove('coach-map-fullscreen-root');
         document.body.style.overflow='';
+        document.body.style.touchAction='';
       }
 
       const restoreCamera=()=>{
@@ -1885,7 +1977,14 @@ window.coachSafeCentrePosition=function(){
         }
       };
 
-      [60,180,420,850].forEach((delay)=>setTimeout(restoreCamera,delay));
+      [40,120,260,520,900].forEach((delay)=>setTimeout(restoreCamera,delay));
+
+      if(!turningOn){
+        setTimeout(()=>{
+          try{window.scrollTo(0,Number(window.__coachSafeScrollY||0))}catch(e){}
+        },80);
+      }
+
       return true;
     };
     syncMapControlStates();
