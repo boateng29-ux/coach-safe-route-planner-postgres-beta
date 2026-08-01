@@ -12,3 +12,86 @@
 @media(min-width:1000px){.nav-card{width:38rem}.speed-card{display:grid}}@media(min-width:700px) and (max-width:999px){.nav-card{width:34rem}.speed-card{display:none}.dock button span{font-size:.6rem}}
 @media(max-width:699px){.nav-card{top:max(.42rem,env(safe-area-inset-top));left:.42rem;right:.42rem;width:auto;grid-template-columns:3rem minmax(0,1fr) auto;gap:.42rem;padding:.52rem;border-radius:.95rem}.turn-icon{width:2.9rem;height:2.9rem;font-size:1.7rem;border-radius:.75rem}.eyebrow{font-size:.5rem}.turn-copy strong{font-size:.88rem;line-height:1.07;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}.lane-text{font-size:.59rem;margin-top:.22rem}.distance-pill{font-size:.74rem;padding:.42rem .48rem}.metrics{gap:.24rem;padding-top:.38rem}.metrics div{padding:.3rem .34rem}.metrics span{font-size:.43rem}.metrics strong{font-size:.68rem}.status-row{gap:.22rem}.status{font-size:.54rem;padding:.19rem .35rem}.road-chip{max-width:38vw;overflow:hidden;text-overflow:ellipsis}.speed-card{display:none}.map-side-btn,.map-zoom{left:.55rem}.compass-btn{top:10.2rem;width:2.75rem;height:2.75rem}.map-zoom{top:13.25rem}.map-zoom button{width:2.75rem;height:2.75rem}.current-road{bottom:5.3rem;min-width:11rem;max-width:76vw;padding:.48rem .7rem;font-size:.78rem}.dock{left:.42rem;right:.42rem;bottom:max(.4rem,env(safe-area-inset-bottom));gap:.24rem;padding:.34rem;border-radius:.95rem}.dock button{height:3.45rem;border-radius:999px;padding:0;display:grid;grid-template-rows:1fr;place-items:center}.dock button svg{width:1.25rem;height:1.25rem}.dock button span{display:none}.vehicle-arrow{top:72%;width:2.6rem;height:2.6rem}}
 @media(max-width:380px){.nav-card{grid-template-columns:2.7rem minmax(0,1fr) auto}.turn-icon{width:2.6rem;height:2.6rem;font-size:1.5rem}.turn-copy strong{font-size:.8rem}.distance-pill{font-size:.68rem;padding:.38rem}.dock{gap:.18rem}.dock button{height:3.1rem}}
+
+
+/* ==========================================================
+   DRIVER V2.7 VISUAL AND MARKER REFINEMENT
+   ========================================================== */
+
+/* Give the desktop speed panel more breathing space. */
+@media (min-width:1000px){
+  .speed-card{
+    top:max(1rem,env(safe-area-inset-top));
+    right:1.1rem;
+  }
+
+  /* Keep compass clear of the instruction panel. */
+  .compass-btn{
+    top:14.4rem;
+  }
+
+  .map-zoom{
+    top:18.2rem;
+  }
+
+  .dock{
+    gap:.65rem;
+    padding:.58rem;
+  }
+
+  .dock button{
+    height:4.8rem;
+  }
+
+  .dock button svg{
+    width:1.85rem;
+    height:1.85rem;
+  }
+
+  .dock button span{
+    font-size:.78rem;
+    letter-spacing:.045em;
+  }
+}
+
+/* Make the active control visibly different without changing layout. */
+.dock button.active{
+  box-shadow:
+    0 0 0 2px rgba(255,226,141,.25),
+    0 8px 20px rgba(0,0,0,.32);
+}
+
+/* Slightly strengthen map labels and route contrast. */
+.leaflet-tile-pane{
+  filter:saturate(1.08) contrast(1.04);
+}
+
+.leaflet-overlay-pane svg{
+  filter:drop-shadow(0 1px 1px rgba(0,0,0,.24));
+}
+
+/* Keep the accuracy circle subtle in navigation mode. */
+.app[data-mode="live"] .leaflet-overlay-pane path[fill="#2979ff"]{
+  opacity:.16;
+}
+
+/* Mobile refinements. */
+@media (max-width:699px){
+  .speed-card{
+    display:none!important;
+  }
+
+  .compass-btn{
+    top:10.55rem;
+  }
+
+  .map-zoom{
+    top:13.65rem;
+  }
+
+  .dock button.active{
+    box-shadow:
+      0 0 0 2px rgba(255,226,141,.2),
+      0 6px 16px rgba(0,0,0,.28);
+  }
+}

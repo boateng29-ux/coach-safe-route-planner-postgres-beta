@@ -125,6 +125,17 @@ export class MapController {
     if (this.endMarker && this.map.hasLayer(this.endMarker)) {
       this.map.removeLayer(this.endMarker);
     }
+
+    /*
+     * In live mode the fixed lower-third vehicle arrow is the primary
+     * location indicator. Hide the Leaflet GPS dot to prevent duplication.
+     */
+    if (this.gpsMarker) {
+      this.gpsMarker.setStyle({
+        opacity: 0,
+        fillOpacity: 0
+      });
+    }
   }
 
   leaveLive() {
@@ -135,6 +146,13 @@ export class MapController {
     }
     if (this.endMarker && !this.map.hasLayer(this.endMarker)) {
       this.endMarker.addTo(this.map);
+    }
+
+    if (this.gpsMarker) {
+      this.gpsMarker.setStyle({
+        opacity: 1,
+        fillOpacity: 1
+      });
     }
   }
 
@@ -150,7 +168,8 @@ export class MapController {
         color: '#fff',
         weight: 3,
         fillColor: '#2979ff',
-        fillOpacity: 1,
+        fillOpacity: this.liveMode ? 0 : 1,
+        opacity: this.liveMode ? 0 : 1,
         interactive: false
       }).addTo(this.map);
 
