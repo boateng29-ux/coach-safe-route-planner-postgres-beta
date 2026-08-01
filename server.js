@@ -1265,6 +1265,194 @@ body.coach-map-fullscreen{
     opacity:1!important;
   }
 
+
+  /* COACH_SAFE_MOBILE_DRIVER_LAYOUT_V1 */
+
+  /* Normal mobile page: map first, information card underneath. */
+  @media (max-width:700px){
+    .driver-map-shell:not(.large-map-mode){
+      display:flex!important;
+      flex-direction:column!important;
+      background:#101418!important;
+    }
+
+    .driver-map-shell:not(.large-map-mode) #driverMap{
+      order:1!important;
+      height:58vh!important;
+      min-height:28rem!important;
+      width:100%!important;
+    }
+
+    .driver-map-shell:not(.large-map-mode) .map-nav-overlay{
+      order:2!important;
+      position:relative!important;
+      inset:auto!important;
+      left:auto!important;
+      right:auto!important;
+      top:auto!important;
+      bottom:auto!important;
+      width:calc(100% - 1rem)!important;
+      max-width:none!important;
+      margin:.5rem!important;
+      border-radius:1rem!important;
+      z-index:5!important;
+      box-shadow:0 10px 28px rgba(0,0,0,.42)!important;
+    }
+
+    .driver-map-shell:not(.large-map-mode) #driverCleanDockV7{
+      position:absolute!important;
+      right:.55rem!important;
+      bottom:calc(58vh + .75rem)!important;
+      z-index:950!important;
+    }
+  }
+
+  /* Full-screen mobile navigation: compact instructions and persistent controls. */
+  @media (max-width:700px){
+    .driver-map-shell.large-map-mode .map-nav-overlay{
+      position:absolute!important;
+      top:max(.45rem,env(safe-area-inset-top))!important;
+      left:.45rem!important;
+      right:.45rem!important;
+      bottom:auto!important;
+      width:auto!important;
+      max-width:none!important;
+      margin:0!important;
+      padding:.52rem .58rem!important;
+      border-radius:.85rem!important;
+      z-index:100300!important;
+      max-height:34dvh!important;
+      overflow:hidden!important;
+      display:block!important;
+      visibility:visible!important;
+      opacity:1!important;
+    }
+
+    .driver-map-shell.large-map-mode .pro-main-row{
+      grid-template-columns:2.7rem minmax(0,1fr) auto!important;
+      gap:.42rem!important;
+      align-items:center!important;
+    }
+
+    .driver-map-shell.large-map-mode .pro-turn-icon{
+      width:2.6rem!important;
+      height:2.6rem!important;
+      min-width:2.6rem!important;
+      font-size:1.55rem!important;
+      border-radius:.72rem!important;
+    }
+
+    .driver-map-shell.large-map-mode .map-nav-overlay .label{
+      font-size:.54rem!important;
+      letter-spacing:.08em!important;
+    }
+
+    .driver-map-shell.large-map-mode .map-nav-overlay .turn{
+      font-size:.88rem!important;
+      line-height:1.08!important;
+      display:-webkit-box!important;
+      -webkit-line-clamp:3!important;
+      -webkit-box-orient:vertical!important;
+      overflow:hidden!important;
+    }
+
+    .driver-map-shell.large-map-mode .waze-distance{
+      min-width:4.6rem!important;
+      max-width:5.6rem!important;
+      padding:.34rem .4rem!important;
+      font-size:.78rem!important;
+      line-height:1.05!important;
+    }
+
+    .driver-map-shell.large-map-mode .lane{
+      margin:.3rem 0 .34rem!important;
+      font-size:.67rem!important;
+      line-height:1.1!important;
+      white-space:nowrap!important;
+      overflow:hidden!important;
+      text-overflow:ellipsis!important;
+    }
+
+    .driver-map-shell.large-map-mode .pro-metrics{
+      gap:.25rem!important;
+      padding-top:.34rem!important;
+      overflow:visible!important;
+      grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    }
+
+    .driver-map-shell.large-map-mode .pro-metric{
+      min-width:0!important;
+      padding:.3rem .3rem!important;
+      border-radius:.5rem!important;
+    }
+
+    .driver-map-shell.large-map-mode .pro-metric strong{
+      font-size:.48rem!important;
+      letter-spacing:.04em!important;
+    }
+
+    .driver-map-shell.large-map-mode .pro-metric span{
+      font-size:.68rem!important;
+      margin-top:.05rem!important;
+    }
+
+    .driver-map-shell.large-map-mode .pro-status-strip{
+      margin-top:.3rem!important;
+      gap:.25rem!important;
+    }
+
+    .driver-map-shell.large-map-mode .pro-status-chip{
+      padding:.2rem .38rem!important;
+      font-size:.58rem!important;
+    }
+
+    /* Hide lower-priority chips in fullscreen to preserve map space. */
+    .driver-map-shell.large-map-mode #mapRoadInfo,
+    .driver-map-shell.large-map-mode #mapCameraHint{
+      display:none!important;
+    }
+
+    .driver-map-shell.large-map-mode #driverCleanDockV7{
+      display:grid!important;
+      visibility:visible!important;
+      opacity:1!important;
+      pointer-events:auto!important;
+      position:absolute!important;
+      left:.45rem!important;
+      right:.45rem!important;
+      bottom:max(.45rem,env(safe-area-inset-bottom))!important;
+      width:auto!important;
+      max-width:none!important;
+      grid-template-columns:repeat(7,minmax(0,1fr))!important;
+      gap:.28rem!important;
+      padding:.38rem!important;
+      border-radius:1rem!important;
+      z-index:100500!important;
+      transform:none!important;
+    }
+
+    .driver-map-shell.large-map-mode #driverCleanDockV7 .driver-clean-btn-v7{
+      width:100%!important;
+      min-width:0!important;
+      height:2.8rem!important;
+      min-height:2.8rem!important;
+      padding:0!important;
+      font-size:1.15rem!important;
+      border-radius:999px!important;
+      display:grid!important;
+      place-items:center!important;
+      visibility:visible!important;
+      opacity:1!important;
+      pointer-events:auto!important;
+    }
+
+    /* Keep the map unobstructed between the compact card and dock. */
+    .driver-map-shell.large-map-mode #driverMap{
+      padding-top:0!important;
+      padding-bottom:0!important;
+    }
+  }
+
 </style>
 
 </head>
