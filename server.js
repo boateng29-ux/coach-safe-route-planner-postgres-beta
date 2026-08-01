@@ -2434,6 +2434,80 @@ const ROUTE_SELECT_SQL = `
 `;
 
 
+/* COACH_SAFE_DRIVER_V212_TILE_ROUTE */
+app.get('/driver-v2/tiles/:z/:x/:y.png', async (req, res) => {
+  try {
+    if (!HAS_LIVE_HERE_KEY) {
+      return res.status(503).type('text/plain').send('HERE_API_KEY is not configured.');
+    }
+
+    const z = Number(req.params.z);
+    const x = Number(req.params.x);
+    const y = Number(req.params.y);
+
+    const maxTile = Math.pow(2, z);
+
+    if (
+      !Number.isInteger(z) ||
+      !Number.isInteger(x) ||
+      !Number.isInteger(y) ||
+      z < 0 ||
+      z > 20 ||
+      x < 0 ||
+      y < 0 ||
+      x >= maxTile ||
+      y >= maxTile
+    ) {
+      return res.status(400).type('text/plain').send('Invalid map tile coordinates.');
+    }
+
+    const tileUrl = new URL(
+      `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8`
+    );
+
+    tileUrl.searchParams.set('lang', 'en');
+    tileUrl.searchParams.set('size', '512');
+    tileUrl.searchParams.set('ppi', '400');
+    tileUrl.searchParams.set('apiKey', HERE_API_KEY);
+
+    const response = await fetch(tileUrl, {
+      headers: {
+        Accept: 'image/png,image/*;q=0.8,*/*;q=0.5',
+        'User-Agent': 'CoachSafe-Driver-V2/2.1.2'
+      }
+    });
+
+    if (!response.ok) {
+      const message = await response.text().catch(() => '');
+      console.error(
+        'HERE Raster Tile API failed',
+        response.status,
+        { z, x, y, message: message.slice(0, 300) }
+      );
+      return res
+        .status(response.status)
+        .type('text/plain')
+        .send('HERE map tile failed (' + response.status + ').');
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+
+    res.set({
+      'Content-Type': response.headers.get('content-type') || 'image/png',
+      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+      'X-Content-Type-Options': 'nosniff',
+      'Access-Control-Allow-Origin': '*'
+    });
+
+    return res.send(buffer);
+  } catch (error) {
+    console.error('Driver V2 HERE tile proxy error', error);
+    return res.status(500).type('text/plain').send(
+      'Map tile proxy failed: ' + (error.message || 'Unknown error')
+    );
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const companyId = await ensureCompany();
@@ -2578,64 +2652,6 @@ app.patch('/api/routes/:id', async (req, res) => {
 
 /* COACH_SAFE_DRIVER_V2_BETA */
 /* COACH_SAFE_DRIVER_V21_HERE_TILES */
-app.get('/api/driver-v2/tiles/:z/:x/:y.png', async (req, res) => {
-  try {
-    if (!HAS_LIVE_HERE_KEY) {
-      return res.status(503).send('HERE map tiles are not configured.');
-    }
-
-    const z = Number(req.params.z);
-    const x = Number(req.params.x);
-    const y = Number(req.params.y);
-
-    if (
-      !Number.isInteger(z) || !Number.isInteger(x) || !Number.isInteger(y) ||
-      z < 0 || z > 20 || x < 0 || y < 0
-    ) {
-      return res.status(400).send('Invalid map tile coordinates.');
-    }
-
-    const tileUrl = new URL(
-      `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8`
-    );
-    tileUrl.searchParams.set('lang', 'en');
-    tileUrl.searchParams.set('ppi', '400');
-    tileUrl.searchParams.set('size', '512');
-    tileUrl.searchParams.set('apiKey', HERE_API_KEY);
-
-    const response = await fetch(tileUrl, {
-      headers: {
-        'Accept': 'image/png,image/*;q=0.8,*/*;q=0.5',
-        'User-Agent': 'CoachSafe/2.1'
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      console.error(
-        'HERE tile failed',
-        response.status,
-        z,
-        x,
-        y,
-        errorText.slice(0, 300)
-      );
-      return res.status(response.status).send('Map tile unavailable.');
-    }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-
-    res.set({
-      'Content-Type': response.headers.get('content-type') || 'image/png',
-      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-      'X-Content-Type-Options': 'nosniff'
-    });
-    res.send(buffer);
-  } catch (error) {
-    console.error('HERE tile proxy error', error);
-    res.status(500).send('Map tile failed.');
-  }
-});
 
 app.get('/api/driver-v2/route/:id', async (req, res) => {
   try {
