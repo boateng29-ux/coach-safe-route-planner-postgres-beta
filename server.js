@@ -2508,6 +2508,41 @@ app.get('/driver-v2/tiles/:z/:x/:y.png', async (req, res) => {
   }
 });
 
+/* COACH_SAFE_DRIVER_V231_PUBLIC_DATA */
+app.get('/driver-v2/data/:id', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+
+    const result = await dbRequired().query(
+      `${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`,
+      [req.params.id, companyId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Driver route not found.' });
+    }
+
+    const route = apiRoute(result.rows[0]);
+
+    /*
+     * This endpoint is public and read-only.
+     * Do not expose operator credentials, passwords or admin data.
+     */
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
+      'X-Content-Type-Options': 'nosniff'
+    });
+
+    return res.json(route);
+  } catch (error) {
+    console.error('Driver V2 public route-data error', error);
+    return res.status(500).json({
+      error: error.message || 'Could not load driver route.'
+    });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const companyId = await ensureCompany();
