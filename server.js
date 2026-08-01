@@ -1242,6 +1242,29 @@ body.coach-map-fullscreen{
     scale:1!important;
   }
 
+
+  /* COACH_SAFE_MOBILE_FULLSCREEN_FIX */
+  body.coach-map-fullscreen{overflow:hidden!important;position:fixed!important;inset:0!important;width:100%!important;height:100%!important}
+  .driver-map-shell.large-map-mode{
+    position:fixed!important;
+    inset:0!important;
+    width:100vw!important;
+    height:100dvh!important;
+    min-height:100dvh!important;
+    padding:0!important;
+    margin:0!important;
+    z-index:99999!important;
+    background:#101418!important;
+  }
+  .driver-map-shell.large-map-mode #driverMap{
+    width:100vw!important;
+    height:100dvh!important;
+    min-height:100dvh!important;
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+
 </style>
 
 </head>
@@ -1448,26 +1471,24 @@ function applyJunctionZoom(distanceM,ins){
 }
 function restoreMapAfterFullscreenExit(){
   const shell=document.getElementById('driverMapShell');
-  const btn=document.getElementById('mapFullscreenBtn');
-  try{
-    shell?.classList.remove('large-map-mode');
-    document.body.classList.remove('coach-map-fullscreen');
-    document.body.style.overflow='';
-    if(btn)btn.textContent='Full screen';
-    lastFullscreenExitAt=Date.now();
+  shell?.classList.remove('large-map-mode');
+  document.body.classList.remove('coach-map-fullscreen');
+  document.body.style.overflow='';
 
-    [80,220,500,900].forEach((delay)=>setTimeout(()=>{
-      try{
-        map.invalidateSize(true);
-        if(currentGps&&followDriver){
-          forceGpsCameraFocus=true;
-          focusLiveGps({animate:false});
-        }else if(routeLine){
-          fit();
-        }
-      }catch(e){}
-    },delay));
-  }catch(e){}
+  const restore=()=>{
+    try{
+      map.invalidateSize(true);
+      if(currentGps&&followDriver){
+        forceGpsCameraFocus=true;
+        focusLiveGps({animate:false});
+      }else{
+        fit();
+      }
+      syncMapControlStates();
+    }catch(e){}
+  };
+
+  [60,180,420,850].forEach((delay)=>setTimeout(restore,delay));
 }
 function currentLaneSummary(ins,progressM){
   const lane=currentLaneForInstruction(ins,progressM);
@@ -1480,7 +1501,7 @@ function syncMapControlStates(){const wakeBtn=document.getElementById('mapWakeLo
 async function requestWakeLock(){if(!('wakeLock' in navigator)){toast('Screen wake lock is not supported in this browser. Keep your device display settings active for this journey.','error');return}try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;syncMapControlStates();logEvent('Screen wake lock released.')});syncMapControlStates();toast('Screen will stay awake while this page is visible.','success');postJourneyEvent('screen_wake_lock_enabled','Driver enabled keep-screen-on mode.',{})}catch(err){toast('Could not keep screen awake: '+(err.message||'permission denied'),'error')}}
 async function toggleWakeLock(){if(wakeLock){try{await wakeLock.release()}catch(e){}wakeLock=null;syncMapControlStates();postJourneyEvent('screen_wake_lock_disabled','Driver disabled keep-screen-on mode.',{});return}await requestWakeLock()}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&wakeLock===null&&document.getElementById('mapWakeLockBtn')?.classList.contains('active'))requestWakeLock()});
-document.addEventListener('fullscreenchange',()=>{setTimeout(()=>{map.invalidateSize(true);if(currentGps&&followDriver){updateSatnavCamera([currentGps.lat,currentGps.lng],currentGps.heading)}else{fit()}syncMapControlStates()},160)});
+
 
 function normalizeDriverInstruction(i,idx){return {index:idx,instruction:i.instruction||'Continue',street:i.street||'',signpostText:i.signpostText||'',roadNumbers:Array.isArray(i.roadNumbers)?i.roadNumbers:[],maneuver:i.maneuver||'',instructionType:i.instructionType||'',junctionType:i.junctionType||'',pointIndex:i.pointIndex,laneGuidance:i.laneGuidance||null,speedLimit:i.speedLimit||null,distanceM:Number(i.distanceM||0),travelTimeSeconds:Number(i.travelTimeSeconds||0)}}let instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);let speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);let laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);let safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];
 let totalRouteM=Number(data.summary?.lengthInMeters||0);let totalTravelS=Number(data.summary?.travelTimeInSeconds||0);
@@ -1626,10 +1647,7 @@ document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!naviga
 document.getElementById('centerGpsBtn')?.addEventListener('click',()=>{if(currentGps){followDriver=true;forceGpsCameraFocus=true;window.__COACH_SAFE_FOLLOW_ACTIVE__=true;focusLiveGps({zoom:18,animate:true});toast('Map centred on your location.','success')}else{toast('Start GPS first.','error')}});
 document.getElementById('mapCenterBtn')?.addEventListener('click',()=>document.getElementById('centerGpsBtn')?.click());
 document.getElementById('mapRecalcBtn')?.addEventListener('click',(e)=>recalcRouteFromGps(e.currentTarget));
-document.getElementById('mapFullscreenBtn')?.addEventListener('click',async()=>{const shell=document.getElementById('driverMapShell');const btn=document.getElementById('mapFullscreenBtn');if(!shell)return;const turningOn=!shell.classList.contains('large-map-mode');if(turningOn){shell.classList.add('large-map-mode');document.body.classList.add('coach-map-fullscreen');document.body.style.overflow='hidden';if(btn)btn.textContent='Exit full screen';try{if(shell.requestFullscreen&&!document.fullscreenElement)await shell.requestFullscreen();}catch(e){}[80,220,500].forEach((delay)=>setTimeout(()=>{try{map.invalidateSize(true);if(currentGps&&followDriver){
-    forceGpsCameraFocus=true;
-    focusLiveGps({zoom:18,animate:true});
-  }else fit()}catch(_){ }},delay));toast('Full screen map on.','success')}else{try{if(document.fullscreenElement&&document.exitFullscreen)await document.exitFullscreen();}catch(e){}restoreMapAfterFullscreenExit();toast('Full screen map off.','success')}});document.addEventListener('fullscreenchange',()=>{const shell=document.getElementById('driverMapShell');if(!document.fullscreenElement&&shell?.classList.contains('large-map-mode')){restoreMapAfterFullscreenExit()}else if(document.fullscreenElement){document.body.classList.add('coach-map-fullscreen');[80,220,500].forEach((delay)=>setTimeout(()=>{try{map.invalidateSize(true)}catch(e){}},delay))}});
+
 window.coachSafeCentrePosition=function(){
       if(currentGps){
         followDriver=true;
@@ -1651,38 +1669,51 @@ window.coachSafeCentrePosition=function(){
     window.coachSafeToggleFullscreen=async function(){
       const shell=document.getElementById('driverMapShell');
       if(!shell)return false;
+
       const turningOn=!shell.classList.contains('large-map-mode');
 
       if(turningOn){
         shell.classList.add('large-map-mode');
         document.body.classList.add('coach-map-fullscreen');
         document.body.style.overflow='hidden';
-        try{
-          if(shell.requestFullscreen&&!document.fullscreenElement)await shell.requestFullscreen();
-        }catch(e){}
       }else{
-        try{
-          if(document.fullscreenElement&&document.exitFullscreen)await document.exitFullscreen();
-        }catch(e){}
         shell.classList.remove('large-map-mode');
         document.body.classList.remove('coach-map-fullscreen');
         document.body.style.overflow='';
       }
 
-      [80,220,500].forEach((delay)=>setTimeout(()=>{
+      const restoreCamera=()=>{
         try{
           map.invalidateSize(true);
           if(currentGps&&followDriver){
-    forceGpsCameraFocus=true;
-    focusLiveGps({zoom:18,animate:true});
-  }
-          else fit();
-        }catch(e){}
-      },delay));
+            forceGpsCameraFocus=true;
+            focusLiveGps({animate:false});
+          }else{
+            fit();
+          }
+          syncMapControlStates();
+        }catch(e){
+          console.warn('Fullscreen map restore failed',e);
+        }
+      };
+
+      [60,180,420,850].forEach((delay)=>setTimeout(restoreCamera,delay));
       return true;
     };
     syncMapControlStates();
-window.addEventListener('pageshow',()=>{if(!document.fullscreenElement&&document.getElementById('driverMapShell')?.classList.contains('large-map-mode'))restoreMapAfterFullscreenExit()});
+window.addEventListener('pageshow',()=>{
+  setTimeout(()=>{
+    try{
+      map.invalidateSize(true);
+      if(currentGps&&followDriver){
+        forceGpsCameraFocus=true;
+        focusLiveGps({animate:false});
+      }else{
+        fit();
+      }
+    }catch(e){}
+  },180);
+});
 
 document.getElementById('stopGpsBtn')?.addEventListener('click',()=>{if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}followDriver=false;setNavigationMode('overview');setText('gpsTracking','Off');setText('gpsStatus','Stopped');document.getElementById('startGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=true;postJourneyEvent('gps_stopped','Driver stopped live GPS tracking.',{})});
 document.getElementById('useGpsReportBtn')?.addEventListener('click',()=>{if(!currentGps){toast('Start GPS first, then tap this again.','error');return}updateReportGpsFields();document.getElementById('roadNameInput').value='GPS: '+currentGps.lat.toFixed(6)+', '+currentGps.lng.toFixed(6);toast('GPS position attached to report.','success')});
