@@ -1230,7 +1230,10 @@ body.coach-map-fullscreen{
     rotate:0deg!important;
     scale:1!important;
   }
-  /* COACH_SAFE_NAV_V3_FINAL_CSS_END */
+  
+  .driver-map-shell.navigation-live .driver-map-controls{display:none!important}
+  .driver-map-shell.navigation-live .satnav-fixed-driver-arrow{display:block}
+/* COACH_SAFE_NAV_V3_FINAL_CSS_END */
 </style>
 
 </head>
@@ -1278,7 +1281,17 @@ let data=window.ROUTE_EXPORT_DATA;
 function quickLatLon(p){if(!p)return null;const lat=Array.isArray(p)?Number(p[0]):Number(p.lat??p.latitude);const lon=Array.isArray(p)?Number(p[1]):Number(p.lon??p.lng??p.longitude);return Number.isFinite(lat)&&Number.isFinite(lon)?[lat,lon]:null}
 function quickDistanceMeters(a,b){a=quickLatLon(a);b=quickLatLon(b);if(!a||!b)return Infinity;const R=6371000,toRad=(d)=>d*Math.PI/180;const dLat=toRad(b[0]-a[0]),dLon=toRad(b[1]-a[1]),lat1=toRad(a[0]),lat2=toRad(b[0]);const h=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;return 2*R*Math.atan2(Math.sqrt(h),Math.sqrt(1-h))}
 function maybeCorrectRoutePointDirection(points,origin,destination){const pts=Array.isArray(points)?points.slice():[];if(pts.length<2)return pts;const first=pts[0],last=pts[pts.length-1];const forward=quickDistanceMeters(origin,first)+quickDistanceMeters(destination,last);const reversed=quickDistanceMeters(origin,last)+quickDistanceMeters(destination,first);if(reversed+75<forward){console.warn('Route geometry looked reversed against origin/destination. Display order corrected.');return pts.reverse()}return pts}
-let routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);const map=L.map('driverMap',{zoomControl:true,preferCanvas:true,touchZoom:'center',scrollWheelZoom:true,doubleClickZoom:true,boxZoom:true,keyboard:true,dragging:true,tap:true}).setView([51.5072,-0.1276],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap contributors',detectRetina:true,crossOrigin:true}).addTo(map);const pin=(c)=>L.divIcon({className:'',html:'<span class="coach-map-pin '+c+'"></span>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-12]});const stopPin=(i)=>L.divIcon({className:'',html:'<span class="coach-stop-pin">'+(i+1)+'</span>',iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-14]});let routeLine=null,startMarker=null,endMarker=null,waypointLayer=null,directionLayer=null,routeUpEnabled=false,currentMapBearing=null,previousGpsPoint=null,lastCameraUpdateAt=0;function removeDirectionToggleArtifacts(){try{document.querySelectorAll('#routeUpBtn,#mapRouteUpBtn,#directionToggleBtn,.route-up-toggle').forEach((el)=>el.remove());document.querySelectorAll('.driver-map-controls button').forEach((btn)=>{const t=(btn.textContent||'').trim().toLowerCase();if(t==='north up'||t==='direction up'||t.includes('north-up')||t.includes('direction-up'))btn.remove();});}catch(e){}}function fit(){if(routeLine){map.invalidateSize(true);map.fitBounds(routeLine.getBounds(),{padding:[34,34],maxZoom:15})}}function bearingBetween(a,b){if(!a||!b)return null;const toRad=(d)=>d*Math.PI/180,toDeg=(r)=>r*180/Math.PI;const lat1=toRad(a[0]),lat2=toRad(b[0]),dLng=toRad(b[1]-a[1]);const y=Math.sin(dLng)*Math.cos(lat2);const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);return (toDeg(Math.atan2(y,x))+360)%360}function routeInitialBearing(){if(!routePoints||routePoints.length<2)return null;const start=routePoints[0];for(let i=1;i<routePoints.length;i++){if(haversine(start,routePoints[i])>25)return bearingBetween(start,routePoints[i])}return bearingBetween(routePoints[0],routePoints[1])}
+let routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);const map=L.map('driverMap',{zoomControl:true,preferCanvas:true,touchZoom:'center',scrollWheelZoom:true,doubleClickZoom:true,boxZoom:true,keyboard:true,dragging:true,tap:true}).setView([51.5072,-0.1276],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap contributors',detectRetina:true,crossOrigin:true}).addTo(map);const pin=(c)=>L.divIcon({className:'',html:'<span class="coach-map-pin '+c+'"></span>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-12]});const stopPin=(i)=>L.divIcon({className:'',html:'<span class="coach-stop-pin">'+(i+1)+'</span>',iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-14]});let routeLine=null,startMarker=null,endMarker=null,waypointLayer=null,directionLayer=null,routeUpEnabled=false,currentMapBearing=null,previousGpsPoint=null,lastCameraUpdateAt=0;function removeDirectionToggleArtifacts(){try{document.querySelectorAll('#routeUpBtn,#mapRouteUpBtn,#directionToggleBtn,.route-up-toggle').forEach((el)=>el.remove());document.querySelectorAll('.driver-map-controls button').forEach((btn)=>{const t=(btn.textContent||'').trim().toLowerCase();if(t==='north up'||t==='direction up'||t.includes('north-up')||t.includes('direction-up'))btn.remove();});}catch(e){}}function fit(){
+  if(liveNavigationActive&&currentGps){
+    forceGpsCameraFocus=true;
+    updateSatnavCamera([currentGps.lat,currentGps.lng],currentGps.heading);
+    return;
+  }
+  if(routeLine){
+    map.invalidateSize(true);
+    map.fitBounds(routeLine.getBounds(),{padding:[34,34],maxZoom:15});
+  }
+}function bearingBetween(a,b){if(!a||!b)return null;const toRad=(d)=>d*Math.PI/180,toDeg=(r)=>r*180/Math.PI;const lat1=toRad(a[0]),lat2=toRad(b[0]),dLng=toRad(b[1]-a[1]);const y=Math.sin(dLng)*Math.cos(lat2);const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);return (toDeg(Math.atan2(y,x))+360)%360}function routeInitialBearing(){if(!routePoints||routePoints.length<2)return null;const start=routePoints[0];for(let i=1;i<routePoints.length;i++){if(haversine(start,routePoints[i])>25)return bearingBetween(start,routePoints[i])}return bearingBetween(routePoints[0],routePoints[1])}
 function directionArrowIcon(bearing){return L.divIcon({className:'',html:'<span class="route-direction-arrow"><span style="--route-arrow-bearing:'+Number(bearing||0).toFixed(1)+'deg">➤</span></span>',iconSize:[30,30],iconAnchor:[15,15]})}
 function addRouteDirectionArrows(){try{if(directionLayer)map.removeLayer(directionLayer);directionLayer=L.layerGroup().addTo(map);if(!Array.isArray(routePoints)||routePoints.length<4)return;const fractions=[.18,.36,.54,.72,.9];fractions.forEach((fraction)=>{let index=Math.max(0,Math.min(routePoints.length-2,Math.floor((routePoints.length-1)*fraction)));let next=index+1;while(next<routePoints.length-1&&haversine(routePoints[index],routePoints[next])<18)next++;const bearing=bearingBetween(routePoints[index],routePoints[next]||routePoints[index+1]);if(Number.isFinite(bearing))L.marker(routePoints[index],{icon:directionArrowIcon(bearing),interactive:false,keyboard:false,zIndexOffset:450}).addTo(directionLayer)})}catch(e){console.warn('Could not add route direction arrows',e)}}
 function setMapBearing(deg){
@@ -1302,69 +1315,87 @@ function setMapBearing(deg){
   }}
   drawRouteOnMap();
   ensureSatnavArrow();removeDirectionToggleArtifacts();setInterval(removeDirectionToggleArtifacts,1500);window.addEventListener('resize',fit);window.addEventListener('orientationchange',()=>setTimeout(fit,300))
-let forceGpsCameraFocus=true;window.__COACH_SAFE_FOLLOW_ACTIVE__=false;let watchId=null,currentGps=null,driverMarker=null,accuracyCircle=null,followDriver=false,journeyStarted=false,currentInstructionIndex=0,lastLoggedInstruction=-1,wakeLock=null,voiceEnabled=false,lastSpokenInstruction=-1,offRouteVoiceLastAt=0;
+let forceGpsCameraFocus=true;let liveNavigationActive=false;window.__COACH_SAFE_FOLLOW_ACTIVE__=false;let watchId=null,currentGps=null,driverMarker=null,accuracyCircle=null,followDriver=false,journeyStarted=false,currentInstructionIndex=0,lastLoggedInstruction=-1,wakeLock=null,voiceEnabled=false,lastSpokenInstruction=-1,offRouteVoiceLastAt=0;
 let junctionZoomLevel=17,lastJunctionZoomLevel=17,lastFullscreenExitAt=0;const gpsIcon=L.divIcon({className:'driver-location-marker',html:'<span class="driver-location-dot"></span>',iconSize:[28,28],iconAnchor:[14,14]});
 // SATNAV_FOLLOW_BEHAVIOUR_V1_JS_START
 function ensureSatnavArrow(){try{const shell=document.getElementById('driverMapShell');if(!shell||document.getElementById('satnavFixedDriverArrow'))return;const arrow=document.createElement('div');arrow.id='satnavFixedDriverArrow';arrow.className='satnav-fixed-driver-arrow';arrow.setAttribute('aria-hidden','true');shell.appendChild(arrow);}catch(e){}}
 function bearingFromRouteProgress(progressM){try{if(!routePoints||routePoints.length<2)return routeInitialBearing()||0;const measures=routeMeasures&&routeMeasures.length?routeMeasures:buildRouteMeasures(routePoints);let idx=0;for(let i=1;i<measures.length;i++){if(Number(measures[i])>=Number(progressM||0)){idx=Math.max(0,i-1);break;}}const a=routePoints[idx]||routePoints[0];let b=routePoints[Math.min(routePoints.length-1,idx+1)]||routePoints[routePoints.length-1];for(let j=idx+1;j<routePoints.length;j++){if(haversine(a,routePoints[j])>12){b=routePoints[j];break;}}return bearingBetween(a,b)||routeInitialBearing()||0;}catch(e){return routeInitialBearing()||0;}}
 function smoothBearing(oldDeg,newDeg,weight=.35){if(!Number.isFinite(oldDeg))return newDeg;if(!Number.isFinite(newDeg))return oldDeg;let delta=((newDeg-oldDeg+540)%360)-180;return (oldDeg+(delta*weight)+360)%360;}
-function updateSatnavCamera(ll,heading){
+function setPlanningMarkersVisible(visible){
+  const action=visible?'addLayer':'removeLayer';
+  for(const layer of [startMarker,endMarker,waypointLayer,directionLayer]){
     try{
-      ensureSatnavArrow();
-
-      const point=[Number(ll[0]),Number(ll[1])];
-      if(!Number.isFinite(point[0])||!Number.isFinite(point[1]))return;
-
-      const progressM=nearestRouteProgressM(point,routePoints);
-      const routeBearing=bearingFromRouteProgress(progressM);
-      const chosen=Number.isFinite(heading)?heading:routeBearing;
-      setMapBearing(smoothBearing(currentMapBearing,chosen,.24));
-
-      const accuracy=Number(currentGps?.accuracy||999);
-      const firstOrForced=forceGpsCameraFocus===true;
-
-      /* Accept a wider accuracy range for the first focus.
-         Later camera movement remains stricter and calmer. */
-      if(!firstOrForced && accuracy>60)return;
-      if(firstOrForced && accuracy>150)return;
-
-      const now=Date.now();
-      if(!firstOrForced && now-lastCameraUpdateAt<900)return;
-
-      lastCameraUpdateAt=now;
-      window.__COACH_SAFE_FOLLOW_ACTIVE__=true;
-
-      const zoom=firstOrForced
-        ? Math.max(18,Number(junctionZoomLevel||17))
-        : Math.max(16.5,Number(junctionZoomLevel||17));
-
-      map.invalidateSize(false);
-
-      if(firstOrForced){
-        forceGpsCameraFocus=false;
-        map.setView(point,zoom,{animate:false});
-        setTimeout(()=>{
-          try{
-            map.invalidateSize(false);
-            map.setView(point,zoom,{animate:true});
-          }catch(e){}
-        },180);
-        return;
+      if(!layer)continue;
+      if(visible){
+        if(!map.hasLayer(layer))layer.addTo(map);
+      }else if(map.hasLayer(layer)){
+        map.removeLayer(layer);
       }
-
-      const centre=map.getCenter();
-      const centreDistance=haversine([centre.lat,centre.lng],point);
-
-      if(Math.abs((map.getZoom()||zoom)-zoom)>.25){
-        map.setView(point,zoom,{animate:true});
-      }else if(centreDistance>14){
-        map.panTo(point,{animate:true,duration:.65});
-      }
-    }catch(e){
-      console.warn('Navigation V3.0.1 GPS camera update skipped',e);
-    }
+    }catch(e){}
   }
-  // SATNAV_FOLLOW_BEHAVIOUR_V1_JS_END
+}
+function enterLiveNavigationMode(){
+  liveNavigationActive=true;
+  followDriver=true;
+  window.__COACH_SAFE_FOLLOW_ACTIVE__=true;
+  setPlanningMarkersVisible(false);
+  document.getElementById('driverMapShell')?.classList.add('navigation-live');
+}
+function leaveLiveNavigationMode(){
+  liveNavigationActive=false;
+  window.__COACH_SAFE_FOLLOW_ACTIVE__=false;
+  document.getElementById('driverMapShell')?.classList.remove('navigation-live');
+  setPlanningMarkersVisible(true);
+}
+function placeDriverInLowerThird(point,animate=true){
+  try{
+    const height=map.getContainer()?.clientHeight||0;
+    if(height<100)return;
+    map.panBy([0,-Math.round(height*.20)],{animate,duration:.4});
+  }catch(e){}
+}
+function updateSatnavCamera(ll,heading){
+  try{
+    ensureSatnavArrow();
+    enterLiveNavigationMode();
+
+    const point=[Number(ll[0]),Number(ll[1])];
+    if(!Number.isFinite(point[0])||!Number.isFinite(point[1]))return;
+
+    const progressM=nearestRouteProgressM(point,routePoints);
+    const routeBearing=bearingFromRouteProgress(progressM);
+    const chosen=Number.isFinite(heading)?heading:routeBearing;
+    setMapBearing(smoothBearing(currentMapBearing,chosen,.24));
+
+    const accuracy=Number(currentGps?.accuracy||999);
+    const firstOrForced=forceGpsCameraFocus===true;
+    if(!firstOrForced&&accuracy>75)return;
+    if(firstOrForced&&accuracy>150)return;
+
+    const now=Date.now();
+    if(!firstOrForced&&now-lastCameraUpdateAt<900)return;
+    lastCameraUpdateAt=now;
+
+    const zoom=firstOrForced
+      ? Math.max(18,Number(junctionZoomLevel||17))
+      : Math.max(17,Number(junctionZoomLevel||17));
+
+    map.invalidateSize(false);
+    forceGpsCameraFocus=false;
+
+    map.setView(point,zoom,{animate:!firstOrForced});
+    setTimeout(()=>placeDriverInLowerThird(point,!firstOrForced),120);
+    setTimeout(()=>{
+      if(liveNavigationActive){
+        map.invalidateSize(false);
+        placeDriverInLowerThird(point,true);
+      }
+    },420);
+  }catch(e){
+    console.warn('Stable live navigation camera skipped',e);
+  }
+}
+// SATNAV_FOLLOW_BEHAVIOUR_V1_JS_END
 
 
 /* COACH_SAFE_DRIVER_V211_JS_START */
@@ -1557,10 +1588,10 @@ function maybeSpeakInstruction(idx,ins,distanceM){if(!voiceEnabled||!journeyStar
 function updateGuidance(progressM,offRouteM){const routeTotal=totalRouteM || routeMeasures[routeMeasures.length-1] || 0;let idx=instructions.findIndex((ins)=>Number(ins.distanceM||0)>progressM+20);if(idx<0)idx=Math.max(0,instructions.length-1);currentInstructionIndex=idx;const ins=instructions[idx]||{instruction:'Continue on approved route',distanceM:progressM};const distToNext=Math.max(0,Number(ins.distanceM||0)-progressM);const progressPct=routeTotal?Math.min(100,Math.max(0,(progressM/routeTotal)*100)):0;const remainingM=Math.max(0,routeTotal-progressM);const remainingS=routeTotal&&totalTravelS?totalTravelS*(remainingM/routeTotal):0;setText('navCurrentInstruction',ins.instruction);setText('navDistanceToNext',metersText(distToNext));setText('mapNextTurn',ins.instruction||'Continue on route');setText('mapNextDistance',distToNext<=35?'Now':'Next in '+metersText(distToNext));applyJunctionZoom(distToNext,ins);setText('navProgressText',Math.round(progressPct)+'%');setText('navRemainingDistance',metersText(remainingM));setText('navEtaRemaining',timeText(remainingS));updateProfessionalNav(ins,remainingM,remainingS,offRouteM);setAdvancedInstructionPanel(ins,progressM,distToNext);const fill=document.getElementById('navProgressFill');if(fill)fill.style.width=progressPct.toFixed(1)+'%';updateInstructionHighlight(idx);if(journeyStarted&&idx!==lastLoggedInstruction){lastLoggedInstruction=idx;logEvent('Next instruction: '+ins.instruction)}if(journeyStarted&&voiceEnabled){maybeSpeakInstruction(idx,ins,distToNext)}if(offRouteM>250){logEvent('Off-route warning: approx '+Math.round(offRouteM)+'m from approved route.');const now=Date.now();if(voiceEnabled&&now-offRouteVoiceLastAt>120000){offRouteVoiceLastAt=now;speak('Warning. You appear to be away from the approved route. Stop when safe and check with operations before continuing.')}if(now-lastOffRouteSentAt>120000){lastOffRouteSentAt=now;postJourneyEvent('off_route_warning','Driver is approx '+Math.round(offRouteM)+'m from the approved route.',{distanceM:Math.round(offRouteM)})}}}
 
 function updateReportGpsFields(){if(!currentGps)return;document.getElementById('reportLat').value=currentGps.lat.toFixed(7);document.getElementById('reportLng').value=currentGps.lng.toFixed(7);document.getElementById('reportAccuracy').value=Math.round(currentGps.accuracy||0)}
-function onGps(pos){updateProfessionalGps(pos);const lat=pos.coords.latitude,lng=pos.coords.longitude,acc=pos.coords.accuracy||0;const ll=[lat,lng];let heading=Number(pos.coords.heading);if(previousGpsPoint&&haversine(previousGpsPoint,ll)>6){heading=bearingBetween(previousGpsPoint,ll)}previousGpsPoint=ll;currentGps={lat,lng,accuracy:acc,heading:Number.isFinite(heading)?heading:currentMapBearing,when:new Date()};if(Number.isFinite(heading))setMapBearing(heading);if(!driverMarker){driverMarker=L.marker(ll,{icon:gpsIcon,zIndexOffset:1000}).bindPopup('Your current position').addTo(map)}else{driverMarker.setLatLng(ll)}const markerEl=driverMarker?.getElement?.();if(markerEl&&Number.isFinite(currentGps.heading))markerEl.style.setProperty('--driver-heading',currentGps.heading.toFixed(1)+'deg');if(accuracyCircle){accuracyCircle.setLatLng(ll).setRadius(acc)}else{accuracyCircle=L.circle(ll,{radius:acc,weight:1,opacity:.45,fillOpacity:.08}).addTo(map)}setText('gpsStatus','Active');setText('gpsTracking','On');setText('gpsAccuracy',Math.round(acc)+'m');const dist=distanceFromRoute(ll,routePoints);const alert=document.getElementById('offRouteAlert');const progressM=nearestRouteProgressM(ll,routePoints);if(dist!==null&&Number.isFinite(dist)){setText('gpsDistance',Math.round(dist)+'m');if(dist>250){alert?.classList.add('show')}else{alert?.classList.remove('show')}updateGuidance(progressM,dist)}if(followDriver){updateSatnavCamera(ll,currentGps.heading)}updateReportGpsFields()}
+function onGps(pos){updateProfessionalGps(pos);const lat=pos.coords.latitude,lng=pos.coords.longitude,acc=pos.coords.accuracy||0;const ll=[lat,lng];let heading=Number(pos.coords.heading);if(previousGpsPoint&&haversine(previousGpsPoint,ll)>6){heading=bearingBetween(previousGpsPoint,ll)}previousGpsPoint=ll;currentGps={lat,lng,accuracy:acc,heading:Number.isFinite(heading)?heading:currentMapBearing,when:new Date()};if(Number.isFinite(heading))setMapBearing(heading);if(!driverMarker){driverMarker=L.marker(ll,{icon:gpsIcon,zIndexOffset:1000}).bindPopup('Your current position').addTo(map)}else{driverMarker.setLatLng(ll)}const markerEl=driverMarker?.getElement?.();if(markerEl&&Number.isFinite(currentGps.heading))markerEl.style.setProperty('--driver-heading',currentGps.heading.toFixed(1)+'deg');const visibleAccuracy=Math.max(5,Math.min(Number(acc||0),18));if(accuracyCircle){accuracyCircle.setLatLng(ll).setRadius(visibleAccuracy).setStyle({weight:1,opacity:.22,fillOpacity:.035})}else{accuracyCircle=L.circle(ll,{radius:visibleAccuracy,weight:1,opacity:.22,fillOpacity:.035,interactive:false}).addTo(map)}setText('gpsStatus','Active');setText('gpsTracking','On');setText('gpsAccuracy',Math.round(acc)+'m');const dist=distanceFromRoute(ll,routePoints);const alert=document.getElementById('offRouteAlert');const progressM=nearestRouteProgressM(ll,routePoints);if(dist!==null&&Number.isFinite(dist)){setText('gpsDistance',Math.round(dist)+'m');if(dist>250){alert?.classList.add('show')}else{alert?.classList.remove('show')}updateGuidance(progressM,dist)}if(followDriver){updateSatnavCamera(ll,currentGps.heading)}updateReportGpsFields()}
 function onGpsError(err){setText('gpsStatus',err.message||'Location unavailable');toast('GPS error: '+(err.message||'location unavailable'),'error')}
-document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!navigator.geolocation){toast('This browser does not support GPS location.','error');return}followDriver=true;forceGpsCameraFocus=true;window.__COACH_SAFE_FOLLOW_ACTIVE__=true;setText('gpsStatus','Requesting permission…');watchId=navigator.geolocation.watchPosition(onGps,onGpsError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});document.getElementById('startGpsBtn').disabled=true;document.getElementById('centerGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=false;postJourneyEvent('gps_started','Driver started live GPS tracking.',{})});
-document.getElementById('centerGpsBtn')?.addEventListener('click',()=>{if(currentGps){followDriver=true;forceGpsCameraFocus=true;window.__COACH_SAFE_FOLLOW_ACTIVE__=true;updateSatnavCamera([currentGps.lat,currentGps.lng],currentGps.heading);toast('Map centred on your location.','success')}else{toast('Start GPS first.','error')}});
+document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!navigator.geolocation){toast('This browser does not support GPS location.','error');return}enterLiveNavigationMode();forceGpsCameraFocus=true;setText('gpsStatus','Requesting permission…');watchId=navigator.geolocation.watchPosition(onGps,onGpsError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});document.getElementById('startGpsBtn').disabled=true;document.getElementById('centerGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=false;postJourneyEvent('gps_started','Driver started live GPS tracking.',{})});
+document.getElementById('centerGpsBtn')?.addEventListener('click',()=>{if(currentGps){enterLiveNavigationMode();forceGpsCameraFocus=true;updateSatnavCamera([currentGps.lat,currentGps.lng],currentGps.heading);toast('Map centred on your location.','success')}else{toast('Start GPS first.','error')}});
 document.getElementById('mapCenterBtn')?.addEventListener('click',()=>document.getElementById('centerGpsBtn')?.click());
 document.getElementById('mapRecalcBtn')?.addEventListener('click',(e)=>recalcRouteFromGps(e.currentTarget));
 document.getElementById('mapFullscreenBtn')?.addEventListener('click',async()=>{const shell=document.getElementById('driverMapShell');const btn=document.getElementById('mapFullscreenBtn');if(!shell)return;const turningOn=!shell.classList.contains('large-map-mode');if(turningOn){shell.classList.add('large-map-mode');document.body.classList.add('coach-map-fullscreen');document.body.style.overflow='hidden';if(btn)btn.textContent='Exit full screen';try{if(shell.requestFullscreen&&!document.fullscreenElement)await shell.requestFullscreen();}catch(e){}[80,220,500].forEach((delay)=>setTimeout(()=>{try{map.invalidateSize(true);if(currentGps&&followDriver){
@@ -1569,9 +1600,8 @@ document.getElementById('mapFullscreenBtn')?.addEventListener('click',async()=>{
   }else fit()}catch(_){ }},delay));toast('Full screen map on.','success')}else{try{if(document.fullscreenElement&&document.exitFullscreen)await document.exitFullscreen();}catch(e){}restoreMapAfterFullscreenExit();toast('Full screen map off.','success')}});document.addEventListener('fullscreenchange',()=>{const shell=document.getElementById('driverMapShell');if(!document.fullscreenElement&&shell?.classList.contains('large-map-mode')){restoreMapAfterFullscreenExit()}else if(document.fullscreenElement){document.body.classList.add('coach-map-fullscreen');[80,220,500].forEach((delay)=>setTimeout(()=>{try{map.invalidateSize(true)}catch(e){}},delay))}});
 window.coachSafeCentrePosition=function(){
       if(currentGps){
-        followDriver=true;
+        enterLiveNavigationMode();
         forceGpsCameraFocus=true;
-        window.__COACH_SAFE_FOLLOW_ACTIVE__=true;
         updateSatnavCamera([currentGps.lat,currentGps.lng],currentGps.heading);
         toast('Map centred on your position.','success');
         return true;
@@ -1621,15 +1651,15 @@ window.coachSafeCentrePosition=function(){
     syncMapControlStates();
 window.addEventListener('pageshow',()=>{if(!document.fullscreenElement&&document.getElementById('driverMapShell')?.classList.contains('large-map-mode'))restoreMapAfterFullscreenExit()});
 
-document.getElementById('stopGpsBtn')?.addEventListener('click',()=>{if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}followDriver=false;window.__COACH_SAFE_FOLLOW_ACTIVE__=false;setText('gpsTracking','Off');setText('gpsStatus','Stopped');document.getElementById('startGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=true;postJourneyEvent('gps_stopped','Driver stopped live GPS tracking.',{})});
+document.getElementById('stopGpsBtn')?.addEventListener('click',()=>{if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}followDriver=false;leaveLiveNavigationMode();setText('gpsTracking','Off');setText('gpsStatus','Stopped');document.getElementById('startGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=true;postJourneyEvent('gps_stopped','Driver stopped live GPS tracking.',{})});
 document.getElementById('useGpsReportBtn')?.addEventListener('click',()=>{if(!currentGps){toast('Start GPS first, then tap this again.','error');return}updateReportGpsFields();document.getElementById('roadNameInput').value='GPS: '+currentGps.lat.toFixed(6)+', '+currentGps.lng.toFixed(6);toast('GPS position attached to report.','success')});
-document.getElementById('journeyStartBtn')?.addEventListener('click',()=>{journeyStarted=true;followDriver=true;document.getElementById('journeyStartBtn').textContent='Journey in progress';document.getElementById('journeyStartBtn').disabled=true;logEvent('Journey started.');postJourneyEvent('journey_started','Driver tapped Start journey.',currentGps?{lat:currentGps.lat,lng:currentGps.lng,accuracyM:Math.round(currentGps.accuracy||0)}:{});if(!currentGps)toast('Start live GPS to enable spoken turn-by-turn.','error');if(voiceEnabled)speakCurrentInstruction()});
+document.getElementById('journeyStartBtn')?.addEventListener('click',()=>{journeyStarted=true;enterLiveNavigationMode();forceGpsCameraFocus=true;document.getElementById('journeyStartBtn').textContent='Journey in progress';document.getElementById('journeyStartBtn').disabled=true;logEvent('Journey started.');postJourneyEvent('journey_started','Driver tapped Start journey.',currentGps?{lat:currentGps.lat,lng:currentGps.lng,accuracyM:Math.round(currentGps.accuracy||0)}:{});if(!currentGps)toast('Start live GPS to enable spoken turn-by-turn.','error');if(voiceEnabled)speakCurrentInstruction()});
 function toggleVoiceGuidance(){if(!speechAvailable()){toast('Spoken guidance is not supported in this browser.','error');setVoiceStatus('Not supported');return}voiceEnabled=!voiceEnabled;if(voiceEnabled&&!journeyStarted){journeyStarted=true;logEvent('Journey started for spoken guidance.');postJourneyEvent('journey_started','Driver started journey with map voice control.',currentGps?{lat:currentGps.lat,lng:currentGps.lng,accuracyM:Math.round(currentGps.accuracy||0)}:{})}setVoiceStatus(voiceEnabled?'On':'Off');if(voiceEnabled){toast('Voice guidance on. The next turn will now be spoken.','success');logEvent('Voice guidance on.');postJourneyEvent('voice_guidance_enabled','Driver enabled spoken turn-by-turn guidance from the live map.',{});lastSpokenInstruction=-1;const ins=instructions[currentInstructionIndex]||instructions[0]||{};const progress=currentGps?nearestRouteProgressM([currentGps.lat,currentGps.lng],routePoints):0;const dist=Math.max(0,Number(ins.distanceM||0)-progress);const instruction=ins.instruction||'Continue on route';speak('Voice guidance is on. Next turn. '+(dist>25?'In '+metersText(dist)+', ':'')+instruction, true)}else{try{window.speechSynthesis.cancel()}catch(e){}toast('Voice guidance off.','success');logEvent('Voice guidance off.');postJourneyEvent('voice_guidance_disabled','Driver muted spoken turn-by-turn guidance from the live map.',{})}}
 document.getElementById('voiceGuidanceBtn')?.addEventListener('click',toggleVoiceGuidance);
 document.getElementById('mapVoiceBtn')?.addEventListener('click',toggleVoiceGuidance);
 document.getElementById('nextInstructionBtn')?.addEventListener('click',()=>{const ins=instructions[currentInstructionIndex]||instructions[0];if(ins){toast(ins.instruction,'success');speakCurrentInstruction(true);logEvent('Instruction repeated: '+ins.instruction)}else{toast('No spoken instruction available.','error')}});
 function rebuildInstructionList(){const list=document.getElementById('instructionList');if(!list)return;list.innerHTML='';const rows=instructions.length?instructions:[{instruction:'No guidance returned.'}];rows.forEach((ins,idx)=>{const li=document.createElement('li');const sp=document.createElement('span');sp.textContent=String(idx+1);const wrap=document.createElement('div');const main=document.createElement('strong');main.textContent=ins.instruction||'Continue';wrap.appendChild(main);const details=[];if(ins.laneGuidance?.text)details.push(ins.laneGuidance.text);if(ins.speedLimit?.maxSpeedLimitMph)details.push('Speed limit: '+ins.speedLimit.maxSpeedLimitMph+' mph');if(ins.street)details.push(ins.street);if(details.length){const p=document.createElement('p');p.className='muted';p.textContent=details.join(' · ');wrap.appendChild(p)}li.appendChild(sp);li.appendChild(wrap);list.appendChild(li)})}
-function applyReroute(newRoute){data=newRoute||data;routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];totalRouteM=Number(data.summary?.lengthInMeters||0);totalTravelS=Number(data.summary?.travelTimeInSeconds||0);routeMeasures=buildRouteMeasures(routePoints);currentInstructionIndex=0;lastLoggedInstruction=-1;lastSpokenInstruction=-1;spokenInstructionCache={};lastVoiceAt=0;drawRouteOnMap();rebuildInstructionList();if(routeUpEnabled)setMapBearing((currentGps&&Number.isFinite(currentGps.heading)?currentGps.heading:routeInitialBearing())||0);if(currentGps){const ll=[currentGps.lat,currentGps.lng];const dist=distanceFromRoute(ll,routePoints)||0;const progressM=nearestRouteProgressM(ll,routePoints);updateGuidance(progressM,dist)}else{updateGuidance(0,0)}
+function applyReroute(newRoute){enterLiveNavigationMode();data=newRoute||data;routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];totalRouteM=Number(data.summary?.lengthInMeters||0);totalTravelS=Number(data.summary?.travelTimeInSeconds||0);routeMeasures=buildRouteMeasures(routePoints);currentInstructionIndex=0;lastLoggedInstruction=-1;lastSpokenInstruction=-1;spokenInstructionCache={};lastVoiceAt=0;drawRouteOnMap();setPlanningMarkersVisible(false);rebuildInstructionList();if(routeUpEnabled)setMapBearing((currentGps&&Number.isFinite(currentGps.heading)?currentGps.heading:routeInitialBearing())||0);if(currentGps){const ll=[currentGps.lat,currentGps.lng];const dist=distanceFromRoute(ll,routePoints)||0;const progressM=nearestRouteProgressM(ll,routePoints);updateGuidance(progressM,dist)}else{updateGuidance(0,0)}
     if(currentGps&&followDriver){
       forceGpsCameraFocus=true;
       window.__COACH_SAFE_FOLLOW_ACTIVE__=true;
