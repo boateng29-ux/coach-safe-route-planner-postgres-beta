@@ -2434,6 +2434,55 @@ const ROUTE_SELECT_SQL = `
 `;
 
 
+
+
+/* COACH_SAFE_PUBLIC_ROUTE_ID_RESOLVER_V1 */
+function cleanPublicRouteId(rawId) {
+  return String(rawId || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/["'<>]/g, '')
+    .trim()
+    .replace(/[).,;:\/]+$/g, '');
+}
+
+function publicRouteIdCandidates(rawId) {
+  const cleaned = cleanPublicRouteId(rawId);
+  if (!cleaned) return [];
+
+  const candidates = [cleaned];
+
+  if (/^route_/i.test(cleaned)) {
+    const withoutPrefix = cleaned.replace(/^route_/i, '');
+    if (withoutPrefix) candidates.push(withoutPrefix);
+  } else {
+    candidates.push(`route_${cleaned}`);
+  }
+
+  return [...new Set(candidates)];
+}
+
+async function resolvePublicRouteRow(rawId, companyId) {
+  const candidates = publicRouteIdCandidates(rawId);
+  if (!candidates.length) return null;
+
+  const result = await dbRequired().query(
+    `${ROUTE_SELECT_SQL}
+     WHERE r.id = ANY($1::text[])
+       AND r."companyId" = $2
+     ORDER BY CASE WHEN r.id = $3 THEN 0 ELSE 1 END
+     LIMIT 1`,
+    [candidates, companyId, candidates[0]]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function resolvePublicRouteId(rawId, companyId) {
+  const row = await resolvePublicRouteRow(rawId, companyId);
+  return row ? String(row.id) : '';
+}
+/* COACH_SAFE_PUBLIC_ROUTE_ID_RESOLVER_V1_END */
+
 /* COACH_SAFE_DRIVER_V212_TILE_ROUTE */
 app.get('/driver-v2/tiles/:z/:x/:y.png', async (req, res) => {
   try {
@@ -2512,17 +2561,21 @@ app.get('/driver-v2/tiles/:z/:x/:y.png', async (req, res) => {
 app.get('/driver-v2/data/:id', async (req, res) => {
   try {
     const companyId = await ensureCompany();
+    const routeRow = await resolvePublicRouteRow(req.params.id, companyId);
 
-    const result = await dbRequired().query(
-      `${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`,
-      [req.params.id, companyId]
-    );
+    if (!routeRow) {
+      console.warn('Driver public route-data lookup failed', {
+        requestedId: cleanPublicRouteId(req.params.id),
+        candidates: publicRouteIdCandidates(req.params.id),
+        companyId
+      });
 
-    if (!result.rows.length) {
-      return res.status(404).json({ error: 'Driver route not found.' });
+      return res.status(404).json({
+        error: 'Driver route not found.'
+      });
     }
 
-    const route = apiRoute(result.rows[0]);
+    const route = apiRoute(routeRow);
 
     /*
      * This endpoint is public and read-only.
@@ -2570,21 +2623,50 @@ app.get('/driver-v3/config', (req, res) => {
 app.get('/driver-v3/route/:id', async (req, res) => {
   try {
     const companyId = await ensureCompany();
+    const requestedId = cleanPublicRouteId(req.params.id);
+    const canonicalId = await resolvePublicRouteId(requestedId, companyId);
 
-    const result = await dbRequired().query(
-      'SELECT id FROM "Route" WHERE id=$1 AND "companyId"=$2',
-      [req.params.id, companyId]
-    );
+    if (!canonicalId) {
+      console.warn('Driver V3 route lookup failed', {
+        requestedId,
+        candidates: publicRouteIdCandidates(requestedId),
+        companyId
+      });
 
-    if (!result.rows.length) {
       return res.status(404).send('Driver route not found.');
     }
 
-    res.set('Cache-Control', 'no-store');
+    /*
+     * Redirect raw UUIDs, mobile-corrupted IDs and other legacy forms to
+     * the exact database ID. This keeps all later API/reroute requests
+     * consistent and prevents repeated route-ID mismatches.
+     */
+    if (requestedId !== canonicalId) {
+      const queryIndex = req.originalUrl.indexOf('?');
+      const query = queryIndex >= 0
+        ? req.originalUrl.slice(queryIndex)
+        : '';
+
+      return res.redirect(
+        302,
+        '/driver-v3/route/' +
+          encodeURIComponent(canonicalId) +
+          query
+      );
+    }
+
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
+      'X-Content-Type-Options': 'nosniff'
+    });
+
     return res.sendFile(
       path.join(__dirname, 'public', 'driver-v3', 'index.html')
     );
   } catch (error) {
+    console.error('Driver V3 page error', error);
+
     return res.status(500).send(
       error.message || 'Driver V3 page failed.'
     );
@@ -2592,9 +2674,11 @@ app.get('/driver-v3/route/:id', async (req, res) => {
 });
 
 app.get('/drive-v3/:id', (req, res) => {
+  const routeId = cleanPublicRouteId(req.params.id);
+
   return res.redirect(
     302,
-    '/driver-v3/route/' + encodeURIComponent(req.params.id)
+    '/driver-v3/route/' + encodeURIComponent(routeId)
   );
 });
 
