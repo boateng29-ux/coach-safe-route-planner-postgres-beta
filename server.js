@@ -2543,6 +2543,61 @@ app.get('/driver-v2/data/:id', async (req, res) => {
   }
 });
 
+/* COACH_SAFE_DRIVER_V3_HERE_VECTOR */
+app.get('/driver-v3/config', (req, res) => {
+  if (!HAS_LIVE_HERE_KEY) {
+    return res.status(503).json({
+      error: 'HERE_API_KEY is not configured.'
+    });
+  }
+
+  /*
+   * Browser map API keys are visible to the browser by design.
+   * Restrict this key to coach.point2point.site in the HERE portal.
+   */
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'Pragma': 'no-cache',
+    'X-Content-Type-Options': 'nosniff'
+  });
+
+  return res.json({
+    apiKey: HERE_API_KEY,
+    apiVersion: '3.2'
+  });
+});
+
+app.get('/driver-v3/route/:id', async (req, res) => {
+  try {
+    const companyId = await ensureCompany();
+
+    const result = await dbRequired().query(
+      'SELECT id FROM "Route" WHERE id=$1 AND "companyId"=$2',
+      [req.params.id, companyId]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).send('Driver route not found.');
+    }
+
+    res.set('Cache-Control', 'no-store');
+    return res.sendFile(
+      path.join(__dirname, 'public', 'driver-v3', 'index.html')
+    );
+  } catch (error) {
+    return res.status(500).send(
+      error.message || 'Driver V3 page failed.'
+    );
+  }
+});
+
+app.get('/drive-v3/:id', (req, res) => {
+  return res.redirect(
+    302,
+    '/driver-v3/route/' + encodeURIComponent(req.params.id)
+  );
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const companyId = await ensureCompany();
@@ -2726,7 +2781,7 @@ app.get('/driver-v2/route/:id', async (req, res) => {
 });
 
 app.get('/drive-v2/:id', (req, res) => {
-  res.redirect(302, '/driver-v2/route/' + encodeURIComponent(req.params.id));
+  res.redirect(302, '/driver-v3/route/' + encodeURIComponent(req.params.id));
 });
 
 async function sendDriverRoutePage(req, res) {
