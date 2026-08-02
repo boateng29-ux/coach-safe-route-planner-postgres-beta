@@ -88,8 +88,8 @@ export class HereMapController {
 
     const shadow = new H.map.Polyline(lineString, {
       style: {
-        strokeColor: 'rgba(255,255,255,0.94)',
-        lineWidth: 15,
+        strokeColor: 'rgba(255,255,255,0.96)',
+        lineWidth: 16,
         lineCap: 'round',
         lineJoin: 'round'
       },
@@ -98,8 +98,8 @@ export class HereMapController {
 
     this.routeLine = new H.map.Polyline(lineString, {
       style: {
-        strokeColor: '#0f6ff4',
-        lineWidth: 9,
+        strokeColor: '#096df3',
+        lineWidth: 10,
         lineCap: 'round',
         lineJoin: 'round'
       },
@@ -216,7 +216,7 @@ export class HereMapController {
       : 0;
 
     let tilt = 58;
-    let lookAheadM = 72;
+    let lookAheadM = 78;
 
     if (nextTurnM <= 45) {
       tilt = 48;

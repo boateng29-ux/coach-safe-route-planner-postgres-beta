@@ -1,4 +1,4 @@
-import { HereMapController } from './here-map-controller.js?v=32';
+import { HereMapController } from './here-map-controller.js?v=40';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -19,7 +19,11 @@ const state = {
   mode: 'overview',
   wakeLock: null,
   viewMode: localStorage.getItem('coachSafeDriverView') || '3d',
-  previousNavigationView: '3d'
+  previousNavigationView: '3d',
+  lifecycle: 'preview',
+  firstReliableNavigationFix: false,
+  lastGpsTimestamp: 0,
+  provisionalNavigation: false
 };
 
 const mapCtl = new HereMapController('map');
@@ -272,13 +276,22 @@ function applyViewMode(mode, { immediate = false } = {}) {
   if (selected === 'overview') {
     setMode('overview');
     mapCtl.overview();
-    toast('Route overview');
+    toast(
+      state.lifecycle === 'navigation'
+        ? 'Route overview — select a navigation view to resume follow'
+        : 'Route overview'
+    );
     return;
   }
 
   if (!state.snappedGps && !state.gps) {
     toast(`${selected === '3d' ? '3D' : selected === '2d' ? '2D' : 'North-up'} view selected`);
     return;
+  }
+
+  if (gps?.active) {
+    state.lifecycle = 'navigation';
+    $('app').dataset.lifecycle = 'navigation';
   }
 
   const position = state.snappedGps || state.gps;
@@ -302,6 +315,89 @@ function applyViewMode(mode, { immediate = false } = {}) {
 
 function closeViewMenu() {
   $('viewMenu').hidden = true;
+}
+
+function routeStartPosition() {
+  const point = state.points[0];
+  if (!point) return null;
+
+  return {
+    lat: point[0],
+    lng: point[1],
+    accuracy: Infinity,
+    speed: 0,
+    heading: routeSegmentBearing(0)
+  };
+}
+
+function nextTurnFromProgress(progress) {
+  const instruction = state.instructions.find(
+    (item) => Number(item.distanceM || 0) >= progress + 5
+  );
+
+  return instruction
+    ? Math.max(0, Number(instruction.distanceM || 0) - progress)
+    : Infinity;
+}
+
+function enterPreview() {
+  state.lifecycle = 'preview';
+  state.firstReliableNavigationFix = false;
+  state.provisionalNavigation = false;
+  $('app').dataset.lifecycle = 'preview';
+  setMode('overview');
+  mapCtl.setViewMode('overview');
+  mapCtl.overview();
+
+  $('gpsBtn').classList.remove('active');
+  const label = $('gpsBtn').querySelector('span');
+  if (label) label.textContent = 'Start';
+}
+
+function enterNavigation({ immediate = false } = {}) {
+  state.lifecycle = 'navigation';
+  state.provisionalNavigation = !state.gps;
+  $('app').dataset.lifecycle = 'navigation';
+
+  if (state.viewMode === 'overview') {
+    state.viewMode = state.previousNavigationView || '3d';
+  }
+
+  mapCtl.setViewMode(state.viewMode);
+  setMode('live');
+
+  const position =
+    state.snappedGps ||
+    state.gps ||
+    routeStartPosition();
+
+  if (!position) return;
+
+  const point = [position.lat, position.lng];
+  const nearest = nearestProgress(point);
+  const heading = state.gps
+    ? navigationBearing(
+        nearest,
+        state.lastHeading,
+        state.gps.speed
+      )
+    : routeSegmentBearing(nearest.index);
+
+  mapCtl.focus(
+    position,
+    {
+      heading,
+      speedMps: state.gps?.speed || 0,
+      nextTurnM: nextTurnFromProgress(nearest.progress),
+      immediate: true,
+      viewMode: state.viewMode
+    }
+  );
+
+  $('routeStatus').textContent = state.gps
+    ? 'Navigation active'
+    : 'Waiting for GPS';
+  $('routeStatus').className = 'status good';
 }
 
 function setMode(mode) {
@@ -392,6 +488,15 @@ function drawRoute(route, overview = true) {
 }
 
 function onGps(position) {
+  const timestamp = Number(position.timestamp || Date.now());
+
+  /*
+   * Some mobile browsers can return a cached fix after a newer one.
+   * Ignore out-of-order readings so the camera cannot jump backwards.
+   */
+  if (timestamp < state.lastGpsTimestamp) return;
+  state.lastGpsTimestamp = timestamp;
+
   const {
     latitude: lat,
     longitude: lng,
@@ -412,27 +517,45 @@ function onGps(position) {
     );
   }
 
-  course = smoothAngle(state.lastHeading, course, 0.22);
-  if (Number.isFinite(course)) state.lastHeading = course;
-
   const firstFix = !state.gps;
   const accuracyM = Number(accuracy || 999);
+  const speedMps = Number.isFinite(Number(speed))
+    ? Number(speed)
+    : 0;
+
+  const nearest = nearestProgress([lat, lng]);
+  const routeHeading = routeSegmentBearing(nearest.index);
+
+  if (!Number.isFinite(course)) {
+    course = routeHeading;
+  }
+
+  course = smoothAngle(state.lastHeading, course, 0.22);
+  if (Number.isFinite(course)) {
+    state.lastHeading = course;
+  }
 
   state.gps = {
     lat,
     lng,
     accuracy: accuracyM,
-    speed: Number(speed),
+    speed: speedMps,
     heading: course
   };
-
-  const nearest = nearestProgress([lat, lng]);
 
   state.gpsReliable =
     accuracyM <= 35 &&
     nearest.distance <= Math.max(45, accuracyM * 1.6);
 
-  const displayPoint = state.gpsReliable
+  /*
+   * With a wide but plausible GPS fix, softly snap the display/camera
+   * to the approved route. Guidance and rerouting still remain locked
+   * until the stricter reliable-GPS rule passes.
+   */
+  const softSnapAllowed =
+    nearest.distance <= Math.max(110, accuracyM * 2);
+
+  const displayPoint = softSnapAllowed
     ? nearest.snapped
     : [lat, lng];
 
@@ -440,46 +563,67 @@ function onGps(position) {
     lat: displayPoint[0],
     lng: displayPoint[1],
     accuracy: accuracyM,
-    speed: Number(speed),
+    speed: speedMps,
     heading: course
   };
+
+  state.provisionalNavigation = !state.gpsReliable;
 
   $('gpsStatus').textContent = state.gpsReliable
     ? `GPS ${Math.round(accuracyM)}m`
     : `GPS settling ${Math.round(accuracyM)}m`;
-  $('gpsStatus').className = `status ${state.gpsReliable ? 'good' : ''}`;
+
+  $('gpsStatus').className =
+    `status ${state.gpsReliable ? 'good' : ''}`;
+
   $('gpsSignal').textContent = `${Math.round(accuracyM)}m`;
 
-  const mph = Number.isFinite(speed) && speed >= 0
-    ? Math.round(speed * 2.23694)
-    : 0;
-
+  const mph = Math.max(0, Math.round(speedMps * 2.23694));
   $('speed').textContent = `${mph} mph`;
   $('speedLarge').textContent = mph;
 
-  let nextTurnM = Infinity;
+  let nextTurnM = nextTurnFromProgress(nearest.progress);
+
   if (state.gpsReliable) {
-    nextTurnM = updateGuidance(nearest.progress, nearest.distance);
+    nextTurnM = updateGuidance(
+      nearest.progress,
+      nearest.distance
+    );
   } else {
-    $('routeStatus').textContent = 'GPS settling';
+    $('routeStatus').textContent = softSnapAllowed
+      ? 'GPS settling — route held'
+      : 'GPS settling';
     $('routeStatus').className = 'status';
   }
 
+  if (state.lifecycle !== 'navigation') {
+    updateButtons();
+    return;
+  }
+
+  setMode('live');
+
   const cameraHeading = smoothAngle(
     mapCtl.lastHeading,
-    navigationBearing(nearest, course, Number(speed)),
+    navigationBearing(nearest, course, speedMps),
     firstFix ? 1 : 0.14
   );
 
-  setMode('live');
+  const forceCamera =
+    firstFix ||
+    !state.firstReliableNavigationFix;
+
+  if (state.gpsReliable) {
+    state.firstReliableNavigationFix = true;
+  }
 
   mapCtl.focus(
     state.snappedGps,
     {
       heading: cameraHeading,
-      speedMps: Number(speed),
+      speedMps,
       nextTurnM,
-      immediate: firstFix,
+      immediate: forceCamera,
       viewMode: state.viewMode === 'overview'
         ? state.previousNavigationView
         : state.viewMode
@@ -501,18 +645,20 @@ function toggleGps() {
     gps.stop();
     $('gpsStatus').textContent = 'GPS off';
     $('gpsStatus').className = 'status';
-    setMode('overview');
-    mapCtl.overview();
+    enterPreview();
+    toast('Navigation stopped.');
   } else {
-    if (state.viewMode === 'overview') {
-      state.viewMode = state.previousNavigationView;
+    enterNavigation({ immediate: true });
+
+    try {
+      gps.start();
+      $('gpsStatus').textContent = 'Acquiring GPS…';
+      $('gpsStatus').className = 'status';
+      toast('Navigation started.');
+    } catch (error) {
+      enterPreview();
+      toast(error.message || 'GPS could not start.');
     }
-    setMode('live');
-    mapCtl.setViewMode(state.viewMode);
-    gps.start();
-    $('gpsStatus').textContent = 'Acquiring GPS…';
-    $('gpsStatus').className = 'status';
-    toast('Starting HERE vector navigation…');
   }
 
   updateButtons();
@@ -590,7 +736,11 @@ async function toggleFullscreen() {
 }
 
 function updateButtons() {
-  $('gpsBtn').classList.toggle('active', !!gps?.active);
+  const navigationActive =
+    state.lifecycle === 'navigation' &&
+    !!gps?.active;
+
+  $('gpsBtn').classList.toggle('active', navigationActive);
   $('voiceBtn').classList.toggle('active', voice.enabled);
   $('wakeBtn').classList.toggle('active', !!state.wakeLock);
   $('fullscreenBtn').classList.toggle(
@@ -602,8 +752,25 @@ function updateButtons() {
   const voiceLabel = $('voiceBtn').querySelector('span');
   const fullLabel = $('fullscreenBtn').querySelector('span');
 
-  if (gpsLabel) gpsLabel.textContent = gps?.active ? 'GPS on' : 'Start';
-  if (voiceLabel) voiceLabel.textContent = voice.enabled ? 'Voice on' : 'Voice';
+  if (gpsLabel) {
+    gpsLabel.textContent = navigationActive
+      ? 'Stop'
+      : 'Start';
+  }
+
+  $('gpsBtn').setAttribute(
+    'aria-label',
+    navigationActive
+      ? 'Stop navigation'
+      : 'Start navigation'
+  );
+
+  if (voiceLabel) {
+    voiceLabel.textContent = voice.enabled
+      ? 'Voice on'
+      : 'Voice';
+  }
+
   if (fullLabel) {
     fullLabel.textContent = document.fullscreenElement
       ? 'Exit'
@@ -640,6 +807,8 @@ async function load() {
   gps = new window.CoachGpsController(onGps, onGpsError);
 
   drawRoute(routePayload.route || {}, true);
+  $('app').dataset.lifecycle = 'preview';
+  enterPreview();
   mapCtl.setViewMode(state.viewMode);
   state.previousNavigationView =
     state.viewMode === 'overview' ? '3d' : state.viewMode;

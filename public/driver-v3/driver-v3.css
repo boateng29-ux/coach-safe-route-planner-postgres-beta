@@ -452,3 +452,76 @@
     font-size:.8rem;
   }
 }
+
+
+/* DRIVER V3.3 — STRICT PREVIEW / NAVIGATION STATES */
+.app[data-mode="overview"] .vehicle-arrow{
+  display:none!important;
+}
+
+.app[data-mode="live"] .vehicle-arrow{
+  display:block!important;
+}
+
+#gpsBtn.active{
+  background:linear-gradient(145deg,#ffe38c,#d8a92e);
+  color:#171005;
+}
+
+
+/* ==========================================================
+   COACH SAFE DRIVER V4.0 RELEASE CANDIDATE
+   Strict Preview / Navigation lifecycle
+   ========================================================== */
+
+.app[data-lifecycle="preview"] .vehicle-arrow{
+  display:none!important;
+}
+
+.app[data-lifecycle="navigation"][data-mode="live"] .vehicle-arrow{
+  display:block!important;
+  top:77%;
+}
+
+.app[data-lifecycle="navigation"] #gpsBtn{
+  background:linear-gradient(145deg,#ffe38c,#d8a92e);
+  color:#171005;
+  box-shadow:
+    0 0 0 2px rgba(255,225,132,.28),
+    0 10px 25px rgba(0,0,0,.36);
+}
+
+.app[data-lifecycle="preview"] #gpsBtn{
+  background:linear-gradient(145deg,#ffe38c,#d8a92e);
+  color:#171005;
+}
+
+/* Coach profile confirms restrictions without dominating navigation. */
+.app[data-lifecycle="navigation"] .coach-profile{
+  opacity:.86;
+}
+
+/* Keep road banner fully clear of the toolbar. */
+.current-road{
+  bottom:7.35rem;
+}
+
+/* Slightly larger speed panel for driving-distance readability. */
+.speed-card{
+  transform:scale(1.06);
+  transform-origin:top right;
+}
+
+@media(max-width:699px){
+  .app[data-lifecycle="navigation"][data-mode="live"] .vehicle-arrow{
+    top:75%;
+  }
+
+  .current-road{
+    bottom:5.95rem;
+  }
+
+  .speed-card{
+    transform:none;
+  }
+}
