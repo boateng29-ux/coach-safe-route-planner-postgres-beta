@@ -2682,6 +2682,99 @@ app.get('/drive-v3/:id', (req, res) => {
   );
 });
 
+
+/* COACH_SAFE_NATIONAL_ROAD_INCIDENT_NEWS */
+app.get('/api/national-road-incidents', async (req, res) => {
+  try {
+    const query = encodeURIComponent(
+      'UK road incident OR motorway closure OR major road disruption'
+    );
+
+    const feedUrl =
+      'https://news.google.com/rss/search?q=' +
+      query +
+      '&hl=en-GB&gl=GB&ceid=GB:en';
+
+    const response = await fetch(feedUrl, {
+      headers: {
+        'User-Agent': 'CoachSafeOperations/2.1'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        'Incident feed returned ' + response.status
+      );
+    }
+
+    const xml = await response.text();
+
+    const decode = (value = '') =>
+      value
+        .replace(/<!\[CDATA\[|\]\]>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>');
+
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)]
+      .slice(0, 12)
+      .map((match) => {
+        const block = match[1];
+
+        const get = (tag) => {
+          const found = block.match(
+            new RegExp('<' + tag + '>([\\\\s\\\\S]*?)<\\\\/' + tag + '>')
+          );
+          return found ? decode(found[1]).trim() : '';
+        };
+
+        const title = get('title');
+        const lower = title.toLowerCase();
+
+        const severity =
+          /closed|closure|serious|major|fatal|collision/.test(lower)
+            ? 'major'
+            : /delay|congestion|blocked|incident/.test(lower)
+              ? 'moderate'
+              : 'info';
+
+        return {
+          title,
+          description: get('description')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 280),
+          url: get('link'),
+          publishedAt: get('pubDate'),
+          severity
+        };
+      })
+      .filter((item) => item.title);
+
+    res.set({
+      'Cache-Control': 'public, max-age=300',
+      'X-Content-Type-Options': 'nosniff'
+    });
+
+    return res.json({
+      source: 'Google News search headlines',
+      officialTravelUpdates:
+        'https://nationalhighways.co.uk/roads-and-travel/live-travel-updates/',
+      items
+    });
+  } catch (error) {
+    console.error('National road incident news error', error);
+
+    return res.status(502).json({
+      error: 'National incident headlines are unavailable.',
+      items: []
+    });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const companyId = await ensureCompany();
