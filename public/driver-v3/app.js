@@ -1,4 +1,4 @@
-import { HereMapController } from './here-map-controller.js?v=60';
+import { HereMapController } from './here-map-controller.js?v=62';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -32,12 +32,47 @@ let gps = null;
 
 let driverMenuTimer = null;
 
-function setDriverMenu(open) {
+let nightModeEnabled =
+  window.localStorage.getItem('coachSafeNightMode') === 'true';
+
+function applyNightMode(enabled) {
+  nightModeEnabled = !!enabled;
+
+  $('app').classList.toggle(
+    'night-mode',
+    nightModeEnabled
+  );
+
+  $('nightBtn')?.classList.toggle(
+    'active',
+    nightModeEnabled
+  );
+
+  const label = $('nightBtn')?.querySelector('span');
+  if (label) {
+    label.textContent = nightModeEnabled
+      ? 'Day mode'
+      : 'Night mode';
+  }
+
+  window.localStorage.setItem(
+    'coachSafeNightMode',
+    String(nightModeEnabled)
+  );
+}
+
+
+
+function setDriverMenu(open, { autoHide = true } = {}) {
   const menu = $('driverMenu');
   const toggle = $('driverMenuToggle');
-  if (!menu || !toggle) return;
+  const app = $('app');
+
+  if (!menu || !toggle || !app) return;
 
   menu.hidden = !open;
+  app.classList.toggle('driver-menu-open', open);
+
   toggle.setAttribute('aria-expanded', String(open));
   toggle.setAttribute(
     'aria-label',
@@ -49,7 +84,11 @@ function setDriverMenu(open) {
 
   clearTimeout(driverMenuTimer);
 
-  if (open && state.lifecycle === 'navigation') {
+  if (
+    open &&
+    autoHide &&
+    state.lifecycle === 'navigation'
+  ) {
     driverMenuTimer = window.setTimeout(() => {
       setDriverMenu(false);
     }, 5000);
@@ -870,6 +909,7 @@ async function load() {
 
   $('loading').classList.add('hidden');
   $('routeStatus').textContent = 'Route ready';
+  applyNightMode(nightModeEnabled);
   setDriverMenu(true);
   syncMinimalDrivingMode();
   updateButtons();
@@ -951,12 +991,40 @@ document.addEventListener('click', (event) => {
   }
 });
 
-$('driverMenuToggle').addEventListener('click', (event) => {
+$('nightBtn').addEventListener('click', (event) => {
+  event.preventDefault();
   event.stopPropagation();
-  setDriverMenu($('driverMenu').hidden);
+
+  applyNightMode(!nightModeEnabled);
+  toast(
+    nightModeEnabled
+      ? 'Night mode on.'
+      : 'Day mode on.'
+  );
+
+  if (state.lifecycle === 'navigation') {
+    clearTimeout(driverMenuTimer);
+    driverMenuTimer = window.setTimeout(() => {
+      setDriverMenu(false);
+    }, 5000);
+  }
 });
 
-$('driverMenu').addEventListener('click', () => {
+$('driverMenuToggle').addEventListener('click', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const willOpen = !$('app').classList.contains('driver-menu-open');
+  setDriverMenu(willOpen);
+});
+
+$('driverMenu').addEventListener('pointerdown', (event) => {
+  event.stopPropagation();
+});
+
+$('driverMenu').addEventListener('click', (event) => {
+  event.stopPropagation();
+
   if (state.lifecycle !== 'navigation') return;
 
   clearTimeout(driverMenuTimer);
@@ -966,8 +1034,25 @@ $('driverMenu').addEventListener('click', () => {
 });
 
 document.addEventListener('fullscreenchange', () => {
+  setDriverMenu(false, { autoHide: false });
   syncMinimalDrivingMode();
-  setTimeout(() => mapCtl.refresh(), 120);
+
+  window.setTimeout(() => {
+    mapCtl.refresh();
+  }, 180);
+
+  updateButtons();
+});
+
+
+document.addEventListener('webkitfullscreenchange', () => {
+  setDriverMenu(false, { autoHide: false });
+  syncMinimalDrivingMode();
+
+  window.setTimeout(() => {
+    mapCtl.refresh();
+  }, 180);
+
   updateButtons();
 });
 

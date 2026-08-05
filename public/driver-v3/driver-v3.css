@@ -587,8 +587,13 @@ button{
 }
 
 /* Active fullscreen + screen-on mode:
-   only the two cards, trip strip and highlighted menu button remain. */
-.app.minimal-driving .driver-menu{
+   controls start hidden, but the chevron can always reopen them. */
+.app.minimal-driving .driver-menu:not([hidden]),
+.app.driver-menu-open .driver-menu:not([hidden]){
+  display:grid;
+}
+
+.app.minimal-driving:not(.driver-menu-open) .driver-menu{
   display:none;
 }
 
@@ -830,5 +835,160 @@ button{
 
   .current-road{
     bottom:3.65rem;
+  }
+}
+
+
+/* V6.1 fullscreen menu reliability */
+.driver-menu-toggle{
+  pointer-events:auto;
+  touch-action:manipulation;
+  user-select:none;
+}
+
+.driver-menu{
+  pointer-events:auto;
+  overscroll-behavior:contain;
+}
+
+.app.driver-menu-open .driver-menu{
+  display:grid!important;
+}
+
+.app.driver-menu-open .driver-menu-toggle{
+  background:linear-gradient(145deg,#ffe184,#d7aa2e);
+  color:#171005;
+}
+
+/* Satellite imagery should retain natural colour and detail. */
+.app[data-map-style="aerial"] .map canvas{
+  filter:saturate(1.08) contrast(1.03) brightness(.96);
+}
+
+.app[data-map-style="vector"] .map canvas{
+  filter:saturate(1.22) contrast(1.07) brightness(.94);
+}
+
+
+/* ==========================================================
+   COACH SAFE DRIVER V6.2 — NIGHT MODE
+   ========================================================== */
+
+.app.night-mode .map{
+  background:#081019;
+}
+
+.app.night-mode[data-map-style="aerial"] .map canvas{
+  filter:
+    brightness(.43)
+    contrast(1.22)
+    saturate(.72)
+    hue-rotate(2deg);
+}
+
+.app.night-mode[data-map-style="vector"] .map canvas{
+  filter:
+    invert(.86)
+    hue-rotate(178deg)
+    brightness(.66)
+    contrast(1.18)
+    saturate(.78);
+}
+
+.app.night-mode .hud-card,
+.app.night-mode .trip-strip,
+.app.night-mode .driver-menu,
+.app.night-mode .driver-menu-toggle,
+.app.night-mode .current-road{
+  background:rgba(2,6,11,.985);
+  border-color:rgba(242,201,76,.48);
+}
+
+.app.night-mode .vehicle-arrow{
+  filter:
+    drop-shadow(0 0 7px rgba(255,255,255,.72))
+    drop-shadow(0 12px 18px rgba(0,0,0,.9));
+}
+
+#nightBtn.active{
+  border-color:#8ec9ff;
+  background:rgba(41,104,166,.34);
+  color:#dcedff;
+}
+
+/* ==========================================================
+   COMPACT MOBILE DRIVER MENU — APPROXIMATELY 50% SMALLER
+   ========================================================== */
+
+@media(max-width:699px){
+  .driver-menu{
+    left:auto;
+    right:.45rem;
+    bottom:calc(var(--safe-bottom) + 3.65rem);
+    width:min(14.5rem,calc(100vw - .9rem));
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:.24rem;
+    padding:.28rem;
+    border-radius:.72rem;
+  }
+
+  .driver-menu button{
+    min-height:2.55rem;
+    gap:.12rem;
+    padding:.2rem .12rem;
+    border-radius:.52rem;
+  }
+
+  .driver-menu svg{
+    width:.95rem;
+    height:.95rem;
+    stroke-width:1.9;
+  }
+
+  .driver-menu button span{
+    font-size:.38rem;
+    line-height:1.05;
+  }
+
+  .driver-menu-toggle{
+    width:2.75rem;
+    height:2.75rem;
+    right:.5rem;
+    bottom:calc(var(--safe-bottom) + 3.55rem);
+    font-size:.9rem;
+    border-width:1.5px;
+  }
+}
+
+/* Extra compact layout for very narrow phones. */
+@media(max-width:375px){
+  .driver-menu{
+    width:min(13.2rem,calc(100vw - .8rem));
+    right:.4rem;
+  }
+
+  .driver-menu button{
+    min-height:2.35rem;
+  }
+
+  .driver-menu button span{
+    font-size:.34rem;
+  }
+}
+
+/* Compact landscape menu so it does not cover the road ahead. */
+@media(max-height:520px) and (orientation:landscape){
+  .driver-menu{
+    width:min(16rem,42vw);
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    bottom:3.5rem;
+  }
+
+  .driver-menu button{
+    min-height:2.45rem;
+  }
+
+  .driver-menu-toggle{
+    bottom:.45rem;
   }
 }

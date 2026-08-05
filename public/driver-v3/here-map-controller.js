@@ -34,16 +34,38 @@ export class HereMapController {
     });
     this.layers = layers;
 
-    const baseLayer =
+    /*
+     * Prefer HERE satellite/hybrid imagery for a richer professional map.
+     * Layer names vary slightly between HERE configurations, so use a
+     * defensive candidate list and fall back to the normal vector map.
+     */
+    const aerialLayer =
+      layers.raster?.satellite?.map ||
+      layers.raster?.satellite?.base ||
+      layers.raster?.hybrid?.map ||
+      layers.raster?.hybrid?.base ||
+      null;
+
+    const vectorLayer =
       layers.vector?.normal?.map ||
-      layers.vector?.normal?.base;
+      layers.vector?.normal?.base ||
+      null;
+
+    const baseLayer = aerialLayer || vectorLayer;
 
     if (!baseLayer) {
-      throw new Error('HERE vector base layer is unavailable.');
+      throw new Error('HERE base map layer is unavailable.');
+    }
+
+    const container = document.getElementById(this.containerId);
+    const app = document.getElementById('app');
+
+    if (app) {
+      app.dataset.mapStyle = aerialLayer ? 'aerial' : 'vector';
     }
 
     this.map = new H.Map(
-      document.getElementById(this.containerId),
+      container,
       baseLayer,
       {
         center: { lat: 51.47, lng: -0.36 },
@@ -61,6 +83,41 @@ export class HereMapController {
     window.addEventListener('resize', this.resizeHandler);
 
     return this.map;
+  }
+
+  setMapStyle(style = 'aerial') {
+    if (!this.map || !this.layers) return false;
+
+    const aerial =
+      this.layers.raster?.satellite?.map ||
+      this.layers.raster?.satellite?.base ||
+      this.layers.raster?.hybrid?.map ||
+      this.layers.raster?.hybrid?.base ||
+      null;
+
+    const vector =
+      this.layers.vector?.normal?.map ||
+      this.layers.vector?.normal?.base ||
+      null;
+
+    const layer = style === 'vector'
+      ? vector
+      : aerial || vector;
+
+    if (!layer) return false;
+
+    this.map.setBaseLayer(layer);
+
+    const app = document.getElementById('app');
+    if (app) {
+      app.dataset.mapStyle =
+        style === 'vector' || !aerial
+          ? 'vector'
+          : 'aerial';
+    }
+
+    this.refresh();
+    return true;
   }
 
   makeLineString(points) {
