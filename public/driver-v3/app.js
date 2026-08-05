@@ -1,4 +1,4 @@
-import { HereMapController } from './here-map-controller.js?v=62';
+import { HereMapController } from './here-map-controller.js?v=63';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -42,6 +42,12 @@ function applyNightMode(enabled) {
     'night-mode',
     nightModeEnabled
   );
+
+  /*
+   * Switch the actual HERE base layer. This avoids the black-screen
+   * effect caused by filtering the complete map canvas.
+   */
+  mapCtl?.setNightMode?.(nightModeEnabled);
 
   $('nightBtn')?.classList.toggle(
     'active',

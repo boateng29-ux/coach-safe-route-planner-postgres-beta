@@ -878,21 +878,16 @@ button{
   background:#081019;
 }
 
-.app.night-mode[data-map-style="aerial"] .map canvas{
-  filter:
-    brightness(.43)
-    contrast(1.22)
-    saturate(.72)
-    hue-rotate(2deg);
+.app[data-map-theme="night"] .map canvas{
+  filter:saturate(.92) contrast(1.04) brightness(.98);
 }
 
-.app.night-mode[data-map-style="vector"] .map canvas{
-  filter:
-    invert(.86)
-    hue-rotate(178deg)
-    brightness(.66)
-    contrast(1.18)
-    saturate(.78);
+.app[data-map-theme="day"][data-map-style="aerial"] .map canvas{
+  filter:saturate(1.08) contrast(1.03) brightness(.97);
+}
+
+.app[data-map-theme="day"][data-map-style="vector"] .map canvas{
+  filter:saturate(1.2) contrast(1.06) brightness(.96);
 }
 
 .app.night-mode .hud-card,
@@ -991,4 +986,20 @@ button{
   .driver-menu-toggle{
     bottom:.45rem;
   }
+}
+
+
+/* Real HERE night layer: subtle UI adaptation only. */
+.app[data-map-theme="night"]{
+  --panel:rgba(1,5,10,.975);
+  --panel-soft:rgba(2,7,12,.95);
+}
+
+.app[data-map-theme="night"] .hud-card,
+.app[data-map-theme="night"] .trip-strip,
+.app[data-map-theme="night"] .driver-menu,
+.app[data-map-theme="night"] .driver-menu-toggle{
+  box-shadow:
+    0 18px 44px rgba(0,0,0,.66),
+    0 0 0 1px rgba(242,201,76,.08);
 }

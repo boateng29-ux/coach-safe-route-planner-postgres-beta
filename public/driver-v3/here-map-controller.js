@@ -14,6 +14,8 @@ export class HereMapController {
     this.resizeHandler = null;
     this.viewMode = '3d';
     this.layers = null;
+    this.dayLayer = null;
+    this.nightLayer = null;
   }
 
   init(apiKey) {
@@ -35,23 +37,33 @@ export class HereMapController {
     this.layers = layers;
 
     /*
-     * Prefer HERE satellite/hybrid imagery for a richer professional map.
-     * Layer names vary slightly between HERE configurations, so use a
-     * defensive candidate list and fall back to the normal vector map.
+     * Day mode prefers aerial/hybrid imagery.
+     * Night mode uses HERE's real night vector layer rather than
+     * applying a dark CSS filter to the map canvas.
      */
     const aerialLayer =
-      layers.raster?.satellite?.map ||
-      layers.raster?.satellite?.base ||
       layers.raster?.hybrid?.map ||
       layers.raster?.hybrid?.base ||
+      layers.raster?.satellite?.map ||
+      layers.raster?.satellite?.base ||
       null;
 
-    const vectorLayer =
+    const vectorDayLayer =
       layers.vector?.normal?.map ||
       layers.vector?.normal?.base ||
       null;
 
-    const baseLayer = aerialLayer || vectorLayer;
+    const vectorNightLayer =
+      layers.vector?.normal?.night ||
+      layers.vector?.normal?.nightMap ||
+      layers.vector?.night?.map ||
+      layers.vector?.night?.base ||
+      null;
+
+    this.dayLayer = aerialLayer || vectorDayLayer;
+    this.nightLayer = vectorNightLayer || vectorDayLayer;
+
+    const baseLayer = this.dayLayer;
 
     if (!baseLayer) {
       throw new Error('HERE base map layer is unavailable.');
@@ -62,6 +74,7 @@ export class HereMapController {
 
     if (app) {
       app.dataset.mapStyle = aerialLayer ? 'aerial' : 'vector';
+      app.dataset.mapTheme = 'day';
     }
 
     this.map = new H.Map(
@@ -89,10 +102,10 @@ export class HereMapController {
     if (!this.map || !this.layers) return false;
 
     const aerial =
-      this.layers.raster?.satellite?.map ||
-      this.layers.raster?.satellite?.base ||
       this.layers.raster?.hybrid?.map ||
       this.layers.raster?.hybrid?.base ||
+      this.layers.raster?.satellite?.map ||
+      this.layers.raster?.satellite?.base ||
       null;
 
     const vector =
@@ -106,6 +119,7 @@ export class HereMapController {
 
     if (!layer) return false;
 
+    this.dayLayer = layer;
     this.map.setBaseLayer(layer);
 
     const app = document.getElementById('app');
@@ -114,6 +128,40 @@ export class HereMapController {
         style === 'vector' || !aerial
           ? 'vector'
           : 'aerial';
+      app.dataset.mapTheme = 'day';
+    }
+
+    this.refresh();
+    return true;
+  }
+
+  setNightMode(enabled) {
+    if (!this.map) return false;
+
+    const layer = enabled
+      ? this.nightLayer
+      : this.dayLayer;
+
+    if (!layer) return false;
+
+    this.map.setBaseLayer(layer);
+
+    const app = document.getElementById('app');
+    if (app) {
+      app.dataset.mapTheme = enabled ? 'night' : 'day';
+
+      if (enabled) {
+        app.dataset.mapStyle = 'vector-night';
+      } else {
+        const aerial =
+          this.layers?.raster?.hybrid?.map ||
+          this.layers?.raster?.hybrid?.base ||
+          this.layers?.raster?.satellite?.map ||
+          this.layers?.raster?.satellite?.base ||
+          null;
+
+        app.dataset.mapStyle = aerial ? 'aerial' : 'vector';
+      }
     }
 
     this.refresh();
