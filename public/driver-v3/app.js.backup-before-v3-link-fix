@@ -1,4 +1,4 @@
-import { HereMapController } from './here-map-controller.js?v=41';
+import { HereMapController } from './here-map-controller.js?v=40';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -146,45 +146,26 @@ function routeSegmentBearing(index) {
     state.points.length - 2
   );
 
-  let endIndex = startIndex + 1;
-  let accumulated = 0;
-
-  while (
-    endIndex < state.points.length - 1 &&
-    accumulated < 90
-  ) {
-    accumulated += haversine(
-      state.points[endIndex - 1],
-      state.points[endIndex]
-    );
-    endIndex += 1;
-  }
-
-  endIndex = clamp(
-    endIndex,
+  const endIndex = clamp(
+    startIndex + Math.min(8, state.points.length - startIndex - 1),
     startIndex + 1,
     state.points.length - 1
   );
 
-  return bearing(
-    state.points[startIndex],
-    state.points[endIndex]
-  );
+  return bearing(state.points[startIndex], state.points[endIndex]);
 }
 
 function navigationBearing(nearest, gpsHeading, speedMps) {
   const routeHeading = routeSegmentBearing(nearest.index);
-
-  const movingReliably =
+  const moving =
     Number.isFinite(speedMps) &&
-    speedMps >= 4.5 &&
-    Number.isFinite(gpsHeading) &&
-    state.gpsReliable;
+    speedMps >= 2.5 &&
+    Number.isFinite(gpsHeading);
 
-  if (!movingReliably) return routeHeading;
+  if (!moving) return routeHeading;
 
   const delta = ((gpsHeading - routeHeading + 540) % 360) - 180;
-  return (routeHeading + delta * 0.55 + 360) % 360;
+  return (routeHeading + delta * 0.7 + 360) % 360;
 }
 
 function metresText(metres) {
@@ -455,9 +436,9 @@ function updateGuidance(progress, offRoute) {
       ? 'Now'
       : `Next in ${metresText(nextM)}`;
 
-  const laneText = instruction.laneGuidance?.text || '';
-  $('laneText').textContent = laneText;
-  $('laneText').hidden = !laneText;
+  $('laneText').textContent =
+    instruction.laneGuidance?.text ||
+    'Follow road signs. Lane guidance not returned.';
 
   $('eta').textContent = etaText(remainingSeconds);
   $('timeLeft').textContent = durationText(remainingSeconds);
@@ -572,7 +553,7 @@ function onGps(position) {
    * until the stricter reliable-GPS rule passes.
    */
   const softSnapAllowed =
-    nearest.distance <= Math.max(160, accuracyM * 2.75);
+    nearest.distance <= Math.max(110, accuracyM * 2);
 
   const displayPoint = softSnapAllowed
     ? nearest.snapped
@@ -842,18 +823,6 @@ async function load() {
   $('loading').classList.add('hidden');
   $('routeStatus').textContent = 'Route ready';
   updateButtons();
-
-  window.setTimeout(() => {
-    const details = $('coachProfileDetails');
-    if (!details || details.hidden) return;
-
-    details.hidden = true;
-    $('coachProfileToggle')?.setAttribute(
-      'aria-expanded',
-      'false'
-    );
-    $('coachProfile')?.classList.add('collapsed');
-  }, 7000);
 }
 
 $('gpsBtn').addEventListener('click', toggleGps);
@@ -915,10 +884,6 @@ $('coachProfileToggle').addEventListener('click', () => {
   $('coachProfileToggle').setAttribute(
     'aria-expanded',
     String(!details.hidden)
-  );
-  $('coachProfile').classList.toggle(
-    'collapsed',
-    details.hidden
   );
 });
 

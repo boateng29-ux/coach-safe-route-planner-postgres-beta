@@ -179,18 +179,19 @@ export class HereMapController {
   }
 
   zoomForSpeed(speedMps, nextTurnM = Infinity) {
-    if (Number.isFinite(nextTurnM) && nextTurnM <= 45) return 19.4;
-    if (Number.isFinite(nextTurnM) && nextTurnM <= 110) return 19.0;
-    if (Number.isFinite(nextTurnM) && nextTurnM <= 240) return 18.5;
+    if (Number.isFinite(nextTurnM) && nextTurnM <= 35) return 19.7;
+    if (Number.isFinite(nextTurnM) && nextTurnM <= 75) return 19.35;
+    if (Number.isFinite(nextTurnM) && nextTurnM <= 120) return 19.05;
+    if (Number.isFinite(nextTurnM) && nextTurnM <= 240) return 18.55;
 
     const mph = Number.isFinite(speedMps) && speedMps >= 0
       ? speedMps * 2.23694
       : 0;
 
-    if (mph < 12) return 18.8;
-    if (mph < 25) return 18.3;
-    if (mph < 40) return 17.7;
-    if (mph < 55) return 17.1;
+    if (mph < 12) return 19.0;
+    if (mph < 25) return 18.45;
+    if (mph < 40) return 17.8;
+    if (mph < 55) return 17.15;
     return 16.6;
   }
 
@@ -215,35 +216,38 @@ export class HereMapController {
       ? speedMps * 2.23694
       : 0;
 
-    let tilt = 58;
-    let lookAheadM = 78;
+    let tilt = 57;
+    let lookAheadM = 82;
 
-    if (nextTurnM <= 45) {
-      tilt = 48;
-      lookAheadM = 26;
-    } else if (nextTurnM <= 110) {
-      tilt = 52;
-      lookAheadM = 42;
+    if (nextTurnM <= 35) {
+      tilt = 42;
+      lookAheadM = 18;
+    } else if (nextTurnM <= 75) {
+      tilt = 46;
+      lookAheadM = 28;
+    } else if (nextTurnM <= 120) {
+      tilt = 49;
+      lookAheadM = 40;
     } else if (nextTurnM <= 240) {
-      tilt = 55;
-      lookAheadM = 60;
+      tilt = 54;
+      lookAheadM = 62;
     } else if (mph >= 55) {
-      tilt = 62;
-      lookAheadM = 145;
+      tilt = 61;
+      lookAheadM = 150;
     } else if (mph >= 40) {
       tilt = 60;
-      lookAheadM = 118;
+      lookAheadM = 120;
     } else if (mph >= 25) {
       tilt = 58;
-      lookAheadM = 95;
+      lookAheadM = 98;
     } else if (mph < 12) {
-      tilt = 55;
-      lookAheadM = 58;
+      tilt = 54;
+      lookAheadM = 66;
     }
 
     if (is2d) {
       tilt = 0;
-      lookAheadM = nextTurnM <= 70 ? 24 : mph >= 40 ? 82 : 50;
+      lookAheadM = nextTurnM <= 120 ? 26 : mph >= 40 ? 86 : 54;
     } else if (isNorth) {
       tilt = 0;
       lookAheadM = 0;

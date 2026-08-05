@@ -525,3 +525,32 @@
     transform:none;
   }
 }
+
+
+/* DRIVER V4.1 — CAMERA / SNAP / HUD POLISH */
+.app[data-lifecycle="navigation"][data-mode="live"] .vehicle-arrow{
+  top:77%;width:3.2rem;height:4rem;border-radius:0;background:transparent;box-shadow:none;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.55));
+}
+.app[data-lifecycle="navigation"][data-mode="live"] .vehicle-arrow::before{
+  content:"";position:absolute;left:50%;top:.1rem;translate:-50% 0;width:0;height:0;
+  border-left:1.05rem solid transparent;border-right:1.05rem solid transparent;
+  border-bottom:2.85rem solid #096df3;filter:drop-shadow(0 0 .15rem white);
+}
+.app[data-lifecycle="navigation"][data-mode="live"] .vehicle-arrow::after{
+  content:"";position:absolute;left:50%;top:1.45rem;translate:-50% 0;width:.95rem;height:.95rem;
+  border-radius:50%;background:#096df3;border:.24rem solid white;
+  box-shadow:0 0 0 .55rem rgba(9,109,243,.18);
+}
+.lane-text[hidden]{display:none!important}
+.coach-profile.collapsed{width:min(18rem,calc(100vw - 2rem))}
+.coach-profile.collapsed .coach-profile-toggle{padding:.48rem .62rem}
+.coach-profile.collapsed .coach-bus-icon{width:2rem;height:2rem}
+.coach-profile.collapsed .coach-profile-toggle small{display:none}
+.current-road{bottom:8rem!important;z-index:880}
+.app[data-lifecycle="navigation"] .coach-profile{opacity:.92}
+@media(max-width:699px){
+  .app[data-lifecycle="navigation"][data-mode="live"] .vehicle-arrow{top:75%;width:2.8rem;height:3.5rem}
+  .coach-profile{display:none!important}
+  .current-road{bottom:6.3rem!important}
+}
