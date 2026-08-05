@@ -1,4 +1,4 @@
-import { HereMapController } from './here-map-controller.js?v=41';
+import { HereMapController } from './here-map-controller.js?v=60';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -29,6 +29,46 @@ const state = {
 const mapCtl = new HereMapController('map');
 const voice = new window.CoachVoiceController();
 let gps = null;
+
+let driverMenuTimer = null;
+
+function setDriverMenu(open) {
+  const menu = $('driverMenu');
+  const toggle = $('driverMenuToggle');
+  if (!menu || !toggle) return;
+
+  menu.hidden = !open;
+  toggle.setAttribute('aria-expanded', String(open));
+  toggle.setAttribute(
+    'aria-label',
+    open ? 'Hide driver options' : 'Show driver options'
+  );
+
+  const glyph = toggle.querySelector('span');
+  if (glyph) glyph.textContent = open ? '▼' : '▲';
+
+  clearTimeout(driverMenuTimer);
+
+  if (open && state.lifecycle === 'navigation') {
+    driverMenuTimer = window.setTimeout(() => {
+      setDriverMenu(false);
+    }, 5000);
+  }
+}
+
+function syncMinimalDrivingMode() {
+  const minimal =
+    state.lifecycle === 'navigation' &&
+    !!document.fullscreenElement &&
+    !!state.wakeLock;
+
+  $('app').classList.toggle('minimal-driving', minimal);
+
+  if (minimal) {
+    setDriverMenu(false);
+  }
+}
+
 
 function toast(message) {
   const node = $('toast');
@@ -239,41 +279,7 @@ function formatTonnes(valueKg) {
 }
 
 function updateCoachProfile(route) {
-  const vehicle = normaliseVehicle(route);
-  const options = route?.options || {};
-
-  $('coachHeight').textContent = formatMetres(vehicle.heightM);
-  $('coachWidth').textContent = formatMetres(vehicle.widthM);
-  $('coachLength').textContent = formatMetres(vehicle.lengthM);
-  $('coachWeight').textContent = formatTonnes(vehicle.weightKg);
-
-  const complete =
-    vehicle.heightM > 0 &&
-    vehicle.widthM > 0 &&
-    vehicle.lengthM > 0 &&
-    vehicle.weightKg > 0;
-
-  $('coachProfileTitle').textContent = complete
-    ? 'Coach profile active'
-    : 'Coach dimensions incomplete';
-
-  $('coachProfileSummary').textContent = complete
-    ? `${formatMetres(vehicle.heightM)} • ${formatMetres(vehicle.widthM)} • ${formatMetres(vehicle.lengthM)} • ${formatTonnes(vehicle.weightKg)}`
-    : 'Check height, width, length and weight before driving';
-
-  $('coachProfile').classList.toggle('warning', !complete);
-
-  const avoidances = [];
-  if (options.avoidTolls) avoidances.push('tolls');
-  if (options.avoidFerries) avoidances.push('ferries');
-  if (options.avoidUnpaved) avoidances.push('unpaved roads');
-  if (options.avoidTunnels) avoidances.push('tunnels');
-  if (options.avoidLowEmissionZones) avoidances.push('low-emission zones');
-
-  $('coachAvoidances').textContent =
-    `Commercial-vehicle restrictions active${
-      avoidances.length ? `. Avoiding ${avoidances.join(', ')}.` : '.'
-    }`;
+  // Coach restrictions remain active in routing; no permanent card is shown.
 }
 
 function applyViewMode(mode, { immediate = false } = {}) {
@@ -427,6 +433,26 @@ function setMode(mode) {
   else mapCtl.leaveLive();
 }
 
+function updateCameraAlert(instruction) {
+  const alert = $('cameraAlert');
+  const distance = $('cameraDistance');
+  if (!alert || !distance) return;
+
+  const metres = Number(
+    instruction?.speedCameraDistanceM ??
+    instruction?.cameraDistanceM ??
+    NaN
+  );
+
+  const visible =
+    Number.isFinite(metres) &&
+    metres >= 0 &&
+    metres <= 1500;
+
+  alert.hidden = !visible;
+  distance.textContent = visible ? metresText(metres) : '—';
+}
+
 function updateGuidance(progress, offRoute) {
   if (!state.instructions.length) return;
 
@@ -458,6 +484,7 @@ function updateGuidance(progress, offRoute) {
   const laneText = instruction.laneGuidance?.text || '';
   $('laneText').textContent = laneText;
   $('laneText').hidden = !laneText;
+  updateCameraAlert(instruction);
 
   $('eta').textContent = etaText(remainingSeconds);
   $('timeLeft').textContent = durationText(remainingSeconds);
@@ -680,6 +707,7 @@ function toggleGps() {
     }
   }
 
+  syncMinimalDrivingMode();
   updateButtons();
 }
 
@@ -736,6 +764,7 @@ async function toggleWake() {
   }
 
   toast(state.wakeLock ? 'Screen will stay on.' : 'Wake lock off.');
+  syncMinimalDrivingMode();
   updateButtons();
 }
 
@@ -841,6 +870,8 @@ async function load() {
 
   $('loading').classList.add('hidden');
   $('routeStatus').textContent = 'Route ready';
+  setDriverMenu(true);
+  syncMinimalDrivingMode();
   updateButtons();
 
   window.setTimeout(() => {
@@ -909,18 +940,6 @@ $('viewMenu').addEventListener('click', (event) => {
   closeViewMenu();
 });
 
-$('coachProfileToggle').addEventListener('click', () => {
-  const details = $('coachProfileDetails');
-  details.hidden = !details.hidden;
-  $('coachProfileToggle').setAttribute(
-    'aria-expanded',
-    String(!details.hidden)
-  );
-  $('coachProfile').classList.toggle(
-    'collapsed',
-    details.hidden
-  );
-});
 
 document.addEventListener('click', (event) => {
   if (
@@ -932,7 +951,22 @@ document.addEventListener('click', (event) => {
   }
 });
 
+$('driverMenuToggle').addEventListener('click', (event) => {
+  event.stopPropagation();
+  setDriverMenu($('driverMenu').hidden);
+});
+
+$('driverMenu').addEventListener('click', () => {
+  if (state.lifecycle !== 'navigation') return;
+
+  clearTimeout(driverMenuTimer);
+  driverMenuTimer = window.setTimeout(() => {
+    setDriverMenu(false);
+  }, 5000);
+});
+
 document.addEventListener('fullscreenchange', () => {
+  syncMinimalDrivingMode();
   setTimeout(() => mapCtl.refresh(), 120);
   updateButtons();
 });

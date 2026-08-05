@@ -13,6 +13,7 @@ export class HereMapController {
     this.lastPosition = null;
     this.resizeHandler = null;
     this.viewMode = '3d';
+    this.layers = null;
   }
 
   init(apiKey) {
@@ -31,6 +32,7 @@ export class HereMapController {
       ppi,
       pois: true
     });
+    this.layers = layers;
 
     const baseLayer =
       layers.vector?.normal?.map ||
