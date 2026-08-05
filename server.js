@@ -1,4 +1,4 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -17,7 +17,7 @@ const app = express();
 /* IOS_DRIVER_ROUTE_LINK_NORMALIZER_START */
 function cleanDriverRouteIdForMobile(rawId) {
   return String(rawId || '')
-    .replace(/[​-‍﻿]/g, '')
+    .replace(/[â€‹-â€ï»¿]/g, '')
     .replace(/["'<>]/g, '')
     .trim()
     .replace(/[).,;:]+$/g, '');
@@ -39,7 +39,7 @@ app.use(function iosDriverRouteLinkNormalizer(req, res, next) {
     }
 
     const decodedPath = decodeURIComponent(pathOnly)
-      .replace(/[​-‍﻿]/g, '')
+      .replace(/[â€‹-â€ï»¿]/g, '')
       .trim();
 
     // Old public driver route link: /driver-route/:id
@@ -122,31 +122,31 @@ app.get('/', (req, res) => {
 
 const COACH_PRESETS = {
   // Legacy keys kept for existing saved vehicles/routes
-  minibus16: { name: 'UK Minibus / 9–16 seat', category: 'Minibus', seats: '9–16', heightM: 2.65, widthM: 2.10, lengthM: 6.10, weightKg: 3500, maxSpeedKmh: 90, notes: 'Typical long-wheelbase 16-seat minibus. Confirm actual plate/V5C dimensions.' },
-  accessibleMinibus: { name: 'Accessible Minibus / wheelchair lift', category: 'Minibus', seats: '9–16', heightM: 2.85, widthM: 2.25, lengthM: 6.80, weightKg: 5000, maxSpeedKmh: 90, notes: 'Higher-access/welfare minibus profile; useful for school and community transport.' },
-  xlMinibus: { name: 'XL Minibus / 17–22 seat', category: 'Minibus', seats: '17–22', heightM: 3.00, widthM: 2.35, lengthM: 7.70, weightKg: 7200, maxSpeedKmh: 90, notes: 'Large minibus / small coach profile.' },
+  minibus16: { name: 'UK Minibus / 9â€“16 seat', category: 'Minibus', seats: '9â€“16', heightM: 2.65, widthM: 2.10, lengthM: 6.10, weightKg: 3500, maxSpeedKmh: 90, notes: 'Typical long-wheelbase 16-seat minibus. Confirm actual plate/V5C dimensions.' },
+  accessibleMinibus: { name: 'Accessible Minibus / wheelchair lift', category: 'Minibus', seats: '9â€“16', heightM: 2.85, widthM: 2.25, lengthM: 6.80, weightKg: 5000, maxSpeedKmh: 90, notes: 'Higher-access/welfare minibus profile; useful for school and community transport.' },
+  xlMinibus: { name: 'XL Minibus / 17â€“22 seat', category: 'Minibus', seats: '17â€“22', heightM: 3.00, widthM: 2.35, lengthM: 7.70, weightKg: 7200, maxSpeedKmh: 90, notes: 'Large minibus / small coach profile.' },
 
-  midi: { name: 'Midi Coach / 33 seat', category: 'Midi coach', seats: '29–35', heightM: 3.20, widthM: 2.55, lengthM: 9.50, weightKg: 12000, maxSpeedKmh: 90, notes: 'Original midi coach preset retained.' },
-  midi29: { name: 'Midi Coach / 25–29 seat', category: 'Midi coach', seats: '25–29', heightM: 3.10, widthM: 2.45, lengthM: 8.80, weightKg: 10000, maxSpeedKmh: 90, notes: 'Short midi coach for smaller groups.' },
-  midi35: { name: 'Midi Coach / 33–35 seat', category: 'Midi coach', seats: '33–35', heightM: 3.30, widthM: 2.55, lengthM: 9.80, weightKg: 12500, maxSpeedKmh: 90, notes: 'Common 33–35 seat midi coach profile.' },
+  midi: { name: 'Midi Coach / 33 seat', category: 'Midi coach', seats: '29â€“35', heightM: 3.20, widthM: 2.55, lengthM: 9.50, weightKg: 12000, maxSpeedKmh: 90, notes: 'Original midi coach preset retained.' },
+  midi29: { name: 'Midi Coach / 25â€“29 seat', category: 'Midi coach', seats: '25â€“29', heightM: 3.10, widthM: 2.45, lengthM: 8.80, weightKg: 10000, maxSpeedKmh: 90, notes: 'Short midi coach for smaller groups.' },
+  midi35: { name: 'Midi Coach / 33â€“35 seat', category: 'Midi coach', seats: '33â€“35', heightM: 3.30, widthM: 2.55, lengthM: 9.80, weightKg: 12500, maxSpeedKmh: 90, notes: 'Common 33â€“35 seat midi coach profile.' },
 
-  standard: { name: 'Standard Coach / 49–57 seat', category: 'Full-size coach', seats: '49–57', heightM: 3.65, widthM: 2.55, lengthM: 12.20, weightKg: 18000, maxSpeedKmh: 90, notes: 'Original standard coach preset retained.' },
-  coach49: { name: 'Full-size Coach / 49–53 seat', category: 'Full-size coach', seats: '49–53', heightM: 3.55, widthM: 2.55, lengthM: 12.00, weightKg: 18000, maxSpeedKmh: 90, notes: 'Typical 12m touring coach.' },
-  coach57: { name: 'Full-size Coach / 53–57 seat', category: 'Full-size coach', seats: '53–57', heightM: 3.65, widthM: 2.55, lengthM: 12.20, weightKg: 19000, maxSpeedKmh: 90, notes: 'Common UK 57-seat coach profile.' },
-  highDecker: { name: 'High-deck Coach / VIP Touring', category: 'Full-size coach', seats: '49–57', heightM: 3.85, widthM: 2.55, lengthM: 12.90, weightKg: 21000, maxSpeedKmh: 90, notes: 'Higher touring coach; stronger low-bridge caution.' },
-  longCoach61: { name: 'Long Coach / 59–61 seat', category: 'Long coach', seats: '59–61', heightM: 3.75, widthM: 2.55, lengthM: 13.20, weightKg: 22000, maxSpeedKmh: 90, notes: 'Long two-axle/extended coach profile.' },
-  triAxle: { name: 'Tri-axle Coach', category: 'Long coach', seats: '61–70', heightM: 3.75, widthM: 2.55, lengthM: 13.80, weightKg: 26000, maxSpeedKmh: 90, notes: 'Original tri-axle preset retained.' },
-  triAxle70: { name: 'Tri-axle Coach / 65–70 seat', category: 'Long coach', seats: '65–70', heightM: 3.80, widthM: 2.55, lengthM: 14.50, weightKg: 26000, maxSpeedKmh: 90, notes: 'Long tri-axle touring coach; confirm operator plate before route approval.' },
-  doubleDecker: { name: 'Double-decker Coach', category: 'Double deck', seats: '70–85', heightM: 4.35, widthM: 2.55, lengthM: 13.50, weightKg: 26000, maxSpeedKmh: 90, notes: 'Original double-decker coach preset retained.' },
-  doubleDeckCoach85: { name: 'Double-deck Coach / 75–85 seat', category: 'Double deck', seats: '75–85', heightM: 4.35, widthM: 2.55, lengthM: 13.70, weightKg: 26000, maxSpeedKmh: 90, notes: 'High-capacity double-deck coach profile.' },
+  standard: { name: 'Standard Coach / 49â€“57 seat', category: 'Full-size coach', seats: '49â€“57', heightM: 3.65, widthM: 2.55, lengthM: 12.20, weightKg: 18000, maxSpeedKmh: 90, notes: 'Original standard coach preset retained.' },
+  coach49: { name: 'Full-size Coach / 49â€“53 seat', category: 'Full-size coach', seats: '49â€“53', heightM: 3.55, widthM: 2.55, lengthM: 12.00, weightKg: 18000, maxSpeedKmh: 90, notes: 'Typical 12m touring coach.' },
+  coach57: { name: 'Full-size Coach / 53â€“57 seat', category: 'Full-size coach', seats: '53â€“57', heightM: 3.65, widthM: 2.55, lengthM: 12.20, weightKg: 19000, maxSpeedKmh: 90, notes: 'Common UK 57-seat coach profile.' },
+  highDecker: { name: 'High-deck Coach / VIP Touring', category: 'Full-size coach', seats: '49â€“57', heightM: 3.85, widthM: 2.55, lengthM: 12.90, weightKg: 21000, maxSpeedKmh: 90, notes: 'Higher touring coach; stronger low-bridge caution.' },
+  longCoach61: { name: 'Long Coach / 59â€“61 seat', category: 'Long coach', seats: '59â€“61', heightM: 3.75, widthM: 2.55, lengthM: 13.20, weightKg: 22000, maxSpeedKmh: 90, notes: 'Long two-axle/extended coach profile.' },
+  triAxle: { name: 'Tri-axle Coach', category: 'Long coach', seats: '61â€“70', heightM: 3.75, widthM: 2.55, lengthM: 13.80, weightKg: 26000, maxSpeedKmh: 90, notes: 'Original tri-axle preset retained.' },
+  triAxle70: { name: 'Tri-axle Coach / 65â€“70 seat', category: 'Long coach', seats: '65â€“70', heightM: 3.80, widthM: 2.55, lengthM: 14.50, weightKg: 26000, maxSpeedKmh: 90, notes: 'Long tri-axle touring coach; confirm operator plate before route approval.' },
+  doubleDecker: { name: 'Double-decker Coach', category: 'Double deck', seats: '70â€“85', heightM: 4.35, widthM: 2.55, lengthM: 13.50, weightKg: 26000, maxSpeedKmh: 90, notes: 'Original double-decker coach preset retained.' },
+  doubleDeckCoach85: { name: 'Double-deck Coach / 75â€“85 seat', category: 'Double deck', seats: '75â€“85', heightM: 4.35, widthM: 2.55, lengthM: 13.70, weightKg: 26000, maxSpeedKmh: 90, notes: 'High-capacity double-deck coach profile.' },
 
-  communityBus: { name: 'Community Bus / 16–22 seat', category: 'Bus', seats: '16–22', heightM: 2.90, widthM: 2.35, lengthM: 7.50, weightKg: 7500, maxSpeedKmh: 80, notes: 'Community / dial-a-ride style bus profile.' },
-  midibus: { name: 'Midibus / local service', category: 'Bus', seats: '25–35', heightM: 3.00, widthM: 2.50, lengthM: 8.90, weightKg: 12000, maxSpeedKmh: 80, notes: 'Short local service bus / midibus.' },
-  singleDeckBus10: { name: 'Single-deck Bus / 10–11m', category: 'Bus', seats: '35–45', heightM: 3.10, widthM: 2.55, lengthM: 10.80, weightKg: 17000, maxSpeedKmh: 80, notes: 'Typical urban single-deck bus.' },
-  singleDeckBus12: { name: 'Single-deck Bus / 12m', category: 'Bus', seats: '40–50', heightM: 3.15, widthM: 2.55, lengthM: 12.00, weightKg: 19000, maxSpeedKmh: 80, notes: 'Full-size 12m service bus profile.' },
-  schoolBus: { name: 'School Bus / 50–70 seat', category: 'Bus', seats: '50–70', heightM: 3.25, widthM: 2.55, lengthM: 12.00, weightKg: 18000, maxSpeedKmh: 80, notes: 'School/contract bus profile.' },
-  doubleDeckBus: { name: 'Double-deck Bus / 10–11m', category: 'Double deck bus', seats: '60–80', heightM: 4.35, widthM: 2.55, lengthM: 10.60, weightKg: 19000, maxSpeedKmh: 80, notes: 'Urban double-deck bus profile.' },
-  doubleDeckBusLong: { name: 'Double-deck Bus / 11–12m', category: 'Double deck bus', seats: '70–90', heightM: 4.40, widthM: 2.55, lengthM: 11.50, weightKg: 26000, maxSpeedKmh: 80, notes: 'Longer high-capacity double-deck bus.' },
+  communityBus: { name: 'Community Bus / 16â€“22 seat', category: 'Bus', seats: '16â€“22', heightM: 2.90, widthM: 2.35, lengthM: 7.50, weightKg: 7500, maxSpeedKmh: 80, notes: 'Community / dial-a-ride style bus profile.' },
+  midibus: { name: 'Midibus / local service', category: 'Bus', seats: '25â€“35', heightM: 3.00, widthM: 2.50, lengthM: 8.90, weightKg: 12000, maxSpeedKmh: 80, notes: 'Short local service bus / midibus.' },
+  singleDeckBus10: { name: 'Single-deck Bus / 10â€“11m', category: 'Bus', seats: '35â€“45', heightM: 3.10, widthM: 2.55, lengthM: 10.80, weightKg: 17000, maxSpeedKmh: 80, notes: 'Typical urban single-deck bus.' },
+  singleDeckBus12: { name: 'Single-deck Bus / 12m', category: 'Bus', seats: '40â€“50', heightM: 3.15, widthM: 2.55, lengthM: 12.00, weightKg: 19000, maxSpeedKmh: 80, notes: 'Full-size 12m service bus profile.' },
+  schoolBus: { name: 'School Bus / 50â€“70 seat', category: 'Bus', seats: '50â€“70', heightM: 3.25, widthM: 2.55, lengthM: 12.00, weightKg: 18000, maxSpeedKmh: 80, notes: 'School/contract bus profile.' },
+  doubleDeckBus: { name: 'Double-deck Bus / 10â€“11m', category: 'Double deck bus', seats: '60â€“80', heightM: 4.35, widthM: 2.55, lengthM: 10.60, weightKg: 19000, maxSpeedKmh: 80, notes: 'Urban double-deck bus profile.' },
+  doubleDeckBusLong: { name: 'Double-deck Bus / 11â€“12m', category: 'Double deck bus', seats: '70â€“90', heightM: 4.40, widthM: 2.55, lengthM: 11.50, weightKg: 26000, maxSpeedKmh: 80, notes: 'Longer high-capacity double-deck bus.' },
   articulatedBus: { name: 'Articulated Bus / 18m', category: 'Specialist bus', seats: '90+', heightM: 3.20, widthM: 2.55, lengthM: 18.00, weightKg: 28000, maxSpeedKmh: 80, notes: 'Specialist articulated bus profile; use only where relevant and confirm permitted use.' }
 };
 
@@ -162,7 +162,7 @@ const DEFAULT_DB = {
       lengthM: 12.2,
       weightKg: 18000,
       maxSpeedKmh: 90,
-      notes: 'Demo 49–57 seat vehicle profile.',
+      notes: 'Demo 49â€“57 seat vehicle profile.',
       createdAt: new Date().toISOString()
     },
     {
@@ -309,7 +309,7 @@ function verifiedCoordinateInputLabel(value, lat, lon) {
   const pipeLabel = text.includes('|') ? text.split('|').slice(1).join('|').trim() : '';
   const withoutCoords = text
     .replace(/@?-?\d{1,2}\.\d{3,}\s*,\s*-?\d{1,3}\.\d{3,}/, '')
-    .replace(/[|\-–—,]+/g, ' ')
+    .replace(/[|\-â€“â€”,]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   return String(pipeLabel || withoutCoords || fallback).slice(0, 220);
@@ -733,7 +733,7 @@ function routeOrderReviewWarnings(origin, destination, waypoints = []) {
     return [{
       level: 'medium',
       title: 'Stop order may be causing a detour',
-      message: 'The planner visits points exactly in this order: Start → Stop 1 → Stop 2 → Destination. Your intermediate stop order adds about ' + Math.round(excessM / 1609.344 * 10) / 10 + ' extra miles compared with the straight start-to-destination direction. Reorder the stops or make the final stop the destination if this was not intended.'
+      message: 'The planner visits points exactly in this order: Start â†’ Stop 1 â†’ Stop 2 â†’ Destination. Your intermediate stop order adds about ' + Math.round(excessM / 1609.344 * 10) / 10 + ' extra miles compared with the straight start-to-destination direction. Reorder the stops or make the final stop the destination if this was not intended.'
     }];
   }
   return [];
@@ -751,7 +751,7 @@ function buildLaneGuidance(section = {}) {
   const directions = recommended.length
     ? [...new Set(recommended.map(({ lane }) => toTitleCase(lane.follow || (lane.directions || [])[0] || 'continue')))].join(' / ')
     : [...new Set(lanes.flatMap((lane) => lane.directions || []).map(toTitleCase))].filter(Boolean).join(' / ');
-  const visual = lanes.map((lane) => lane.follow ? '●' : '○').join(' ');
+  const visual = lanes.map((lane) => lane.follow ? 'â—' : 'â—‹').join(' ');
   return {
     laneCount: lanes.length,
     recommendedLaneNumbers: recommended.map(({ index }) => index + 1),
@@ -1544,36 +1544,36 @@ body.coach-map-fullscreen{
 
 </head>
 <body>
-<header>${logo}<div><div class="eyebrow">${escapeHtml(settings.companyName || 'Point 2 Point')} • Driver route</div><h1>${escapeHtml(title)}</h1><div class="muted">${escapeHtml(metresToMiles(route.summary?.lengthInMeters || 0))} miles • ${escapeHtml(secondsToText(route.summary?.travelTimeInSeconds || 0))} • <span class="status" id="statusBadge">${escapeHtml(record.status || 'approved')}</span></div></div></header>
+<header>${logo}<div><div class="eyebrow">${escapeHtml(settings.companyName || 'Point 2 Point')} â€¢ Driver route</div><h1>${escapeHtml(title)}</h1><div class="muted">${escapeHtml(metresToMiles(route.summary?.lengthInMeters || 0))} miles â€¢ ${escapeHtml(secondsToText(route.summary?.travelTimeInSeconds || 0))} â€¢ <span class="status" id="statusBadge">${escapeHtml(record.status || 'approved')}</span></div></div></header>
 <div id="driverMapShell" class="driver-map-shell">
   <div id="driverMap"></div>
   <div class="map-nav-overlay waze-card pro-nav-v21" aria-live="polite">
     <div class="pro-main-row">
-      <div id="mapTurnIcon" class="pro-turn-icon" aria-hidden="true">↑</div>
+      <div id="mapTurnIcon" class="pro-turn-icon" aria-hidden="true">â†‘</div>
       <div><div class="label">Next manoeuvre</div><div id="mapNextTurn" class="turn">Start journey to load next instruction</div></div>
-      <div id="mapNextDistance" class="waze-distance">—</div>
+      <div id="mapNextDistance" class="waze-distance">â€”</div>
     </div>
     <div id="mapLaneHint" class="lane">Lane information appears when available</div>
     <div class="pro-metrics">
-      <div class="pro-metric"><strong>ETA</strong><span id="proEtaClock">—</span></div>
-      <div class="pro-metric"><strong>Time left</strong><span id="proTimeLeft">—</span></div>
-      <div class="pro-metric"><strong>Distance</strong><span id="proDistanceLeft">—</span></div>
-      <div class="pro-metric"><strong>Speed</strong><span id="proCurrentSpeed">—</span></div>
+      <div class="pro-metric"><strong>ETA</strong><span id="proEtaClock">â€”</span></div>
+      <div class="pro-metric"><strong>Time left</strong><span id="proTimeLeft">â€”</span></div>
+      <div class="pro-metric"><strong>Distance</strong><span id="proDistanceLeft">â€”</span></div>
+      <div class="pro-metric"><strong>Speed</strong><span id="proCurrentSpeed">â€”</span></div>
     </div>
     <div class="pro-status-strip" aria-label="Journey status">
       <span id="proRouteStatus" class="pro-status-chip">Route ready</span>
-      <span id="proGpsAccuracy" class="pro-status-chip">GPS —</span>
-      <span id="mapRoadInfo" class="pro-status-chip">Road info —</span>
-      <span id="mapSpeedLimit" class="pro-status-chip">Limit —</span>
+      <span id="proGpsAccuracy" class="pro-status-chip">GPS â€”</span>
+      <span id="mapRoadInfo" class="pro-status-chip">Road info â€”</span>
+      <span id="mapSpeedLimit" class="pro-status-chip">Limit â€”</span>
       <span id="mapCameraHint" class="pro-status-chip warn">No camera feed</span>
     </div>
   </div>
 </div>
 <main class="content">
   <section class="card driver-summary-card" hidden aria-hidden="true"><h2>Driver summary</h2><div class="stats"><div class="stat"><strong>Driver</strong>${escapeHtml(driver.name || 'Not assigned')}</div><div class="stat"><strong>Vehicle</strong>${escapeHtml(vehicle.name || 'Coach')}<br>${escapeHtml(vehicle.registration || '')}</div><div class="stat"><strong>Height</strong>${escapeHtml(vehicle.heightM || '')}m</div><div class="stat"><strong>Weight</strong>${Number(vehicle.weightKg || 0).toLocaleString()}kg</div></div><p class="muted"><strong>Operator notes:</strong> ${escapeHtml(record.operatorNotes || 'None')}</p><div class="buttons"><button class="secondary" onclick="window.print()">Print</button><button id="completeBtn" class="button" type="button">Mark completed</button></div></section>
-  <section class="card gps-card driver-gps-card" hidden aria-hidden="true"><h2>Live GPS driver mode</h2><p class="muted">Shows your current location against the approved route. Keep using road signs and operator instructions.</p><div class="gps-grid"><div class="gps-pill"><strong>Status</strong><span id="gpsStatus">Not started</span></div><div class="gps-pill"><strong>Accuracy</strong><span id="gpsAccuracy">—</span></div><div class="gps-pill"><strong>Distance from route</strong><span id="gpsDistance">—</span></div><div class="gps-pill"><strong>Tracking</strong><span id="gpsTracking">Off</span></div></div><div id="offRouteAlert" class="offroute">You appear to be away from the approved route. Stop when safe and check with operations before continuing.</div><div class="buttons" style="margin-top:.8rem"><button id="startGpsBtn" type="button">Start live GPS</button><button id="centerGpsBtn" class="secondary" type="button" disabled>Centre on me</button><button id="stopGpsBtn" class="secondary" type="button" disabled>Stop GPS</button></div></section>
+  <section class="card gps-card driver-gps-card" hidden aria-hidden="true"><h2>Live GPS driver mode</h2><p class="muted">Shows your current location against the approved route. Keep using road signs and operator instructions.</p><div class="gps-grid"><div class="gps-pill"><strong>Status</strong><span id="gpsStatus">Not started</span></div><div class="gps-pill"><strong>Accuracy</strong><span id="gpsAccuracy">â€”</span></div><div class="gps-pill"><strong>Distance from route</strong><span id="gpsDistance">â€”</span></div><div class="gps-pill"><strong>Tracking</strong><span id="gpsTracking">Off</span></div></div><div id="offRouteAlert" class="offroute">You appear to be away from the approved route. Stop when safe and check with operations before continuing.</div><div class="buttons" style="margin-top:.8rem"><button id="startGpsBtn" type="button">Start live GPS</button><button id="centerGpsBtn" class="secondary" type="button" disabled>Centre on me</button><button id="stopGpsBtn" class="secondary" type="button" disabled>Stop GPS</button></div></section>
   <div id="driverEventLog" hidden></div>
-  <section class="card wide nav-assist-card" hidden><h2>Live driving instructions</h2><div class="nav-hero"><strong id="navCurrentInstruction">Start journey to load next instruction</strong><div class="distance">Next action in <span id="navDistanceToNext">—</span></div></div><div class="nav-info-grid"><div class="nav-info"><strong>Lane guidance</strong><span id="navLaneGuidance">Follow road signs</span><div id="navLaneVisual" class="lane-visual"></div></div><div class="nav-info"><strong>Speed limit</strong><span id="navSpeedLimit">When available</span></div><div class="nav-info"><strong>Road / signpost</strong><span id="navRoadInfo">—</span></div><div class="nav-info"><strong>Camera alerts</strong><span id="navCameraAlert" class="camera-muted">No connected speed-camera feed</span></div></div><div style="margin-top:.75rem"><strong class="muted">All route instructions</strong><ol id="instructionList" class="instruction-list"></ol></div></section>
+  <section class="card wide nav-assist-card" hidden><h2>Live driving instructions</h2><div class="nav-hero"><strong id="navCurrentInstruction">Start journey to load next instruction</strong><div class="distance">Next action in <span id="navDistanceToNext">â€”</span></div></div><div class="nav-info-grid"><div class="nav-info"><strong>Lane guidance</strong><span id="navLaneGuidance">Follow road signs</span><div id="navLaneVisual" class="lane-visual"></div></div><div class="nav-info"><strong>Speed limit</strong><span id="navSpeedLimit">When available</span></div><div class="nav-info"><strong>Road / signpost</strong><span id="navRoadInfo">â€”</span></div><div class="nav-info"><strong>Camera alerts</strong><span id="navCameraAlert" class="camera-muted">No connected speed-camera feed</span></div></div><div style="margin-top:.75rem"><strong class="muted">All route instructions</strong><ol id="instructionList" class="instruction-list"></ol></div></section>
 
   ${stopsHtml}
   <section class="card wide"><h2>Report unsuitable road</h2><form id="driverReportForm" class="form-grid"><label>Road / location<input name="roadName" id="roadNameInput" placeholder="Example: narrow hotel approach" /></label><label>Issue type<select name="issueType"><option>Unsuitable road</option><option>Low bridge concern</option><option>Narrow road</option><option>Weight restriction concern</option><option>Tight turn</option><option>Coach access restriction</option><option>Other</option></select></label><label>Notes<textarea name="notes" rows="3" placeholder="Explain what happened or what needs checking."></textarea></label><input type="hidden" name="lat" id="reportLat"><input type="hidden" name="lng" id="reportLng"><input type="hidden" name="accuracyM" id="reportAccuracy"><div class="buttons"><button type="button" id="useGpsReportBtn" class="secondary">Use my GPS location</button><button type="submit">Submit road report</button></div></form></section>
@@ -1594,7 +1594,7 @@ let routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,da
     map.fitBounds(routeLine.getBounds(),{padding:[34,34],maxZoom:15});
   }
 }function bearingBetween(a,b){if(!a||!b)return null;const toRad=(d)=>d*Math.PI/180,toDeg=(r)=>r*180/Math.PI;const lat1=toRad(a[0]),lat2=toRad(b[0]),dLng=toRad(b[1]-a[1]);const y=Math.sin(dLng)*Math.cos(lat2);const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);return (toDeg(Math.atan2(y,x))+360)%360}function routeInitialBearing(){if(!routePoints||routePoints.length<2)return null;const start=routePoints[0];for(let i=1;i<routePoints.length;i++){if(haversine(start,routePoints[i])>25)return bearingBetween(start,routePoints[i])}return bearingBetween(routePoints[0],routePoints[1])}
-function directionArrowIcon(bearing){return L.divIcon({className:'',html:'<span class="route-direction-arrow"><span style="--route-arrow-bearing:'+Number(bearing||0).toFixed(1)+'deg">➤</span></span>',iconSize:[30,30],iconAnchor:[15,15]})}
+function directionArrowIcon(bearing){return L.divIcon({className:'',html:'<span class="route-direction-arrow"><span style="--route-arrow-bearing:'+Number(bearing||0).toFixed(1)+'deg">âž¤</span></span>',iconSize:[30,30],iconAnchor:[15,15]})}
 function addRouteDirectionArrows(){try{if(directionLayer)map.removeLayer(directionLayer);directionLayer=L.layerGroup().addTo(map);if(!Array.isArray(routePoints)||routePoints.length<4)return;const fractions=[.18,.36,.54,.72,.9];fractions.forEach((fraction)=>{let index=Math.max(0,Math.min(routePoints.length-2,Math.floor((routePoints.length-1)*fraction)));let next=index+1;while(next<routePoints.length-1&&haversine(routePoints[index],routePoints[next])<18)next++;const bearing=bearingBetween(routePoints[index],routePoints[next]||routePoints[index+1]);if(Number.isFinite(bearing))L.marker(routePoints[index],{icon:directionArrowIcon(bearing),interactive:false,keyboard:false,zIndexOffset:450}).addTo(directionLayer)})}catch(e){console.warn('Could not add route direction arrows',e)}}
 function setMapBearing(deg){
     if(!Number.isFinite(deg))return;
@@ -1785,17 +1785,17 @@ function setText(id,value){const el=document.getElementById(id);if(el)el.textCon
 /* COACH_SAFE_PRO_DRIVER_V21_JS_START */
 function proManeuverIcon(ins){
   const text=((ins?.maneuver||'')+' '+(ins?.instructionType||'')+' '+(ins?.instruction||'')).toLowerCase();
-  if(text.includes('roundabout'))return '↻';
-  if(text.includes('u-turn')||text.includes('uturn'))return '↶';
-  if(text.includes('sharp left'))return '↙';
-  if(text.includes('sharp right'))return '↘';
-  if(text.includes('slight left')||text.includes('keep left'))return '↖';
-  if(text.includes('slight right')||text.includes('keep right'))return '↗';
-  if(text.includes('left'))return '←';
-  if(text.includes('right'))return '→';
-  if(text.includes('arriv')||text.includes('destination'))return '●';
-  if(text.includes('exit'))return '↗';
-  return '↑';
+  if(text.includes('roundabout'))return 'â†»';
+  if(text.includes('u-turn')||text.includes('uturn'))return 'â†¶';
+  if(text.includes('sharp left'))return 'â†™';
+  if(text.includes('sharp right'))return 'â†˜';
+  if(text.includes('slight left')||text.includes('keep left'))return 'â†–';
+  if(text.includes('slight right')||text.includes('keep right'))return 'â†—';
+  if(text.includes('left'))return 'â†';
+  if(text.includes('right'))return 'â†’';
+  if(text.includes('arriv')||text.includes('destination'))return 'â—';
+  if(text.includes('exit'))return 'â†—';
+  return 'â†‘';
 }
 function proEtaClock(secondsRemaining){
   const date=new Date(Date.now()+Math.max(0,Number(secondsRemaining||0))*1000);
@@ -1820,9 +1820,9 @@ function updateProfessionalNav(ins,remainingM,remainingS,offRouteM){
 function updateProfessionalGps(pos){
   const speedMps=Number(pos?.coords?.speed);
   const speedMph=Number.isFinite(speedMps)&&speedMps>=0?Math.round(speedMps*2.236936):null;
-  setText('proCurrentSpeed',speedMph===null?'—':speedMph+' mph');
+  setText('proCurrentSpeed',speedMph===null?'â€”':speedMph+' mph');
   const acc=Math.round(Number(pos?.coords?.accuracy||0));
-  proSetStatus('proGpsAccuracy','GPS '+(acc?acc+'m':'—'),acc&&acc<=12?'good':acc&&acc<=30?'warn':'bad');
+  proSetStatus('proGpsAccuracy','GPS '+(acc?acc+'m':'â€”'),acc&&acc<=12?'good':acc&&acc<=30?'warn':'bad');
 }
 /* COACH_SAFE_PRO_DRIVER_V21_JS_END */
 
@@ -1876,7 +1876,7 @@ function setAdvancedInstructionPanel(ins, progressM, distToNext) {
   if (ins && ins.roadNumbers && ins.roadNumbers.length) roadBits.push(ins.roadNumbers.join(', '));
   if (ins && ins.signpostText) roadBits.push('towards ' + ins.signpostText);
 
-  const roadText = roadBits.length ? roadBits.join(' · ') : 'Road info —';
+  const roadText = roadBits.length ? roadBits.join(' Â· ') : 'Road info â€”';
   setText('navRoadInfo', roadText);
   setText('mapRoadInfo', roadText);
 
@@ -1918,7 +1918,7 @@ if(accuracyCircle){
   accuracyCircle=L.circle(ll,{radius:visualAccuracy,weight:1,opacity:.22,fillOpacity:.035,interactive:false}).addTo(map);
 }setText('gpsStatus','Active');setText('gpsTracking','On');setText('gpsAccuracy',Math.round(acc)+'m');const dist=distanceFromRoute(ll,routePoints);const alert=document.getElementById('offRouteAlert');const progressM=nearestRouteProgressM(ll,routePoints);if(dist!==null&&Number.isFinite(dist)){setText('gpsDistance',Math.round(dist)+'m');if(dist>250){alert?.classList.add('show')}else{alert?.classList.remove('show')}updateGuidance(progressM,dist)}if(followDriver){updateSatnavCamera(ll,currentGps.heading)}updateReportGpsFields()}
 function onGpsError(err){setText('gpsStatus',err.message||'Location unavailable');toast('GPS error: '+(err.message||'location unavailable'),'error')}
-document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!navigator.geolocation){toast('This browser does not support GPS location.','error');return}followDriver=true;setNavigationMode('live');forceGpsCameraFocus=true;setText('gpsStatus','Requesting permission…');watchId=navigator.geolocation.watchPosition(onGps,onGpsError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});document.getElementById('startGpsBtn').disabled=true;document.getElementById('centerGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=false;postJourneyEvent('gps_started','Driver started live GPS tracking.',{})});
+document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!navigator.geolocation){toast('This browser does not support GPS location.','error');return}followDriver=true;setNavigationMode('live');forceGpsCameraFocus=true;setText('gpsStatus','Requesting permissionâ€¦');watchId=navigator.geolocation.watchPosition(onGps,onGpsError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});document.getElementById('startGpsBtn').disabled=true;document.getElementById('centerGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=false;postJourneyEvent('gps_started','Driver started live GPS tracking.',{})});
 document.getElementById('centerGpsBtn')?.addEventListener('click',()=>{if(currentGps){followDriver=true;forceGpsCameraFocus=true;window.__COACH_SAFE_FOLLOW_ACTIVE__=true;focusLiveGps({zoom:18,animate:true});toast('Map centred on your location.','success')}else{toast('Start GPS first.','error')}});
 document.getElementById('mapCenterBtn')?.addEventListener('click',()=>document.getElementById('centerGpsBtn')?.click());
 document.getElementById('mapRecalcBtn')?.addEventListener('click',(e)=>recalcRouteFromGps(e.currentTarget));
@@ -2009,7 +2009,7 @@ function toggleVoiceGuidance(){if(!speechAvailable()){toast('Spoken guidance is 
 document.getElementById('voiceGuidanceBtn')?.addEventListener('click',toggleVoiceGuidance);
 document.getElementById('mapVoiceBtn')?.addEventListener('click',toggleVoiceGuidance);
 document.getElementById('nextInstructionBtn')?.addEventListener('click',()=>{const ins=instructions[currentInstructionIndex]||instructions[0];if(ins){toast(ins.instruction,'success');speakCurrentInstruction(true);logEvent('Instruction repeated: '+ins.instruction)}else{toast('No spoken instruction available.','error')}});
-function rebuildInstructionList(){const list=document.getElementById('instructionList');if(!list)return;list.innerHTML='';const rows=instructions.length?instructions:[{instruction:'No guidance returned.'}];rows.forEach((ins,idx)=>{const li=document.createElement('li');const sp=document.createElement('span');sp.textContent=String(idx+1);const wrap=document.createElement('div');const main=document.createElement('strong');main.textContent=ins.instruction||'Continue';wrap.appendChild(main);const details=[];if(ins.laneGuidance?.text)details.push(ins.laneGuidance.text);if(ins.speedLimit?.maxSpeedLimitMph)details.push('Speed limit: '+ins.speedLimit.maxSpeedLimitMph+' mph');if(ins.street)details.push(ins.street);if(details.length){const p=document.createElement('p');p.className='muted';p.textContent=details.join(' · ');wrap.appendChild(p)}li.appendChild(sp);li.appendChild(wrap);list.appendChild(li)})}
+function rebuildInstructionList(){const list=document.getElementById('instructionList');if(!list)return;list.innerHTML='';const rows=instructions.length?instructions:[{instruction:'No guidance returned.'}];rows.forEach((ins,idx)=>{const li=document.createElement('li');const sp=document.createElement('span');sp.textContent=String(idx+1);const wrap=document.createElement('div');const main=document.createElement('strong');main.textContent=ins.instruction||'Continue';wrap.appendChild(main);const details=[];if(ins.laneGuidance?.text)details.push(ins.laneGuidance.text);if(ins.speedLimit?.maxSpeedLimitMph)details.push('Speed limit: '+ins.speedLimit.maxSpeedLimitMph+' mph');if(ins.street)details.push(ins.street);if(details.length){const p=document.createElement('p');p.className='muted';p.textContent=details.join(' Â· ');wrap.appendChild(p)}li.appendChild(sp);li.appendChild(wrap);list.appendChild(li)})}
 function applyReroute(newRoute){data=newRoute||data;routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];totalRouteM=Number(data.summary?.lengthInMeters||0);totalTravelS=Number(data.summary?.travelTimeInSeconds||0);routeMeasures=buildRouteMeasures(routePoints);currentInstructionIndex=0;lastLoggedInstruction=-1;lastSpokenInstruction=-1;spokenInstructionCache={};lastVoiceAt=0;drawRouteOnMap();rebuildInstructionList();if(routeUpEnabled)setMapBearing((currentGps&&Number.isFinite(currentGps.heading)?currentGps.heading:routeInitialBearing())||0);if(currentGps){const ll=[currentGps.lat,currentGps.lng];const dist=distanceFromRoute(ll,routePoints)||0;const progressM=nearestRouteProgressM(ll,routePoints);updateGuidance(progressM,dist)}else{updateGuidance(0,0)}
     if(currentGps&&followDriver){
       setNavigationMode('live');
@@ -2022,7 +2022,7 @@ function applyReroute(newRoute){data=newRoute||data;routePoints=maybeCorrectRout
       fit();
     }
   }
-async function recalcRouteFromGps(triggerBtn){const btn=triggerBtn||document.getElementById('recalcBtn')||document.getElementById('mapRecalcBtn');if(!currentGps){toast('Start live GPS first so the app can reroute from your current position.','error');return}if(btn)btn.disabled=true;const oldText=btn?btn.textContent:'';if(btn)btn.textContent='Recalculating…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/reroute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:currentGps.lat,lng:currentGps.lng,accuracyM:currentGps.accuracy})});const payload=await r.json();if(!r.ok)throw new Error(payload.error||'Could not recalculate route.');applyReroute(payload.route);
+async function recalcRouteFromGps(triggerBtn){const btn=triggerBtn||document.getElementById('recalcBtn')||document.getElementById('mapRecalcBtn');if(!currentGps){toast('Start live GPS first so the app can reroute from your current position.','error');return}if(btn)btn.disabled=true;const oldText=btn?btn.textContent:'';if(btn)btn.textContent='Recalculatingâ€¦';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/reroute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:currentGps.lat,lng:currentGps.lng,accuracyM:currentGps.accuracy})});const payload=await r.json();if(!r.ok)throw new Error(payload.error||'Could not recalculate route.');applyReroute(payload.route);
       forceGpsCameraFocus=true;
       window.__COACH_SAFE_FOLLOW_ACTIVE__=true;
       [120,500,1100,1700].forEach((delay)=>setTimeout(()=>{
@@ -2035,7 +2035,7 @@ async function recalcRouteFromGps(triggerBtn){const btn=triggerBtn||document.get
 document.getElementById('recalcBtn')?.addEventListener('click',()=>recalcRouteFromGps(document.getElementById('recalcBtn')));
 rebuildInstructionList();
 if(instructions.length){updateGuidance(0,0)}
-document.getElementById('completeBtn')?.addEventListener('click',async()=>{const btn=document.getElementById('completeBtn');btn.disabled=true;btn.textContent='Marking complete…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/complete',{method:'POST'});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not mark route completed.');document.getElementById('statusBadge').textContent='completed';toast('Route marked as completed.','success');logEvent('Journey completed.');if(voiceEnabled)speak('Route completed.');btn.textContent='Completed';}catch(e){toast(e.message,'error');btn.disabled=false;btn.textContent='Mark completed';}});
+document.getElementById('completeBtn')?.addEventListener('click',async()=>{const btn=document.getElementById('completeBtn');btn.disabled=true;btn.textContent='Marking completeâ€¦';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/complete',{method:'POST'});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not mark route completed.');document.getElementById('statusBadge').textContent='completed';toast('Route marked as completed.','success');logEvent('Journey completed.');if(voiceEnabled)speak('Route completed.');btn.textContent='Completed';}catch(e){toast(e.message,'error');btn.disabled=false;btn.textContent='Mark completed';}});
 document.getElementById('journeyCompleteBtn')?.addEventListener('click',()=>document.getElementById('completeBtn')?.click());
 document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget;updateReportGpsFields();const payload=Object.fromEntries(new FormData(form));try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not save report.');form.reset();toast('Road report sent to operations.','success');logEvent('Road report sent to operations.');}catch(err){toast(err.message,'error');}});
 </script>
@@ -2103,13 +2103,13 @@ function buildRouteReportHtml(record) {
 
 </head>
 <body>
-<div class="live-nav-bar"><a href="${liveRouteUrl}">← Back to live route</a><span>Driver route pack</span></div>
+<div class="live-nav-bar"><a href="${liveRouteUrl}">â† Back to live route</a><span>Driver route pack</span></div>
 <header>
-  <div><div class="eyebrow">Coach Safe Route Planner</div><h1>${escapeHtml(title)}</h1><div class="meta"><span class="brand">Point 2 Point</span> • Approved route report • ${escapeHtml(record.status || 'approved')}</div></div>
+  <div><div class="eyebrow">Coach Safe Route Planner</div><h1>${escapeHtml(title)}</h1><div class="meta"><span class="brand">Point 2 Point</span> â€¢ Approved route report â€¢ ${escapeHtml(record.status || 'approved')}</div></div>
   <div class="buttons"><a class="button" href="${liveRouteUrl}">Live route</a><button onclick="fitRouteForPrint()">Fit route</button><button onclick="window.print()">Print / Save PDF</button></div>
 </header>
 <main class="route-layout">
-  <section class="map-wrap"><div id="exportMap"></div><div class="map-note"><span>Use + / − or pinch to zoom. Drag the map to inspect roads and junctions.</span><span>Created ${escapeHtml(new Date(record.createdAt).toLocaleString())}</span></div></section>
+  <section class="map-wrap"><div id="exportMap"></div><div class="map-note"><span>Use + / âˆ’ or pinch to zoom. Drag the map to inspect roads and junctions.</span><span>Created ${escapeHtml(new Date(record.createdAt).toLocaleString())}</span></div></section>
   <aside class="panel">
     <h2>Approval summary</h2>
     <div class="approval"><strong>Assigned driver:</strong> ${escapeHtml(driver)}<br><strong>Operator notes:</strong> ${escapeHtml(record.operatorNotes || 'None')}<br><strong>Route ID:</strong> ${escapeHtml(record.id || '')}<div class="buttons"><a class="button" href="${liveRouteUrl}">Back to live route</a></div></div>
@@ -2117,7 +2117,7 @@ function buildRouteReportHtml(record) {
       <div class="stat"><strong>Distance</strong>${escapeHtml(metresToMiles(route.summary?.lengthInMeters))} miles</div>
       <div class="stat"><strong>Time</strong>${escapeHtml(secondsToText(route.summary?.travelTimeInSeconds))}</div>
       <div class="stat"><strong>Vehicle</strong>${escapeHtml(vehicle.name || 'Coach')}<br>${escapeHtml(vehicle.registration || '')}</div>
-      <div class="stat"><strong>Dimensions</strong>${escapeHtml(vehicle.heightM)}m H • ${escapeHtml(vehicle.widthM)}m W • ${escapeHtml(vehicle.lengthM)}m L • ${Number(vehicle.weightKg || 0).toLocaleString()}kg</div>
+      <div class="stat"><strong>Dimensions</strong>${escapeHtml(vehicle.heightM)}m H â€¢ ${escapeHtml(vehicle.widthM)}m W â€¢ ${escapeHtml(vehicle.lengthM)}m L â€¢ ${Number(vehicle.weightKg || 0).toLocaleString()}kg</div>
     </div>
     <h2>Route risk score</h2>
     <div class="approval"><div class="risk">${escapeHtml(risk.score)} / 100</div><strong>${escapeHtml(risk.level)} risk</strong><p class="muted">${escapeHtml(risk.recommendation)}</p></div>
@@ -2314,7 +2314,7 @@ async function ensureSeedData(companyId) {
   const vehicles = await db.query('SELECT COUNT(*)::int AS count FROM "Vehicle" WHERE "companyId"=$1', [companyId]);
   if (!vehicles.rows[0].count) {
     const demo = [
-      cleanSavedVehicle({ name: 'P2P Standard Coach', registration: 'DEMO-57', preset: 'standard', notes: 'Demo 49–57 seat vehicle profile.' }),
+      cleanSavedVehicle({ name: 'P2P Standard Coach', registration: 'DEMO-57', preset: 'standard', notes: 'Demo 49â€“57 seat vehicle profile.' }),
       cleanSavedVehicle({ name: 'P2P Double Decker', registration: 'DEMO-DD', preset: 'doubleDecker', notes: 'Demo high vehicle profile.' })
     ];
     for (const v of demo) {
@@ -2881,7 +2881,14 @@ async function sendDriverRoutePage(req, res) {
   }
 }
 
-app.get('/driver/route/:id', sendDriverRoutePage);
+app.get('/driver/route/:id', (req, res) => {
+  const routeId = cleanPublicRouteId(req.params.id);
+
+  return res.redirect(
+    302,
+    '/driver-v3/route/' + encodeURIComponent(routeId)
+  );
+});
 app.get('/driver-route/:id', sendDriverRoutePage);
 
 app.get('/driver/route/:id/route-pack', async (req, res) => {
