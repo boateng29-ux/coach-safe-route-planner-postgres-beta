@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQb7BCHj8EKpD1PpfO5GdK8LAzE+zAM=" crossorigin="" />
   <link rel="stylesheet" href="/vendor/leaflet-local.css?v=11" />
-  <link rel="stylesheet" href="/styles.css?v=stage11a" />
+  <link rel="stylesheet" href="/styles.css?v=stage12" />
 <link rel="stylesheet" href="/verified-pins.css?v=2">
 </head>
 <body class="locked coach-safe-professional">
@@ -643,6 +643,7 @@
         <button type="button" data-company-tab="users">Users & roles</button>
         <button type="button" data-company-tab="subscription">Subscription</button>
         <button type="button" data-company-tab="audit">Audit log</button>
+        <button type="button" data-company-tab="system-health">System health</button>
       </nav>
 
       <article class="panel company-tab-panel active" data-company-panel="profile">
@@ -699,6 +700,68 @@
       <article class="panel company-tab-panel" data-company-panel="audit">
         <p class="eyebrow">Audit log</p><h3>Recent account activity</h3>
         <div id="commercialAuditList" class="commercial-list"></div>
+      </article>
+
+      <article id="systemHealthPanel" class="panel company-tab-panel system-health-panel" data-company-panel="system-health">
+        <div class="system-health-head">
+          <div>
+            <p class="eyebrow">Support & diagnostics</p>
+            <h3>System Health</h3>
+            <p class="muted">Run read-only checks across authentication, company context, APIs, PostgreSQL and operational datasets.</p>
+          </div>
+          <div class="system-health-actions">
+            <button id="runDiagnosticsBtn" class="primary" type="button">Run diagnostics</button>
+            <button id="downloadDiagnosticsBtn" class="secondary" type="button" disabled>Download report</button>
+          </div>
+        </div>
+
+        <section class="diagnostic-overall">
+          <div id="diagnosticOverallIcon" class="diagnostic-overall-icon pending">…</div>
+          <div>
+            <span>Overall status</span>
+            <strong id="diagnosticOverallStatus">Not checked</strong>
+            <small id="diagnosticCheckedAt">Run diagnostics to begin.</small>
+          </div>
+        </section>
+
+        <div id="diagnosticSummaryGrid" class="diagnostic-summary-grid">
+          <article><span>Database</span><strong>Not checked</strong><small>PostgreSQL</small></article>
+          <article><span>API</span><strong>Not checked</strong><small>Application endpoints</small></article>
+          <article><span>Company</span><strong>Not checked</strong><small>Tenant context</small></article>
+          <article><span>Operational data</span><strong>Not checked</strong><small>Routes, fleet and drivers</small></article>
+        </div>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Identity</p><h4>Current user and company</h4></div></div>
+          <div id="diagnosticIdentity" class="diagnostic-kv-grid"><p class="muted">No diagnostic result yet.</p></div>
+        </section>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Data visibility</p><h4>Company-scoped records</h4></div></div>
+          <div id="diagnosticDataCounts" class="diagnostic-count-grid"></div>
+          <div id="diagnosticTenantWarning" class="diagnostic-warning" hidden></div>
+        </section>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Endpoint tests</p><h4>API checks</h4></div><span id="diagnosticApiLatency">—</span></div>
+          <div id="diagnosticApiTests" class="diagnostic-test-list"></div>
+        </section>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Infrastructure</p><h4>Runtime and database</h4></div></div>
+          <div id="diagnosticInfrastructure" class="diagnostic-kv-grid"></div>
+        </section>
+
+        <section id="diagnosticCompanyDistributionSection" class="diagnostic-section" hidden>
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Support-only</p><h4>Company record distribution</h4></div></div>
+          <p class="muted">Visible only when protected global diagnostics are enabled on the server.</p>
+          <div id="diagnosticCompanyDistribution" class="diagnostic-table-wrap"></div>
+        </section>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Suggested action</p><h4>Diagnostic findings</h4></div></div>
+          <div id="diagnosticFindings" class="diagnostic-findings"><p class="muted">No findings yet.</p></div>
+        </section>
       </article>
 
       <article id="settingsCard" class="panel admin-card wide-card">
@@ -762,7 +825,7 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="/app.js?v=stage11a"></script>
+  <script src="/app.js?v=stage12"></script>
 <script src="/verified-pins.js?v=2" defer></script>
 
   <dialog id="companyOnboardingDialog" class="onboarding-dialog">

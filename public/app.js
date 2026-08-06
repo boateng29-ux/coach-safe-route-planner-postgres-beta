@@ -26,6 +26,23 @@ const loginEmail = document.getElementById('loginEmail');
 const loginPassword = document.getElementById('loginPassword');
 const loginButton = document.getElementById('loginButton');
 const loginMessage = document.getElementById('loginMessage');
+const runDiagnosticsBtn = document.getElementById('runDiagnosticsBtn');
+const downloadDiagnosticsBtn = document.getElementById('downloadDiagnosticsBtn');
+const diagnosticOverallIcon = document.getElementById('diagnosticOverallIcon');
+const diagnosticOverallStatus = document.getElementById('diagnosticOverallStatus');
+const diagnosticCheckedAt = document.getElementById('diagnosticCheckedAt');
+const diagnosticSummaryGrid = document.getElementById('diagnosticSummaryGrid');
+const diagnosticIdentity = document.getElementById('diagnosticIdentity');
+const diagnosticDataCounts = document.getElementById('diagnosticDataCounts');
+const diagnosticTenantWarning = document.getElementById('diagnosticTenantWarning');
+const diagnosticApiTests = document.getElementById('diagnosticApiTests');
+const diagnosticApiLatency = document.getElementById('diagnosticApiLatency');
+const diagnosticInfrastructure = document.getElementById('diagnosticInfrastructure');
+const diagnosticCompanyDistributionSection = document.getElementById('diagnosticCompanyDistributionSection');
+const diagnosticCompanyDistribution = document.getElementById('diagnosticCompanyDistribution');
+const diagnosticFindings = document.getElementById('diagnosticFindings');
+let latestDiagnosticReport = null;
+
 const currentUserBadge = document.getElementById('currentUserBadge');
 const logoutButton = document.getElementById('logoutButton');
 const workspaceTabs = document.querySelectorAll('.workspace-tabs button');
@@ -47,6 +64,8 @@ const missionFleetStatus = document.getElementById('missionFleetStatus');
 const missionDriverStatus = document.getElementById('missionDriverStatus');
 let operationsMap = null;
 let operationsMapLayer = null;
+let operationsMapResizeObserver = null;
+let operationsMapResizeTimers = [];
 
 const overviewActivityFeed = document.getElementById('overviewActivityFeed');
 const vehicleKpis = document.getElementById('vehicleKpis');
@@ -232,8 +251,8 @@ function unlockApp() {
   if (selected === 'overview') {
     setTimeout(() => {
       renderMissionControl();
-      operationsMap?.invalidateSize(true);
-    }, 180);
+      scheduleOperationsMapResize({ fit: true });
+    }, 120);
   }
 }
 
@@ -358,10 +377,160 @@ async function loadCommercialAudit() {
   try { const rows=await api('/api/platform/audit?limit=50'); box.innerHTML=rows.map(r=>`<article class="commercial-row"><div><strong>${escapeHtml(r.action||'Activity')}</strong><span>${escapeHtml(r.userName||r.userEmail||'System')}</span></div><span>${r.createdAt?new Date(r.createdAt).toLocaleString():'—'}</span></article>`).join('')||'<p class="muted">No audit entries.</p>'; }
   catch(e){box.innerHTML=`<p class="muted">${escapeHtml(e.message)}</p>`;}
 }
+
+function diagnosticStatusClass(ok, warning = false) {
+  if (!ok) return 'fail';
+  return warning ? 'warning' : 'pass';
+}
+
+function diagnosticValue(value, fallback = '—') {
+  return value === undefined || value === null || value === ''
+    ? fallback
+    : String(value);
+}
+
+function renderDiagnosticReport(report) {
+  latestDiagnosticReport = report;
+  if (downloadDiagnosticsBtn) downloadDiagnosticsBtn.disabled = false;
+
+  const checks = report.checks || {};
+  const failed = Object.values(checks).filter((item) => item && item.ok === false);
+  const warnings = (report.findings || []).filter((item) => item.level === 'warning');
+  const overall = failed.length ? 'fail' : warnings.length ? 'warning' : 'pass';
+
+  if (diagnosticOverallIcon) {
+    diagnosticOverallIcon.className = `diagnostic-overall-icon ${overall}`;
+    diagnosticOverallIcon.textContent = overall === 'pass' ? '✓' : overall === 'warning' ? '!' : '×';
+  }
+  if (diagnosticOverallStatus) {
+    diagnosticOverallStatus.textContent = overall === 'pass' ? 'Healthy' : overall === 'warning' ? 'Attention required' : 'Checks failed';
+  }
+  if (diagnosticCheckedAt) {
+    diagnosticCheckedAt.textContent = `Checked ${new Date(report.generatedAt || Date.now()).toLocaleString()}`;
+  }
+
+  const cards = [
+    ['Database', checks.database, `${diagnosticValue(report.performance?.databaseMs)} ms`],
+    ['API', checks.api, `${diagnosticValue(report.performance?.totalMs)} ms total`],
+    ['Company', checks.company, report.company?.name || 'Unknown'],
+    ['Operational data', checks.operationalData, `${Number(report.counts?.routes || 0)} routes visible`]
+  ];
+  if (diagnosticSummaryGrid) {
+    diagnosticSummaryGrid.innerHTML = cards.map(([title, check, detail]) => `
+      <article class="${diagnosticStatusClass(check?.ok, check?.warning)}">
+        <span>${escapeHtml(title)}</span>
+        <strong>${check?.ok ? (check.warning ? 'Warning' : 'Pass') : 'Fail'}</strong>
+        <small>${escapeHtml(detail)}</small>
+      </article>`).join('');
+  }
+
+  if (diagnosticIdentity) {
+    diagnosticIdentity.innerHTML = `
+      <div><span>User</span><strong>${escapeHtml(report.user?.name || report.user?.email || 'Unknown')}</strong></div>
+      <div><span>Email</span><strong>${escapeHtml(report.user?.email || '—')}</strong></div>
+      <div><span>Role</span><strong>${escapeHtml(report.user?.role || '—')}</strong></div>
+      <div><span>User company ID</span><strong class="technical-value">${escapeHtml(report.user?.companyId || '—')}</strong></div>
+      <div><span>Company</span><strong>${escapeHtml(report.company?.name || 'Unknown')}</strong></div>
+      <div><span>Workspace</span><strong>${escapeHtml(report.company?.slug || '—')}</strong></div>
+      <div><span>Company ID</span><strong class="technical-value">${escapeHtml(report.company?.id || '—')}</strong></div>
+      <div><span>Plan / status</span><strong>${escapeHtml(`${report.company?.plan || '—'} / ${report.company?.status || '—'}`)}</strong></div>`;
+  }
+
+  const countEntries = [
+    ['Routes', report.counts?.routes], ['Vehicles', report.counts?.vehicles],
+    ['Drivers', report.counts?.drivers], ['Road reports', report.counts?.reports],
+    ['Journey events', report.counts?.journeyEvents], ['Users', report.counts?.users]
+  ];
+  if (diagnosticDataCounts) {
+    diagnosticDataCounts.innerHTML = countEntries.map(([label,value]) => `
+      <article><span>${escapeHtml(label)}</span><strong>${Number(value || 0)}</strong></article>`).join('');
+  }
+
+  if (diagnosticTenantWarning) {
+    const mismatch = report.tenantMismatch;
+    diagnosticTenantWarning.hidden = !mismatch?.suspected;
+    diagnosticTenantWarning.innerHTML = mismatch?.suspected
+      ? `<strong>Possible company mismatch detected</strong><span>${escapeHtml(mismatch.message || '')}</span>`
+      : '';
+  }
+
+  if (diagnosticApiTests) {
+    diagnosticApiTests.innerHTML = (report.apiTests || []).map((test) => `
+      <article class="diagnostic-test ${test.ok ? 'pass' : 'fail'}">
+        <span>${test.ok ? '✓' : '×'}</span>
+        <div><strong>${escapeHtml(test.name)}</strong><small>${escapeHtml(test.detail || '')}</small></div>
+        <time>${Number(test.ms || 0)} ms</time>
+      </article>`).join('');
+  }
+  if (diagnosticApiLatency) diagnosticApiLatency.textContent = `${Number(report.performance?.totalMs || 0)} ms total`;
+
+  if (diagnosticInfrastructure) {
+    diagnosticInfrastructure.innerHTML = `
+      <div><span>Database</span><strong>${escapeHtml(report.infrastructure?.database || 'Unknown')}</strong></div>
+      <div><span>Routing provider</span><strong>${escapeHtml(report.infrastructure?.routingProvider || 'Unknown')}</strong></div>
+      <div><span>Node.js</span><strong>${escapeHtml(report.infrastructure?.nodeVersion || '—')}</strong></div>
+      <div><span>Environment</span><strong>${escapeHtml(report.infrastructure?.environment || '—')}</strong></div>
+      <div><span>Server uptime</span><strong>${escapeHtml(report.infrastructure?.uptime || '—')}</strong></div>
+      <div><span>Memory used</span><strong>${escapeHtml(report.infrastructure?.memoryUsed || '—')}</strong></div>`;
+  }
+
+  const distribution = report.companyDistribution || [];
+  if (diagnosticCompanyDistributionSection) diagnosticCompanyDistributionSection.hidden = !distribution.length;
+  if (diagnosticCompanyDistribution && distribution.length) {
+    diagnosticCompanyDistribution.innerHTML = `<table><thead><tr><th>Company</th><th>ID</th><th>Users</th><th>Routes</th><th>Vehicles</th><th>Drivers</th><th>Reports</th></tr></thead><tbody>${distribution.map((row) => `
+      <tr class="${row.id === report.company?.id ? 'current-company' : ''}"><td>${escapeHtml(row.name || 'Unnamed')}</td><td class="technical-value">${escapeHtml(row.id || '')}</td><td>${Number(row.users||0)}</td><td>${Number(row.routes||0)}</td><td>${Number(row.vehicles||0)}</td><td>${Number(row.drivers||0)}</td><td>${Number(row.reports||0)}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  if (diagnosticFindings) {
+    const findings = report.findings || [];
+    diagnosticFindings.innerHTML = findings.length ? findings.map((item) => `
+      <article class="${escapeHtml(item.level || 'info')}"><span></span><div><strong>${escapeHtml(item.title || 'Finding')}</strong><small>${escapeHtml(item.detail || '')}</small>${item.suggestion ? `<em>${escapeHtml(item.suggestion)}</em>` : ''}</div></article>`).join('') : '<article class="pass"><span></span><div><strong>No problems detected</strong><small>All available diagnostic checks passed.</small></div></article>';
+  }
+}
+
+async function runSystemDiagnostics() {
+  if (!runDiagnosticsBtn) return;
+  runDiagnosticsBtn.disabled = true;
+  runDiagnosticsBtn.textContent = 'Running…';
+  const started = performance.now();
+  try {
+    const serverReport = await api('/api/platform/diagnostics');
+    serverReport.client = {
+      userAgent: navigator.userAgent,
+      online: navigator.onLine,
+      location: window.location.origin,
+      viewport: `${window.innerWidth}x${window.innerHeight}`
+    };
+    serverReport.performance = serverReport.performance || {};
+    serverReport.performance.clientRoundTripMs = Math.round(performance.now() - started);
+    renderDiagnosticReport(serverReport);
+    showToast('Diagnostics completed.', 'success');
+  } catch (error) {
+    const fallbackTests = [];
+    for (const [name,path] of [['Health','/api/health'],['Vehicles','/api/vehicles'],['Drivers','/api/drivers'],['Routes','/api/routes'],['Reports','/api/reports']]) {
+      const t=performance.now();
+      try { const value=await api(path); fallbackTests.push({name,path,ok:true,ms:Math.round(performance.now()-t),detail:Array.isArray(value)?`${value.length} records`:'Responded'}); }
+      catch(e){ fallbackTests.push({name,path,ok:false,ms:Math.round(performance.now()-t),detail:e.message}); }
+    }
+    renderDiagnosticReport({generatedAt:new Date().toISOString(),user:currentUser||{},company:currentCompany||{},counts:{routes:approvedRoutes.length,vehicles:vehicles.length,drivers:drivers.length,reports:reports.length,journeyEvents:latestJourneyEvents.length},checks:{database:{ok:false},api:{ok:fallbackTests.some(t=>t.ok),warning:true},company:{ok:!!currentUser?.companyId},operationalData:{ok:true,warning:!approvedRoutes.length}},apiTests:fallbackTests,performance:{totalMs:Math.round(performance.now()-started)},infrastructure:{database:'Server diagnostic endpoint unavailable',routingProvider:'See Health test',nodeVersion:'Server unavailable',environment:'Browser fallback',uptime:'—',memoryUsed:'—'},findings:[{level:'warning',title:'Server diagnostics endpoint unavailable',detail:error.message,suggestion:'Run the Stage 1.2 server installer and redeploy.'}]});
+    showToast('Fallback diagnostics completed.', 'warning');
+  } finally { runDiagnosticsBtn.disabled=false; runDiagnosticsBtn.textContent='Run diagnostics'; }
+}
+
+function downloadDiagnosticReport() {
+  if (!latestDiagnosticReport) return;
+  const safeReport = JSON.parse(JSON.stringify(latestDiagnosticReport));
+  if (safeReport.user) delete safeReport.user.token;
+  const blob = new Blob([JSON.stringify(safeReport,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download=`coach-safe-diagnostics-${new Date().toISOString().replace(/[:.]/g,'-')}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
 function showCompanyTab(name) {
   document.querySelectorAll('[data-company-tab]').forEach(n=>n.classList.toggle('active',n.dataset.companyTab===name));
   document.querySelectorAll('[data-company-panel]').forEach(n=>n.classList.toggle('active',n.dataset.companyPanel===name));
-  if(name==='users')loadCommercialUsers(); if(name==='audit')loadCommercialAudit();
+  if(name==='users')loadCommercialUsers(); if(name==='audit')loadCommercialAudit(); if(name==='system-health' && !latestDiagnosticReport)runSystemDiagnostics();
 }
 function setCommercialOnboardStep(step) {
   commercialOnboardStep=Math.max(1,Math.min(4,Number(step)||1));
@@ -833,6 +1002,62 @@ function routePointsForMission(route = {}) {
   }).filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
 }
 
+function scheduleOperationsMapResize({ fit = false } = {}) {
+  if (!operationsMap || !operationsMapElement) return;
+
+  operationsMapResizeTimers.forEach((timer) => clearTimeout(timer));
+  operationsMapResizeTimers = [];
+
+  [0, 80, 220, 480, 900].forEach((delay, index) => {
+    const timer = setTimeout(() => {
+      if (!operationsMap || !operationsMapElement?.offsetParent) return;
+
+      operationsMap.invalidateSize({
+        pan: false,
+        animate: false
+      });
+
+      if (fit && index === 4 && missionMapBounds.length) {
+        operationsMap.fitBounds(missionMapBounds, {
+          padding: [35, 35],
+          maxZoom: 13,
+          animate: false
+        });
+      }
+    }, delay);
+
+    operationsMapResizeTimers.push(timer);
+  });
+}
+
+function observeOperationsMapSize() {
+  if (!operationsMapElement || operationsMapResizeObserver) return;
+
+  if ('ResizeObserver' in window) {
+    operationsMapResizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+
+      const width = entry.contentRect?.width || 0;
+      const height = entry.contentRect?.height || 0;
+
+      if (width > 100 && height > 100) {
+        scheduleOperationsMapResize();
+      }
+    });
+
+    operationsMapResizeObserver.observe(operationsMapElement);
+  }
+
+  window.addEventListener('resize', () => {
+    scheduleOperationsMapResize();
+  }, { passive: true });
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) scheduleOperationsMapResize({ fit: true });
+  });
+}
+
 function initialiseOperationsMap() {
   if (!operationsMapElement || operationsMap) return;
   operationsMap = L.map(operationsMapElement, {
@@ -849,6 +1074,8 @@ function initialiseOperationsMap() {
   ).addTo(operationsMap);
 
   operationsMapLayer = L.layerGroup().addTo(operationsMap);
+  observeOperationsMapSize();
+  scheduleOperationsMapResize();
 }
 
 function renderOperationsMap() {
@@ -924,7 +1151,7 @@ function renderOperationsMap() {
     operationsMap.setView([54.4, -3.2], 6);
   }
 
-  setTimeout(() => operationsMap?.invalidateSize(), 100);
+  scheduleOperationsMapResize({ fit: bounds.length > 0 });
 }
 
 function renderMissionKpis() {
@@ -2158,6 +2385,9 @@ document.getElementById('newCompanyUserForm')?.addEventListener('submit',async(e
 dispatchStatusFilter?.addEventListener('change',renderMissionDispatch);
 refreshMissionControlBtn?.addEventListener('click',async()=>{refreshMissionControlBtn.disabled=true;refreshMissionControlBtn.textContent='Refreshing…';try{await loadPrivateData();showToast('Mission Control refreshed.','success')}catch(e){showToast(e.message||'Could not refresh Mission Control.','error')}finally{refreshMissionControlBtn.disabled=false;refreshMissionControlBtn.textContent='Refresh'}});
 document.addEventListener('click',event=>{const b=event.target.closest('[data-map-layer]');if(b){const l=b.dataset.mapLayer;missionMapLayers[l]=!missionMapLayers[l];b.classList.toggle('active',missionMapLayers[l]);renderOperationsMap();return}const f=event.target.closest('[data-map-fit]');if(f&&operationsMap){if(missionMapBounds.length)operationsMap.fitBounds(missionMapBounds,{padding:[35,35],maxZoom:13});else operationsMap.setView([54.4,-3.2],6)}});
+runDiagnosticsBtn?.addEventListener('click', runSystemDiagnostics);
+downloadDiagnosticsBtn?.addEventListener('click', downloadDiagnosticReport);
+
 async function boot() {
   enableRouteActions(false);
   loadOperatorPreferences();
