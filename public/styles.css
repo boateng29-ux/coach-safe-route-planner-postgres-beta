@@ -2440,3 +2440,36 @@ body:not(.active-view-planner) #verifiedPinsPanel{
 
 /* Coach Safe Stage 1.2 — System Health */
 .system-health-panel{grid-column:1/-1}.system-health-head,.diagnostic-section-title{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}.system-health-actions{display:flex;gap:.5rem}.diagnostic-overall{display:flex;align-items:center;gap:.8rem;margin:1rem 0;padding:1rem;border:1px solid var(--line);border-radius:.85rem;background:rgba(255,255,255,.025)}.diagnostic-overall-icon{width:3rem;height:3rem;display:grid;place-items:center;border-radius:50%;font-size:1.25rem;font-weight:950;background:#273442;color:#bac6d2}.diagnostic-overall-icon.pass{background:rgba(87,217,141,.13);color:#57d98d}.diagnostic-overall-icon.warning{background:rgba(255,196,93,.13);color:#ffc45d}.diagnostic-overall-icon.fail{background:rgba(255,112,124,.13);color:#ff707c}.diagnostic-overall span,.diagnostic-overall strong,.diagnostic-overall small{display:block}.diagnostic-overall span,.diagnostic-overall small{color:var(--muted);font-size:.65rem}.diagnostic-overall strong{font-size:1.05rem;margin:.1rem 0}.diagnostic-summary-grid,.diagnostic-count-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem}.diagnostic-summary-grid article,.diagnostic-count-grid article{padding:.75rem;border:1px solid var(--line);border-radius:.75rem;background:rgba(255,255,255,.025)}.diagnostic-summary-grid span,.diagnostic-summary-grid strong,.diagnostic-summary-grid small,.diagnostic-count-grid span,.diagnostic-count-grid strong{display:block}.diagnostic-summary-grid span,.diagnostic-summary-grid small,.diagnostic-count-grid span{color:var(--muted);font-size:.62rem}.diagnostic-summary-grid strong,.diagnostic-count-grid strong{margin:.16rem 0;color:var(--gold-2);font-size:1rem}.diagnostic-summary-grid article.pass{border-color:rgba(87,217,141,.25)}.diagnostic-summary-grid article.warning{border-color:rgba(255,196,93,.3)}.diagnostic-summary-grid article.fail{border-color:rgba(255,112,124,.35)}.diagnostic-section{margin-top:1rem;padding-top:1rem;border-top:1px solid rgba(255,255,255,.07)}.diagnostic-section-title h4{margin:.1rem 0 .6rem}.diagnostic-kv-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem}.diagnostic-kv-grid>div{padding:.65rem;border:1px solid rgba(255,255,255,.06);border-radius:.68rem;background:rgba(255,255,255,.02)}.diagnostic-kv-grid span,.diagnostic-kv-grid strong{display:block}.diagnostic-kv-grid span{color:var(--muted);font-size:.58rem}.diagnostic-kv-grid strong{margin-top:.15rem;font-size:.68rem;overflow-wrap:anywhere}.technical-value{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.58rem!important}.diagnostic-warning{margin-top:.7rem;padding:.75rem;border:1px solid rgba(255,196,93,.35);border-radius:.7rem;background:rgba(255,196,93,.06)}.diagnostic-warning strong,.diagnostic-warning span{display:block}.diagnostic-warning span{margin-top:.15rem;color:var(--muted);font-size:.65rem}.diagnostic-test-list,.diagnostic-findings{display:grid;gap:.5rem}.diagnostic-test{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.65rem;border:1px solid rgba(255,255,255,.06);border-radius:.7rem}.diagnostic-test>span{width:1.5rem;height:1.5rem;display:grid;place-items:center;border-radius:50%;background:rgba(87,217,141,.1);color:#57d98d}.diagnostic-test.fail>span{background:rgba(255,112,124,.1);color:#ff707c}.diagnostic-test strong,.diagnostic-test small{display:block}.diagnostic-test small,.diagnostic-test time{color:var(--muted);font-size:.6rem}.diagnostic-table-wrap{overflow:auto}.diagnostic-table-wrap table{width:100%;border-collapse:collapse;font-size:.64rem}.diagnostic-table-wrap th,.diagnostic-table-wrap td{padding:.55rem;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}.diagnostic-table-wrap tr.current-company{background:rgba(237,197,83,.06)}.diagnostic-findings article{display:grid;grid-template-columns:auto 1fr;gap:.6rem;padding:.7rem;border:1px solid rgba(255,255,255,.06);border-radius:.7rem}.diagnostic-findings article>span{width:.65rem;height:.65rem;margin-top:.2rem;border-radius:50%;background:#6aa7ff}.diagnostic-findings article.warning>span{background:#ffc45d}.diagnostic-findings article.error>span{background:#ff707c}.diagnostic-findings article.pass>span{background:#57d98d}.diagnostic-findings strong,.diagnostic-findings small,.diagnostic-findings em{display:block}.diagnostic-findings small{color:var(--muted);font-size:.64rem;margin-top:.12rem}.diagnostic-findings em{color:var(--gold-2);font-style:normal;font-size:.61rem;margin-top:.3rem}@media(max-width:900px){.diagnostic-summary-grid,.diagnostic-count-grid,.diagnostic-kv-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:600px){.system-health-head{flex-direction:column}.system-health-actions{width:100%;flex-direction:column}.diagnostic-summary-grid,.diagnostic-count-grid,.diagnostic-kv-grid{grid-template-columns:1fr}}
+
+.diagnostic-error-detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}
+.diagnostic-error-detail>div{padding:.78rem;border:1px solid rgba(255,112,124,.22);border-radius:.72rem;background:rgba(255,112,124,.045)}
+.diagnostic-error-detail .wide{grid-column:1/-1}
+.diagnostic-error-detail span,.diagnostic-error-detail strong,.diagnostic-error-detail code,.diagnostic-error-detail em{display:block}
+.diagnostic-error-detail span{color:var(--muted);font-size:.6rem}
+.diagnostic-error-detail strong{margin-top:.18rem;color:#fff;font-size:.72rem}
+.diagnostic-error-detail code{margin-top:.3rem;padding:.55rem;overflow-wrap:anywhere;border-radius:.5rem;background:#080d13;color:#ffb6bc;font-size:.65rem;white-space:pre-wrap}
+.diagnostic-error-detail em{margin-top:.25rem;color:#ffd37b;font-size:.67rem;font-style:normal}
+@media(max-width:760px){.diagnostic-error-detail{grid-template-columns:1fr}.diagnostic-error-detail .wide{grid-column:auto}}
+
+
+/* ============================================================
+   COACH SAFE STAGE 1.3 — OPERATIONAL DATA VISIBILITY
+   ============================================================ */
+
+.operational-load-error{
+  min-height:9rem;
+}
+
+.error-state{
+  border-color:rgba(255,112,124,.32);
+  background:rgba(255,112,124,.04);
+}
+
+.error-state .empty-state-icon{
+  background:rgba(255,112,124,.12);
+  color:#ff9199;
+}
+
+.saved-routes .mission-empty-state{
+  min-height:8rem;
+}

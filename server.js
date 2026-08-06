@@ -2248,7 +2248,13 @@ function isPublicApiRequest(req) {
   return false;
 }
 
-async function ensureCompany() {
+async function ensureCompany(req = null) {
+  const authenticatedCompanyId =
+    String(req?.user?.companyId || '').trim();
+
+  if (authenticatedCompanyId) {
+    return authenticatedCompanyId;
+  }
   if (cachedCompanyId) return cachedCompanyId;
   const db = dbRequired();
   let result = await db.query('SELECT * FROM "Company" ORDER BY "createdAt" ASC LIMIT 1');
@@ -2804,7 +2810,7 @@ app.use('/api', (req, res, next) => {
 
 app.get('/api/settings', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query('SELECT * FROM "Company" WHERE id=$1', [companyId]);
     res.json(companyToSettings(result.rows[0] || {}));
   } catch (error) {
@@ -2814,7 +2820,7 @@ app.get('/api/settings', async (req, res) => {
 
 app.patch('/api/settings', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const settings = cleanSettings(req.body || {});
     const result = await dbRequired().query(
       'UPDATE "Company" SET name=$1, "brandingName"=$2, "logoUrl"=$3, "updatedAt"=NOW() WHERE id=$4 RETURNING *',
@@ -2828,7 +2834,7 @@ app.patch('/api/settings', async (req, res) => {
 
 app.get('/api/journey-events', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const limit = Math.min(250, Math.max(1, Number(req.query.limit || 100)));
     const result = await dbRequired().query(
       `SELECT e.*, d.name AS "driverName" FROM "JourneyEvent" e
@@ -2846,7 +2852,7 @@ app.get('/api/journey-events', async (req, res) => {
 
 app.get('/api/routes/:id/events', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const routeExists = await dbRequired().query('SELECT id FROM "Route" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     if (!routeExists.rows.length) return res.status(404).json({ error: 'Route not found.' });
     const result = await dbRequired().query(
@@ -2865,7 +2871,7 @@ app.get('/api/routes/:id/events', async (req, res) => {
 
 app.get('/api/routes/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
     if (!result.rows.length) return res.status(404).json({ error: 'Route not found.' });
     res.json(apiRoute(result.rows[0]));
@@ -2876,7 +2882,7 @@ app.get('/api/routes/:id', async (req, res) => {
 
 app.patch('/api/routes/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     let statusSql = '';
     const values = [];
     let i = 1;
@@ -3174,42 +3180,196 @@ app.get('/api/geocode-candidates', async (req, res) => {
 /* VERIFIED_PINS_GEOCODE_CANDIDATES_V1_END */
 
 
-/* COACH_SAFE_SYSTEM_HEALTH_STAGE12 */
-app.get('/api/platform/diagnostics', requireAuth, async (req, res) => {
+
+/* COACH_SAFE_SYSTEM_HEALTH_STAGE121 */
+function diagnosticError(error, stage, operation, suggestion='') {
+  return {
+    stage,
+    code:String(error?.code||error?.statusCode||''),
+    message:String(error?.message||'Unknown diagnostic error.'),
+    operation,
+    suggestion
+  };
+}
+
+async function diagnosticsTableExists(client, tableName) {
+  const result=await client.query(
+    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1) AS present",
+    [tableName]
+  );
+  return Boolean(result.rows[0]?.present);
+}
+
+async function diagnosticsColumns(client, tableName) {
+  const result=await client.query(
+    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1",
+    [tableName]
+  );
+  return new Set(result.rows.map(row=>row.column_name));
+}
+
+async function diagnosticsCount(client, tableName, companyId, tests) {
+  const started=Date.now();
+  try {
+    if (!(await diagnosticsTableExists(client,tableName))) {
+      tests.push({name:tableName,ok:false,warning:true,ms:Date.now()-started,detail:'Optional table is not present'});
+      return 0;
+    }
+    const columns=await diagnosticsColumns(client,tableName);
+    if (!columns.has('companyId')) {
+      tests.push({name:tableName,ok:false,warning:true,ms:Date.now()-started,detail:'Table has no companyId column'});
+      return 0;
+    }
+    const result=await client.query(
+      'SELECT COUNT(*)::int AS count FROM "'+tableName+'" WHERE "companyId"=$1',
+      [companyId]
+    );
+    const count=Number(result.rows[0]?.count||0);
+    tests.push({name:tableName,ok:true,ms:Date.now()-started,detail:count+' visible records'});
+    return count;
+  } catch(error) {
+    tests.push({name:tableName,ok:false,ms:Date.now()-started,detail:error.message,code:error.code||''});
+    return 0;
+  }
+}
+
+app.get('/api/platform/diagnostics', requireAuth, async (req,res)=>{
   const started=Date.now();
   const companyId=String(req.user?.companyId||'');
   const findings=[];
   const apiTests=[];
-  let client;
+  const errors=[];
+  const counts={users:0,routes:0,vehicles:0,drivers:0,reports:0,journeyEvents:0};
+  let client=null;
+  let company=null;
+  let databaseMs=null;
+  let databaseConnected=false;
+  let companyDistribution=[];
+
   try {
     const dbStarted=Date.now();
-    client=await dbRequired().connect();
-    await client.query('SELECT 1');
-    const databaseMs=Date.now()-dbStarted;
-    const companyResult=await client.query('SELECT id,slug,name,"brandingName",status,plan,"onboardingComplete" FROM "Company" WHERE id=$1',[companyId]);
-    const company=companyResult.rows[0]||null;
-    const countSql={users:'SELECT COUNT(*)::int AS count FROM "User" WHERE "companyId"=$1',routes:'SELECT COUNT(*)::int AS count FROM "Route" WHERE "companyId"=$1',vehicles:'SELECT COUNT(*)::int AS count FROM "Vehicle" WHERE "companyId"=$1',drivers:'SELECT COUNT(*)::int AS count FROM "Driver" WHERE "companyId"=$1',reports:'SELECT COUNT(*)::int AS count FROM "UnsuitableRoadReport" WHERE "companyId"=$1',journeyEvents:'SELECT COUNT(*)::int AS count FROM "JourneyEvent" WHERE "companyId"=$1'};
-    const counts={};
-    for(const [name,sql] of Object.entries(countSql)){const t=Date.now();try{const result=await client.query(sql,[companyId]);counts[name]=Number(result.rows[0]?.count||0);apiTests.push({name,ok:true,ms:Date.now()-t,detail:counts[name]+' visible records'});}catch(error){counts[name]=0;apiTests.push({name,ok:false,ms:Date.now()-t,detail:error.message});}}
-    let companyDistribution=[];
-    const globalEnabled=String(process.env.ALLOW_PLATFORM_DIAGNOSTICS_GLOBAL||'').toLowerCase()==='true';
-    if(globalEnabled && ['super_admin','admin','owner'].includes(String(req.user?.role||'').toLowerCase())){
-      const distribution=await client.query('SELECT c.id,c.name,COUNT(DISTINCT u.id)::int AS users,COUNT(DISTINCT r.id)::int AS routes,COUNT(DISTINCT v.id)::int AS vehicles,COUNT(DISTINCT d.id)::int AS drivers,COUNT(DISTINCT rep.id)::int AS reports FROM "Company" c LEFT JOIN "User" u ON u."companyId"=c.id LEFT JOIN "Route" r ON r."companyId"=c.id LEFT JOIN "Vehicle" v ON v."companyId"=c.id LEFT JOIN "Driver" d ON d."companyId"=c.id LEFT JOIN "UnsuitableRoadReport" rep ON rep."companyId"=c.id GROUP BY c.id,c.name ORDER BY c.name');
-      companyDistribution=distribution.rows;
+    try {
+      client=await dbRequired().connect();
+      await client.query('SELECT 1 AS healthy');
+      databaseConnected=true;
+      databaseMs=Date.now()-dbStarted;
+    } catch(error) {
+      errors.push(diagnosticError(error,'Database connection','dbRequired().connect(); SELECT 1','Verify DATABASE_URL and Render database connectivity.'));
     }
-    const otherData=companyDistribution.filter(row=>row.id!==companyId && (Number(row.routes)||Number(row.vehicles)||Number(row.drivers)||Number(row.reports)));
-    const tenantMismatch={suspected:!counts.routes && otherData.some(row=>Number(row.routes)>0),message:''};
-    if(tenantMismatch.suspected){tenantMismatch.message='The signed-in company has zero routes, while another company contains route records. Existing data may be assigned to a different company ID.';findings.push({level:'warning',title:'Possible company/tenant mismatch',detail:tenantMismatch.message,suggestion:'Do not move data yet. Review the company distribution and reconnect the correct admin/company after taking a database backup.'});}
-    if(!company) findings.push({level:'error',title:'Company record not found',detail:'The authenticated token contains a company ID that does not exist.',suggestion:'Sign out and verify the user/company relationship.'});
-    if(!counts.routes) findings.push({level:'info',title:'No routes visible to this company',detail:'The current company-scoped route query returned zero records.',suggestion:'Create a route or enable protected global diagnostics to check for a tenant mismatch.'});
-    if(!counts.vehicles) findings.push({level:'info',title:'No vehicles visible',detail:'The current company has no vehicle records.',suggestion:'Confirm the Fleet workspace or company assignment.'});
-    if(!counts.drivers) findings.push({level:'info',title:'No drivers visible',detail:'The current company has no driver records.',suggestion:'Confirm the Drivers workspace or company assignment.'});
+
+    if (!client || !databaseConnected) {
+      return res.status(200).json({
+        generatedAt:new Date().toISOString(),
+        diagnosticVersion:'1.2.1',
+        user:{id:req.user?.id,name:req.user?.name,email:req.user?.email,role:req.user?.role,companyId},
+        company:null,counts,
+        checks:{
+          database:{ok:false,detail:errors[0]?.message||'Connection failed'},
+          api:{ok:false,detail:'Database checks skipped'},
+          company:{ok:false,detail:'Company lookup skipped'},
+          operationalData:{ok:false,warning:true,detail:'Database unavailable'}
+        },
+        apiTests,performance:{databaseMs,totalMs:Date.now()-started},
+        infrastructure:{database:'Connection failed',routingProvider:HAS_LIVE_TOMTOM_KEY?'TomTom connected':'Unavailable',nodeVersion:process.version,environment:process.env.NODE_ENV||'development',uptime:Math.round(process.uptime())+' seconds',memoryUsed:Math.round(process.memoryUsage().rss/1024/1024)+' MB'},
+        endpointError:errors[0],
+        findings:[{level:'error',title:'Database connection failed',detail:errors[0]?.message||'Connection failed',suggestion:'Check DATABASE_URL. Do not alter operational records.'}]
+      });
+    }
+
+    try {
+      if (!(await diagnosticsTableExists(client,'Company'))) throw Object.assign(new Error('Company table does not exist.'),{code:'TABLE_MISSING'});
+      const columns=await diagnosticsColumns(client,'Company');
+      const wanted=['id','slug','name','legalName','brandingName','logoUrl','countryCode','timezone','status','plan','onboardingComplete'].filter(c=>columns.has(c));
+      const select=wanted.length?wanted.map(c=>'"'+c+'"').join(','):'*';
+      const result=await client.query('SELECT '+select+' FROM "Company" WHERE id=$1 LIMIT 1',[companyId]);
+      company=result.rows[0]||null;
+      if(company){
+        company.slug=company.slug||'';
+        company.name=company.name||company.brandingName||'Unnamed company';
+        company.status=String(company.status||'legacy').toLowerCase();
+        company.plan=String(company.plan||'legacy').toLowerCase();
+      }
+    } catch(error) {
+      errors.push(diagnosticError(error,'Company lookup','SELECT available Company columns WHERE id=$1','Compare User.companyId with Company.id before changing records.'));
+    }
+
+    const tables={users:'User',routes:'Route',vehicles:'Vehicle',drivers:'Driver',reports:'UnsuitableRoadReport',journeyEvents:'JourneyEvent'};
+    for(const [key,table] of Object.entries(tables)) counts[key]=await diagnosticsCount(client,table,companyId,apiTests);
+
+    const globalEnabled=String(process.env.ALLOW_PLATFORM_DIAGNOSTICS_GLOBAL||'').toLowerCase()==='true';
+    const trusted=['super_admin','admin','owner'].includes(String(req.user?.role||'').toLowerCase());
+    if(globalEnabled&&trusted&&await diagnosticsTableExists(client,'Company')){
+      try {
+        const companies=await client.query('SELECT id,name FROM "Company" ORDER BY name');
+        for(const c of companies.rows){
+          const row={id:c.id,name:c.name||'Unnamed company',users:0,routes:0,vehicles:0,drivers:0,reports:0};
+          for(const [key,table] of Object.entries({users:'User',routes:'Route',vehicles:'Vehicle',drivers:'Driver',reports:'UnsuitableRoadReport'})){
+            if(!(await diagnosticsTableExists(client,table)))continue;
+            const cols=await diagnosticsColumns(client,table);
+            if(!cols.has('companyId'))continue;
+            const r=await client.query('SELECT COUNT(*)::int AS count FROM "'+table+'" WHERE "companyId"=$1',[c.id]);
+            row[key]=Number(r.rows[0]?.count||0);
+          }
+          companyDistribution.push(row);
+        }
+      } catch(error) {
+        errors.push(diagnosticError(error,'Company distribution','Read-only counts grouped by company','This support-only check is optional.'));
+      }
+    }
+
+    const otherData=companyDistribution.filter(row=>row.id!==companyId&&(Number(row.routes)||Number(row.vehicles)||Number(row.drivers)||Number(row.reports)));
+    const tenantMismatch={suspected:!counts.routes&&otherData.some(row=>Number(row.routes)>0),message:''};
+    if(tenantMismatch.suspected){
+      tenantMismatch.message='The signed-in company has zero routes while another company contains routes.';
+      findings.push({level:'warning',title:'Possible company mismatch',detail:tenantMismatch.message,suggestion:'Back up the database and verify Company IDs before reconnecting records.'});
+    }
+    if(!company) findings.push({level:'error',title:'Company record unresolved',detail:'The token contains companyId '+companyId+', but no Company row matched.',suggestion:'Check User.companyId against Company.id. Existing operational records remain present.'});
+    if(counts.routes) findings.push({level:'info',title:'Route data is present',detail:counts.routes+' routes are visible to the authenticated company ID.',suggestion:'If Saved Routes is empty, inspect the frontend status filter or route API rendering.'});
+
+    const requiredFailure=apiTests.some(t=>!t.ok&&!t.warning);
     const memory=process.memoryUsage();
-    res.json({generatedAt:new Date().toISOString(),user:{id:req.user?.id,name:req.user?.name,email:req.user?.email,role:req.user?.role,companyId},company,counts,tenantMismatch,checks:{database:{ok:true},api:{ok:apiTests.every(t=>t.ok),warning:apiTests.some(t=>!t.ok)},company:{ok:!!company},operationalData:{ok:true,warning:!counts.routes&&!counts.vehicles&&!counts.drivers}},apiTests,performance:{databaseMs,totalMs:Date.now()-started},infrastructure:{database:'Connected',routingProvider:HAS_LIVE_TOMTOM_KEY?'TomTom connected':'Routing provider status unavailable',nodeVersion:process.version,environment:process.env.NODE_ENV||'development',uptime:Math.round(process.uptime())+' seconds',memoryUsed:Math.round(memory.rss/1024/1024)+' MB'},companyDistribution,findings});
-  } catch(error){res.status(500).json({error:error.message||'Diagnostics failed.'});}
-  finally{client?.release?.();}
+    const primaryError=errors.find(e=>e.stage==='Company lookup'||e.stage==='Database connection')||errors[0]||null;
+
+    return res.status(200).json({
+      generatedAt:new Date().toISOString(),
+      diagnosticVersion:'1.2.1',
+      user:{id:req.user?.id,name:req.user?.name,email:req.user?.email,role:req.user?.role,companyId},
+      company,counts,tenantMismatch,
+      checks:{
+        database:{ok:databaseConnected,detail:databaseConnected?databaseMs+' ms':primaryError?.message||'Failed'},
+        api:{ok:!requiredFailure,warning:apiTests.some(t=>!t.ok),detail:apiTests.filter(t=>t.ok).length+'/'+apiTests.length+' dataset checks passed'},
+        company:{ok:!!company,warning:!company,detail:company?company.name:'No Company row matched user companyId'},
+        operationalData:{ok:!!(counts.routes||counts.vehicles||counts.drivers||counts.reports),warning:!counts.routes,detail:counts.routes+' routes · '+counts.vehicles+' vehicles · '+counts.drivers+' drivers'}
+      },
+      apiTests,
+      performance:{databaseMs,totalMs:Date.now()-started},
+      infrastructure:{database:databaseConnected?'Connected':'Failed',routingProvider:HAS_LIVE_TOMTOM_KEY?'TomTom connected':'Unavailable',nodeVersion:process.version,environment:process.env.NODE_ENV||'development',uptime:Math.round(process.uptime())+' seconds',memoryUsed:Math.round(memory.rss/1024/1024)+' MB'},
+      companyDistribution,
+      endpointError:primaryError,
+      errors,
+      findings
+    });
+  } catch(error) {
+    const endpointError=diagnosticError(error,'Unhandled diagnostics error','/api/platform/diagnostics','Inspect Render logs. No write query was attempted.');
+    return res.status(200).json({
+      generatedAt:new Date().toISOString(),diagnosticVersion:'1.2.1',
+      user:{id:req.user?.id,name:req.user?.name,email:req.user?.email,role:req.user?.role,companyId},
+      company,counts,
+      checks:{
+        database:{ok:databaseConnected,detail:databaseConnected?'Connected before endpoint error':endpointError.message},
+        api:{ok:false,detail:endpointError.message},
+        company:{ok:!!company,detail:company?.name||'Unresolved'},
+        operationalData:{ok:!!counts.routes,warning:true,detail:counts.routes+' routes counted'}
+      },
+      apiTests,performance:{databaseMs,totalMs:Date.now()-started},
+      infrastructure:{database:databaseConnected?'Connected':'Unknown',routingProvider:HAS_LIVE_TOMTOM_KEY?'TomTom connected':'Unknown',nodeVersion:process.version,environment:process.env.NODE_ENV||'development',uptime:Math.round(process.uptime())+' seconds',memoryUsed:Math.round(process.memoryUsage().rss/1024/1024)+' MB'},
+      endpointError,errors:[endpointError],
+      findings:[{level:'error',title:'Diagnostics endpoint error',detail:endpointError.message,suggestion:endpointError.suggestion}]
+    });
+  } finally { client?.release?.(); }
 });
-/* COACH_SAFE_SYSTEM_HEALTH_STAGE12_END */
+/* COACH_SAFE_SYSTEM_HEALTH_STAGE121_END */
+
 
 app.get('/api/health', async (req, res) => {
   let databaseReady = false;
@@ -3303,7 +3463,7 @@ app.post('/api/route', async (req, res) => {
 
 app.get('/api/vehicles', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query('SELECT * FROM "Vehicle" WHERE "companyId"=$1 ORDER BY "createdAt" DESC', [companyId]);
     res.json(result.rows.map(apiVehicle));
   } catch (error) {
@@ -3313,7 +3473,7 @@ app.get('/api/vehicles', async (req, res) => {
 
 app.post('/api/vehicles', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const vehicle = cleanSavedVehicle(req.body || {});
     const result = await dbRequired().query(
       'INSERT INTO "Vehicle" (id,"companyId",registration,name,"coachType","heightM","widthM","lengthM","weightKg","createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW()) RETURNING *',
@@ -3327,7 +3487,7 @@ app.post('/api/vehicles', async (req, res) => {
 
 app.delete('/api/vehicles/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query('DELETE FROM "Vehicle" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     res.json({ ok: true, deleted: result.rowCount });
   } catch (error) {
@@ -3337,7 +3497,7 @@ app.delete('/api/vehicles/:id', async (req, res) => {
 
 app.get('/api/drivers', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query('SELECT * FROM "Driver" WHERE "companyId"=$1 ORDER BY "createdAt" DESC', [companyId]);
     res.json(result.rows.map(apiDriver));
   } catch (error) {
@@ -3347,7 +3507,7 @@ app.get('/api/drivers', async (req, res) => {
 
 app.post('/api/drivers', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const driver = cleanDriver(req.body || {});
     const result = await dbRequired().query(
       'INSERT INTO "Driver" (id,"companyId",name,phone,email,"createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,NOW(),NOW()) RETURNING *',
@@ -3361,7 +3521,7 @@ app.post('/api/drivers', async (req, res) => {
 
 app.delete('/api/drivers/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query('DELETE FROM "Driver" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     res.json({ ok: true, deleted: result.rowCount });
   } catch (error) {
@@ -3371,7 +3531,7 @@ app.delete('/api/drivers/:id', async (req, res) => {
 
 app.get('/api/routes', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r."companyId"=$1 ORDER BY r."createdAt" DESC`, [companyId]);
     res.json(result.rows.map(apiRoute));
   } catch (error) {
@@ -3381,7 +3541,7 @@ app.get('/api/routes', async (req, res) => {
 
 app.post('/api/routes', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const route = stripRouteForStorage(req.body.route || {});
     if (!route.origin || !route.destination || !route.points?.length) return res.status(400).json({ error: 'A calculated route is required before approval.' });
     const driverId = String(req.body.driverId || '') || null;
@@ -3405,7 +3565,7 @@ app.post('/api/routes', async (req, res) => {
 
 app.delete('/api/routes/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query('DELETE FROM "Route" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     res.json({ ok: true, deleted: result.rowCount });
   } catch (error) {
@@ -3415,7 +3575,7 @@ app.delete('/api/routes/:id', async (req, res) => {
 
 app.get('/api/routes/:id/report', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
     if (!result.rows.length) return res.status(404).send('Route report not found.');
     res.type('html').send(buildRouteReportHtml(apiRoute(result.rows[0])));
@@ -3426,7 +3586,7 @@ app.get('/api/routes/:id/report', async (req, res) => {
 
 app.get('/api/reports', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query('SELECT * FROM "UnsuitableRoadReport" WHERE "companyId"=$1 ORDER BY "createdAt" DESC', [companyId]);
     res.json(result.rows.map(apiReport));
   } catch (error) {
@@ -3436,7 +3596,7 @@ app.get('/api/reports', async (req, res) => {
 
 app.post('/api/reports', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const report = {
       id: id('issue'),
       routeId: String(req.body.routeId || '') || null,
@@ -3456,7 +3616,7 @@ app.post('/api/reports', async (req, res) => {
 
 app.delete('/api/reports/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany();
+    const companyId = await ensureCompany(req);
     const result = await dbRequired().query('DELETE FROM "UnsuitableRoadReport" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     res.json({ ok: true, deleted: result.rowCount });
   } catch (error) {
@@ -3478,3 +3638,8 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('No live TOMTOM_API_KEY found. Mock routes are disabled. Add .env and restart before calculating routes.');
   }
 });
+
+/* COACH_SAFE_OPERATIONAL_VISIBILITY_STAGE13
+   Protected operational handlers patched: 19
+   ensureCompany() calls changed to ensureCompany(req): 19
+*/

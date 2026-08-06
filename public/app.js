@@ -41,6 +41,8 @@ const diagnosticInfrastructure = document.getElementById('diagnosticInfrastructu
 const diagnosticCompanyDistributionSection = document.getElementById('diagnosticCompanyDistributionSection');
 const diagnosticCompanyDistribution = document.getElementById('diagnosticCompanyDistribution');
 const diagnosticFindings = document.getElementById('diagnosticFindings');
+const diagnosticErrorSection = document.getElementById('diagnosticErrorSection');
+const diagnosticErrorDetail = document.getElementById('diagnosticErrorDetail');
 let latestDiagnosticReport = null;
 
 const currentUserBadge = document.getElementById('currentUserBadge');
@@ -194,6 +196,62 @@ function escapeHtml(value = '') {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+
+function apiList(payload, preferredKeys = []) {
+  if (Array.isArray(payload)) return payload;
+
+  if (payload && typeof payload === 'object') {
+    for (const key of preferredKeys) {
+      if (Array.isArray(payload[key])) return payload[key];
+    }
+
+    for (const value of Object.values(payload)) {
+      if (Array.isArray(value)) return value;
+    }
+  }
+
+  return [];
+}
+
+function normaliseOperationalRecord(record = {}) {
+  const route = record.route && typeof record.route === 'object'
+    ? record.route
+    : {};
+
+  return {
+    ...record,
+    id: record.id || record.routeId || '',
+    origin:
+      record.origin ||
+      record.startAddress ||
+      route.origin?.label ||
+      route.origin ||
+      'Start',
+    destination:
+      record.destination ||
+      record.destinationAddress ||
+      route.destination?.label ||
+      route.destination ||
+      'Destination',
+    status: String(record.status || 'approved').toLowerCase(),
+    route
+  };
+}
+
+function operationalLoadError(target, label, error) {
+  if (!target) return;
+
+  target.className = `${target.className || ''} operational-load-error`.trim();
+  target.innerHTML = `
+    <div class="mission-empty-state error-state">
+      <span class="empty-state-icon">!</span>
+      <strong>${escapeHtml(label)} could not load</strong>
+      <small>${escapeHtml(error?.message || 'The server returned an unexpected response.')}</small>
+      <button type="button" data-retry-operational-load>Retry data load</button>
+    </div>
+  `;
 }
 
 async function api(path, options = {}) {
@@ -410,10 +468,10 @@ function renderDiagnosticReport(report) {
   }
 
   const cards = [
-    ['Database', checks.database, `${diagnosticValue(report.performance?.databaseMs)} ms`],
-    ['API', checks.api, `${diagnosticValue(report.performance?.totalMs)} ms total`],
-    ['Company', checks.company, report.company?.name || 'Unknown'],
-    ['Operational data', checks.operationalData, `${Number(report.counts?.routes || 0)} routes visible`]
+    ['Database', checks.database, checks.database?.detail || `${diagnosticValue(report.performance?.databaseMs)} ms`],
+    ['API', checks.api, checks.api?.detail || `${diagnosticValue(report.performance?.totalMs)} ms total`],
+    ['Company', checks.company, checks.company?.detail || report.company?.name || 'Unknown'],
+    ['Operational data', checks.operationalData, checks.operationalData?.detail || `${Number(report.counts?.routes || 0)} routes visible`]
   ];
   if (diagnosticSummaryGrid) {
     diagnosticSummaryGrid.innerHTML = cards.map(([title, check, detail]) => `
@@ -481,6 +539,28 @@ function renderDiagnosticReport(report) {
       <tr class="${row.id === report.company?.id ? 'current-company' : ''}"><td>${escapeHtml(row.name || 'Unnamed')}</td><td class="technical-value">${escapeHtml(row.id || '')}</td><td>${Number(row.users||0)}</td><td>${Number(row.routes||0)}</td><td>${Number(row.vehicles||0)}</td><td>${Number(row.drivers||0)}</td><td>${Number(row.reports||0)}</td></tr>`).join('')}</tbody></table>`;
   }
 
+  const endpointError =
+    report.endpointError ||
+    report.serverError ||
+    report.diagnosticsError ||
+    null;
+
+  if (diagnosticErrorSection) {
+    diagnosticErrorSection.hidden = !endpointError;
+  }
+
+  if (diagnosticErrorDetail) {
+    diagnosticErrorDetail.innerHTML = endpointError
+      ? `
+        <div><span>Stage</span><strong>${escapeHtml(endpointError.stage || 'Unknown')}</strong></div>
+        <div><span>PostgreSQL code</span><strong class="technical-value">${escapeHtml(endpointError.code || '—')}</strong></div>
+        <div class="wide"><span>Message</span><strong>${escapeHtml(endpointError.message || 'No error message supplied.')}</strong></div>
+        <div class="wide"><span>Operation</span><code>${escapeHtml(endpointError.operation || endpointError.query || '—')}</code></div>
+        <div class="wide"><span>Suggested repair</span><em>${escapeHtml(endpointError.suggestion || 'Review the database schema and server logs before changing data.')}</em></div>
+      `
+      : '';
+  }
+
   if (diagnosticFindings) {
     const findings = report.findings || [];
     diagnosticFindings.innerHTML = findings.length ? findings.map((item) => `
@@ -512,7 +592,29 @@ async function runSystemDiagnostics() {
       try { const value=await api(path); fallbackTests.push({name,path,ok:true,ms:Math.round(performance.now()-t),detail:Array.isArray(value)?`${value.length} records`:'Responded'}); }
       catch(e){ fallbackTests.push({name,path,ok:false,ms:Math.round(performance.now()-t),detail:e.message}); }
     }
-    renderDiagnosticReport({generatedAt:new Date().toISOString(),user:currentUser||{},company:currentCompany||{},counts:{routes:approvedRoutes.length,vehicles:vehicles.length,drivers:drivers.length,reports:reports.length,journeyEvents:latestJourneyEvents.length},checks:{database:{ok:false},api:{ok:fallbackTests.some(t=>t.ok),warning:true},company:{ok:!!currentUser?.companyId},operationalData:{ok:true,warning:!approvedRoutes.length}},apiTests:fallbackTests,performance:{totalMs:Math.round(performance.now()-started)},infrastructure:{database:'Server diagnostic endpoint unavailable',routingProvider:'See Health test',nodeVersion:'Server unavailable',environment:'Browser fallback',uptime:'—',memoryUsed:'—'},findings:[{level:'warning',title:'Server diagnostics endpoint unavailable',detail:error.message,suggestion:'Run the Stage 1.2 server installer and redeploy.'}]});
+    renderDiagnosticReport({
+      generatedAt:new Date().toISOString(),
+      user:currentUser||{},
+      company:currentCompany||{},
+      counts:{routes:approvedRoutes.length,vehicles:vehicles.length,drivers:drivers.length,reports:reports.length,journeyEvents:latestJourneyEvents.length},
+      checks:{
+        database:{ok:false,detail:'Server endpoint failed before returning database result'},
+        api:{ok:fallbackTests.some(t=>t.ok),warning:true,detail:'Browser fallback checks'},
+        company:{ok:!!currentUser?.companyId,warning:!currentCompany?.id,detail:currentCompany?.name||'Token has company ID; Company API unresolved'},
+        operationalData:{ok:true,warning:!approvedRoutes.length,detail:`${approvedRoutes.length} routes visible in browser`}
+      },
+      apiTests:fallbackTests,
+      performance:{totalMs:Math.round(performance.now()-started)},
+      infrastructure:{database:'Server diagnostic endpoint unavailable',routingProvider:'See Health test',nodeVersion:'Server unavailable',environment:'Browser fallback',uptime:'—',memoryUsed:'—'},
+      endpointError:{
+        stage:'GET /api/platform/diagnostics',
+        code:error.code||error.status||'HTTP/API',
+        message:error.message||'Diagnostics endpoint failed.',
+        operation:'/api/platform/diagnostics',
+        suggestion:'Install Stage 1.2.1 and redeploy. Operational data is still visible, so do not move or delete records.'
+      },
+      findings:[{level:'warning',title:'Server diagnostics endpoint unavailable',detail:error.message,suggestion:'Install the Stage 1.2.1 server diagnostics and redeploy.'}]
+    });
     showToast('Fallback diagnostics completed.', 'warning');
   } finally { runDiagnosticsBtn.disabled=false; runDiagnosticsBtn.textContent='Run diagnostics'; }
 }
@@ -560,13 +662,29 @@ async function loadPrivateData() {
     await loadCommercialCompany();
   }
 
-  await loadVehicles();
-  await loadDrivers();
-  await loadApprovedRoutes();
-  await loadReports();
+  const results = await Promise.allSettled([
+    loadVehicles(),
+    loadDrivers(),
+    loadApprovedRoutes(),
+    loadReports()
+  ]);
+
+  const rejected = results.filter((result) => result.status === 'rejected');
 
   // Final render after every operational dataset has settled.
   renderDashboardStats();
+
+  if (rejected.length) {
+    console.error(
+      'One or more operational datasets failed:',
+      rejected.map((result) => result.reason)
+    );
+  }
+
+  return {
+    ok: rejected.length === 0,
+    failures: rejected.length
+  };
 }
 
 async function handleLogin() {
@@ -781,7 +899,10 @@ function buildRouteTrackingMap(routes = [], events = []) {
 
 async function refreshJourneyTracking() {
   try {
-    latestJourneyEvents = await api('/api/journey-events?limit=250');
+    latestJourneyEvents = apiList(
+      await api('/api/journey-events?limit=250'),
+      ['events', 'journeyEvents', 'data']
+    );
   } catch (error) {
     latestJourneyEvents = [];
     console.warn('Could not load journey tracking', error);
@@ -1647,7 +1768,18 @@ async function loadPresets() {
 }
 
 async function loadVehicles() {
-  vehicles = await api('/api/vehicles');
+  try {
+    const payload = await api('/api/vehicles');
+    vehicles = apiList(payload, ['vehicles', 'data']).map((vehicle) => ({
+      ...vehicle,
+      id: vehicle.id || vehicle.vehicleId || ''
+    }));
+  } catch (error) {
+    vehicles = [];
+    operationalLoadError(vehicleList, 'Vehicles', error);
+    throw error;
+  }
+
   vehicleSelect.innerHTML = '<option value="">Use manual coach profile</option>' + vehicles.map((v) => `
     <option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}${v.registration ? ` ÔÇó ${escapeHtml(v.registration)}` : ''}</option>
   `).join('');
@@ -1672,7 +1804,18 @@ async function loadVehicles() {
 }
 
 async function loadDrivers() {
-  drivers = await api('/api/drivers');
+  try {
+    const payload = await api('/api/drivers');
+    drivers = apiList(payload, ['drivers', 'data']).map((driver) => ({
+      ...driver,
+      id: driver.id || driver.driverId || ''
+    }));
+  } catch (error) {
+    drivers = [];
+    operationalLoadError(driverList, 'Drivers', error);
+    throw error;
+  }
+
   driverSelect.innerHTML = '<option value="">No driver assigned</option>' + drivers.map((d) => `
     <option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}${d.base ? ` ÔÇó ${escapeHtml(d.base)}` : ''}</option>
   `).join('');
@@ -1697,12 +1840,29 @@ async function loadDrivers() {
 }
 
 async function loadApprovedRoutes() {
-  approvedRoutes = await api('/api/routes');
+  try {
+    const payload = await api('/api/routes');
+    approvedRoutes = apiList(
+      payload,
+      ['routes', 'approvedRoutes', 'records', 'data']
+    ).map(normaliseOperationalRecord);
+  } catch (error) {
+    approvedRoutes = [];
+    operationalLoadError(approvedRoutesEl, 'Saved routes', error);
+    throw error;
+  }
+
   await refreshJourneyTracking();
   renderDashboardStats();
+
   if (!approvedRoutes.length) {
     approvedRoutesEl.className = 'saved-routes empty';
-    approvedRoutesEl.textContent = 'No approved routes yet.';
+    approvedRoutesEl.innerHTML = missionEmptyState(
+      'No routes visible for this company',
+      'The database is connected, but the routes API returned no company-scoped records. Run System Health if routes are expected.',
+      'Run diagnostics',
+      'settings'
+    );
     return;
   }
   approvedRoutesEl.className = 'saved-routes';
@@ -1758,7 +1918,18 @@ async function loadApprovedRoutes() {
 }
 
 async function loadReports() {
-  reports = await api('/api/reports');
+  try {
+    const payload = await api('/api/reports');
+    reports = apiList(
+      payload,
+      ['reports', 'roadReports', 'records', 'data']
+    );
+  } catch (error) {
+    reports = [];
+    operationalLoadError(reportList, 'Road reports', error);
+    throw error;
+  }
+
   renderDashboardStats();
   if (!reports.length) {
     reportList.className = 'database-list empty';
@@ -2387,6 +2558,22 @@ refreshMissionControlBtn?.addEventListener('click',async()=>{refreshMissionContr
 document.addEventListener('click',event=>{const b=event.target.closest('[data-map-layer]');if(b){const l=b.dataset.mapLayer;missionMapLayers[l]=!missionMapLayers[l];b.classList.toggle('active',missionMapLayers[l]);renderOperationsMap();return}const f=event.target.closest('[data-map-fit]');if(f&&operationsMap){if(missionMapBounds.length)operationsMap.fitBounds(missionMapBounds,{padding:[35,35],maxZoom:13});else operationsMap.setView([54.4,-3.2],6)}});
 runDiagnosticsBtn?.addEventListener('click', runSystemDiagnostics);
 downloadDiagnosticsBtn?.addEventListener('click', downloadDiagnosticReport);
+
+
+document.addEventListener('click', async (event) => {
+  const retry = event.target.closest('[data-retry-operational-load]');
+  if (!retry) return;
+
+  retry.disabled = true;
+  retry.textContent = 'Retrying…';
+
+  try {
+    await loadPrivateData();
+    showToast('Operational data reloaded.', 'success');
+  } catch (error) {
+    showToast(error.message || 'Data reload failed.', 'error');
+  }
+});
 
 async function boot() {
   enableRouteActions(false);
