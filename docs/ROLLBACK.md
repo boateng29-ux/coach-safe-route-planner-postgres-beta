@@ -1,0 +1,1 @@
+Restore the backed-up public/index.html, public/app.js and public/styles.css. No database changes are included.
