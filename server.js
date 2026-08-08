@@ -1054,6 +1054,14 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Driver Route - ${escapeHtml(title)}</title>
+<!-- COACH_SAFE_PWA_V1 -->
+<link rel="manifest" href="/manifest.webmanifest" />
+<meta name="theme-color" content="#101418" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Coach Safe" />
+<link rel="apple-touch-icon" href="/icons/coach-safe-192.png" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="/driver-controls.css?v=clean7" />
 <style>
@@ -1069,57 +1077,6 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
   .driver-location-dot{transform:rotate(var(--driver-heading,0deg));transform-origin:50% 50%}
   .route-direction-arrow{display:grid;place-items:center;width:1.8rem;height:1.8rem;border-radius:999px;background:rgba(5,5,5,.86);color:var(--gold2);border:2px solid rgba(241,213,138,.85);font-weight:950;font-size:1rem;box-shadow:0 4px 14px rgba(0,0,0,.45)}
   .route-direction-arrow span{display:block;line-height:1;transform:rotate(var(--route-arrow-bearing,0deg))}
-/* COACH_SAFE_NAV_V3_START */
-  /* Navigation V3 keeps Leaflet tiles north-up and stable. */
-  .satnav-fixed-driver-arrow{
-    position:absolute;
-    left:50%;
-    bottom:28%;
-    z-index:930;
-    width:2.35rem;
-    height:2.35rem;
-    translate:-50% 50%;
-    pointer-events:none;
-    filter:drop-shadow(0 10px 18px rgba(0,0,0,.65));
-    display:none;
-    transform:rotate(var(--driver-arrow-bearing,0deg));
-    transform-origin:50% 50%;
-    transition:transform .25s linear;
-  }
-  .satnav-fixed-driver-arrow::before{
-    content:'';
-    position:absolute;
-    left:50%;
-    top:0;
-    translate:-50% 0;
-    border-left:.72rem solid transparent;
-    border-right:.72rem solid transparent;
-    border-bottom:1.75rem solid #2979ff;
-  }
-  .satnav-fixed-driver-arrow::after{
-    content:'';
-    position:absolute;
-    left:50%;
-    top:.54rem;
-    translate:-50% 0;
-    width:.82rem;
-    height:.82rem;
-    border-radius:999px;
-    background:#2979ff;
-    border:3px solid #fff;
-    box-shadow:0 0 0 8px rgba(41,121,255,.22);
-  }
-  .driver-map-shell.satnav-active .satnav-fixed-driver-arrow{display:block;}
-  .driver-map-shell.satnav-active .driver-location-marker{opacity:.12!important;}
-  @media(max-width:520px){
-    .satnav-fixed-driver-arrow{bottom:30%;width:2.05rem;height:2.05rem}
-    .satnav-fixed-driver-arrow::before{
-      border-left:.62rem solid transparent;
-      border-right:.62rem solid transparent;
-      border-bottom:1.52rem solid #2979ff
-    }
-  }
-  /* COACH_SAFE_NAV_V3_CSS_END */
 
 /* COACH_SAFE_PRO_DRIVER_V21_START */
 .map-nav-overlay.pro-nav-v21{
@@ -1168,79 +1125,12 @@ function buildDriverRouteHtml(record, settings = DEFAULT_DB.settings) {
 }
 /* COACH_SAFE_PRO_DRIVER_V21_END */
 
-/* COACH_SAFE_DRIVER_V211_START */
-.driver-map-shell.large-map-mode{
-  position:fixed!important;
-  inset:0!important;
-  width:100vw!important;
-  height:100dvh!important;
-  z-index:99999!important;
-  background:#0d1117!important;
-}
-.driver-map-shell.large-map-mode #driverMap{
-  width:100%!important;
-  height:100%!important;
-  min-height:100dvh!important;
-}
-.driver-map-shell.large-map-mode .driver-map-controls{
-  display:flex!important;
-  visibility:visible!important;
-  opacity:1!important;
-  pointer-events:auto!important;
-  z-index:100500!important;
-}
-.driver-map-shell.large-map-mode .map-nav-overlay{
-  display:block!important;
-  visibility:visible!important;
-  opacity:1!important;
-  z-index:100400!important;
-}
-body.coach-map-fullscreen{
-  overflow:hidden!important;
-  overscroll-behavior:none!important;
-}
-@media(max-width:520px){
-  .driver-map-shell.large-map-mode .driver-map-controls{
-    left:.45rem!important;
-    right:.45rem!important;
-    bottom:max(.45rem,env(safe-area-inset-bottom))!important;
-  }
-}
-/* COACH_SAFE_DRIVER_V211_END */
 
 
 
   @media(min-width:920px){.content{grid-template-columns:1fr 1fr}.wide{grid-column:1/-1}#driverMap{height:64vh}}
   @media print{@page{size:A4 portrait;margin:10mm}header{position:static}.buttons,.form-grid,.toast{display:none!important}.content{display:block}.card{break-inside:avoid;margin-bottom:1rem}#driverMap{height:6in}}
 
-  /* COACH_SAFE_NAV_V301_START */
-  /* GPS camera focus has priority over whole-route fitBounds. */
-  /* COACH_SAFE_NAV_V3_FINAL_CSS_START */
-  .driver-map-controls{display:none!important;}
-  #driverMap,
-  #driverMap.route-up,
-  #driverMap.satnav-follow,
-  #driverMap .leaflet-map-pane,
-  #driverMap .leaflet-tile-pane,
-  #driverMap .leaflet-overlay-pane,
-  #driverMap .leaflet-marker-pane,
-  #driverMap .leaflet-shadow-pane,
-  #driverMap .leaflet-tooltip-pane,
-  #driverMap .leaflet-popup-pane{
-    rotate:0deg!important;
-    scale:1!important;
-  }
-  /* COACH_SAFE_NAV_V3_FINAL_CSS_END */
-
-  /* COACH_SAFE_SINGLE_NAV_CONTROLLER */
-  .driver-map-controls{display:none!important}
-  #driverMap,#driverMap.route-up,#driverMap.satnav-follow,
-  #driverMap .leaflet-map-pane,#driverMap .leaflet-tile-pane,
-  #driverMap .leaflet-overlay-pane,#driverMap .leaflet-marker-pane,
-  #driverMap .leaflet-shadow-pane,#driverMap .leaflet-tooltip-pane{
-    rotate:0deg!important;
-    scale:1!important;
-  }
 
 
   /* COACH_SAFE_MOBILE_FULLSCREEN_FIX */
@@ -1540,6 +1430,50 @@ body.coach-map-fullscreen{
     background:#101418!important;
   }
 
+
+  /* COACH_SAFE_NAV_ENGINE_V2_CSS */
+  #driverMap{overflow:hidden!important;background:#101418!important}
+  #driverMap .leaflet-tile-pane,
+  #driverMap .leaflet-overlay-pane,
+  #driverMap .leaflet-shadow-pane{
+    transform-origin:50% 72%!important;
+    rotate:var(--coach-nav-rotation,0deg)!important;
+    scale:var(--coach-nav-scale,1)!important;
+    transition:rotate .72s cubic-bezier(.2,.7,.2,1),scale .35s ease!important;
+    will-change:rotate,scale;
+  }
+  .driver-map-shell.navigation-live #driverMap .leaflet-tile-pane,
+  .driver-map-shell.navigation-live #driverMap .leaflet-overlay-pane,
+  .driver-map-shell.navigation-live #driverMap .leaflet-shadow-pane{
+    --coach-nav-scale:1.42;
+  }
+  .driver-map-shell.navigation-live .driver-location-marker{display:none!important}
+  .coach-fixed-vehicle-v2{
+    display:none;position:absolute;left:50%;top:72%;translate:-50% -50%;z-index:100200;
+    width:3.2rem;height:3.2rem;border-radius:999px;pointer-events:none;
+    filter:drop-shadow(0 9px 15px rgba(0,0,0,.6));
+  }
+  .driver-map-shell.navigation-live .coach-fixed-vehicle-v2{display:grid;place-items:center}
+  .coach-fixed-vehicle-v2::before{
+    content:'';position:absolute;width:2.55rem;height:2.55rem;border-radius:999px;
+    background:rgba(37,116,255,.24);border:1px solid rgba(90,160,255,.55)
+  }
+  .coach-fixed-vehicle-v2::after{
+    content:'▲';position:relative;z-index:2;color:#fff;font-size:1.7rem;line-height:1;
+    text-shadow:0 0 0 #fff,0 2px 10px rgba(0,0,0,.85)
+  }
+  .driver-map-shell.navigation-live .leaflet-control-zoom{opacity:.25}
+  .driver-map-shell.navigation-live .coach-map-pin,
+  .driver-map-shell.navigation-live .route-direction-arrow,
+  .driver-map-shell.navigation-live .coach-stop-pin,
+  .driver-map-shell.navigation-live .stop-label{display:none!important}
+  @media(max-width:700px){
+    .coach-fixed-vehicle-v2{top:73%;width:2.9rem;height:2.9rem}
+    .coach-fixed-vehicle-v2::before{width:2.3rem;height:2.3rem}
+    .coach-fixed-vehicle-v2::after{font-size:1.5rem}
+    .driver-map-shell.large-map-mode .map-nav-overlay{max-height:28dvh!important}
+  }
+
 </style>
 
 </head>
@@ -1579,7 +1513,7 @@ body.coach-map-fullscreen{
   <section class="card wide"><h2>Report unsuitable road</h2><form id="driverReportForm" class="form-grid"><label>Road / location<input name="roadName" id="roadNameInput" placeholder="Example: narrow hotel approach" /></label><label>Issue type<select name="issueType"><option>Unsuitable road</option><option>Low bridge concern</option><option>Narrow road</option><option>Weight restriction concern</option><option>Tight turn</option><option>Coach access restriction</option><option>Other</option></select></label><label>Notes<textarea name="notes" rows="3" placeholder="Explain what happened or what needs checking."></textarea></label><input type="hidden" name="lat" id="reportLat"><input type="hidden" name="lng" id="reportLng"><input type="hidden" name="accuracyM" id="reportAccuracy"><div class="buttons"><button type="button" id="useGpsReportBtn" class="secondary">Use my GPS location</button><button type="submit">Submit road report</button></div></form></section>
   <section class="card wide"><p class="muted"><strong>Important:</strong> Voice guidance is an aid only. Follow road signs, temporary restrictions, coach access signs and operator instructions at all times.</p></section>
 </main>
-<script>window.ROUTE_EXPORT_DATA=${jsonForHtml(route)};window.DRIVER_ROUTE_ID=${JSON.stringify(record.id)};</script>
+<script>window.ROUTE_EXPORT_DATA=${jsonForHtml(route)};window.DRIVER_ROUTE_ID=${JSON.stringify(record.id)};window.COACH_SAFE_NAV_VERSION='2.0-clean';</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 function toast(message,type){let t=document.createElement('div');t.className='toast '+(type||'');t.textContent=message;document.body.appendChild(t);setTimeout(()=>t.remove(),4200)}
@@ -1587,190 +1521,46 @@ let data=window.ROUTE_EXPORT_DATA;
 function quickLatLon(p){if(!p)return null;const lat=Array.isArray(p)?Number(p[0]):Number(p.lat??p.latitude);const lon=Array.isArray(p)?Number(p[1]):Number(p.lon??p.lng??p.longitude);return Number.isFinite(lat)&&Number.isFinite(lon)?[lat,lon]:null}
 function quickDistanceMeters(a,b){a=quickLatLon(a);b=quickLatLon(b);if(!a||!b)return Infinity;const R=6371000,toRad=(d)=>d*Math.PI/180;const dLat=toRad(b[0]-a[0]),dLon=toRad(b[1]-a[1]),lat1=toRad(a[0]),lat2=toRad(b[0]);const h=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;return 2*R*Math.atan2(Math.sqrt(h),Math.sqrt(1-h))}
 function maybeCorrectRoutePointDirection(points,origin,destination){const pts=Array.isArray(points)?points.slice():[];if(pts.length<2)return pts;const first=pts[0],last=pts[pts.length-1];const forward=quickDistanceMeters(origin,first)+quickDistanceMeters(destination,last);const reversed=quickDistanceMeters(origin,last)+quickDistanceMeters(destination,first);if(reversed+75<forward){console.warn('Route geometry looked reversed against origin/destination. Display order corrected.');return pts.reverse()}return pts}
-let routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);const map=L.map('driverMap',{zoomControl:true,preferCanvas:true,touchZoom:'center',scrollWheelZoom:true,doubleClickZoom:true,boxZoom:true,keyboard:true,dragging:true,tap:true}).setView([51.5072,-0.1276],10);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap contributors',detectRetina:true,crossOrigin:true}).addTo(map);const pin=(c)=>L.divIcon({className:'',html:'<span class="coach-map-pin '+c+'"></span>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-12]});const stopPin=(i)=>L.divIcon({className:'',html:'<span class="coach-stop-pin">'+(i+1)+'</span>',iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-14]});let routeLine=null,startMarker=null,endMarker=null,waypointLayer=null,directionLayer=null,routeUpEnabled=false,currentMapBearing=null,previousGpsPoint=null,lastCameraUpdateAt=0;function removeDirectionToggleArtifacts(){try{document.querySelectorAll('#routeUpBtn,#mapRouteUpBtn,#directionToggleBtn,.route-up-toggle').forEach((el)=>el.remove());document.querySelectorAll('.driver-map-controls button').forEach((btn)=>{const t=(btn.textContent||'').trim().toLowerCase();if(t==='north up'||t==='direction up'||t.includes('north-up')||t.includes('direction-up'))btn.remove();});}catch(e){}}function fit(){
-  if(navigationMode!=='overview'||window.__COACH_SAFE_FOLLOW_ACTIVE__)return;
-  if(routeLine){
-    map.invalidateSize(true);
-    map.fitBounds(routeLine.getBounds(),{padding:[34,34],maxZoom:15});
-  }
-}function bearingBetween(a,b){if(!a||!b)return null;const toRad=(d)=>d*Math.PI/180,toDeg=(r)=>r*180/Math.PI;const lat1=toRad(a[0]),lat2=toRad(b[0]),dLng=toRad(b[1]-a[1]);const y=Math.sin(dLng)*Math.cos(lat2);const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);return (toDeg(Math.atan2(y,x))+360)%360}function routeInitialBearing(){if(!routePoints||routePoints.length<2)return null;const start=routePoints[0];for(let i=1;i<routePoints.length;i++){if(haversine(start,routePoints[i])>25)return bearingBetween(start,routePoints[i])}return bearingBetween(routePoints[0],routePoints[1])}
-function directionArrowIcon(bearing){return L.divIcon({className:'',html:'<span class="route-direction-arrow"><span style="--route-arrow-bearing:'+Number(bearing||0).toFixed(1)+'deg">➤</span></span>',iconSize:[30,30],iconAnchor:[15,15]})}
-function addRouteDirectionArrows(){try{if(directionLayer)map.removeLayer(directionLayer);directionLayer=L.layerGroup().addTo(map);if(!Array.isArray(routePoints)||routePoints.length<4)return;const fractions=[.18,.36,.54,.72,.9];fractions.forEach((fraction)=>{let index=Math.max(0,Math.min(routePoints.length-2,Math.floor((routePoints.length-1)*fraction)));let next=index+1;while(next<routePoints.length-1&&haversine(routePoints[index],routePoints[next])<18)next++;const bearing=bearingBetween(routePoints[index],routePoints[next]||routePoints[index+1]);if(Number.isFinite(bearing))L.marker(routePoints[index],{icon:directionArrowIcon(bearing),interactive:false,keyboard:false,zIndexOffset:450}).addTo(directionLayer)})}catch(e){console.warn('Could not add route direction arrows',e)}}
-function setMapBearing(deg){
-    if(!Number.isFinite(deg))return;
-    currentMapBearing=((deg%360)+360)%360;
-    const shell=document.getElementById('driverMapShell');
-    const arrow=document.getElementById('satnavFixedDriverArrow');
-    shell?.classList.add('satnav-active');
-    if(arrow)arrow.style.setProperty('--driver-arrow-bearing',currentMapBearing.toFixed(1)+'deg');
-    removeDirectionToggleArtifacts();
-  }
-  function updateRouteUpButton(){
-    routeUpEnabled=true;
-    if(Number.isFinite(currentMapBearing))setMapBearing(currentMapBearing);
-    else setMapBearing(routeInitialBearing()||0);
-  }
-  function drawRouteOnMap(){if(routeLine)map.removeLayer(routeLine);if(startMarker)map.removeLayer(startMarker);if(endMarker)map.removeLayer(endMarker);if(waypointLayer)map.removeLayer(waypointLayer);if(directionLayer)map.removeLayer(directionLayer);routeLine=null;startMarker=null;endMarker=null;waypointLayer=null;directionLayer=null;if(routePoints.length){routeLine=L.polyline(routePoints,{weight:7,opacity:.9,className:'coach-route-line'}).addTo(map);addRouteDirectionArrows();startMarker=L.marker(routePoints[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);endMarker=L.marker(routePoints[routePoints.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);const wp=(data.waypoints||[]).filter(w=>Number.isFinite(Number(w.lat))&&Number.isFinite(Number(w.lon))).map((w,i)=>L.marker([Number(w.lat),Number(w.lon)],{icon:stopPin(i)}).bindPopup('Stop '+(i+1)+': '+(w.label||'Planned stop')).bindTooltip('Stop '+(i+1),{permanent:true,direction:'top',offset:[0,-18],className:'stop-label'}));if(wp.length)waypointLayer=L.layerGroup(wp).addTo(map);
-    [250,800,1400].forEach((d)=>setTimeout(()=>{
-    if(!window.__COACH_SAFE_FOLLOW_ACTIVE__)fit();
-  },d));
-  }}
-  drawRouteOnMap();
-  ensureSatnavArrow();removeDirectionToggleArtifacts();setInterval(removeDirectionToggleArtifacts,1500);window.addEventListener('resize',()=>{
-  setTimeout(()=>{
-    map.invalidateSize(true);
-    if(navigationMode==='live'&&currentGps){
-      forceGpsCameraFocus=true;
-      focusLiveGps({animate:false});
-    }else{
-      fit();
-    }
-  },180);
-});
-window.addEventListener('orientationchange',()=>{
-  setTimeout(()=>{
-    map.invalidateSize(true);
-    if(navigationMode==='live'&&currentGps){
-      forceGpsCameraFocus=true;
-      focusLiveGps({animate:false});
-    }else{
-      fit();
-    }
-  },350);
-})
-let navigationMode='overview';
-let forceGpsCameraFocus=true;
-window.__COACH_SAFE_FOLLOW_ACTIVE__=false;
-let watchId=null,currentGps=null,driverMarker=null,accuracyCircle=null,followDriver=false,journeyStarted=false,currentInstructionIndex=0,lastLoggedInstruction=-1,wakeLock=null,voiceEnabled=false,lastSpokenInstruction=-1,offRouteVoiceLastAt=0;
+let routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);
+const map=L.map('driverMap',{zoomControl:true,preferCanvas:true,touchZoom:'center',scrollWheelZoom:true,doubleClickZoom:true,boxZoom:true,keyboard:true,dragging:true,tap:true}).setView([51.5072,-0.1276],10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'&copy; OpenStreetMap contributors',detectRetina:true,crossOrigin:true,keepBuffer:5,updateWhenIdle:false}).addTo(map);
+const pin=(c)=>L.divIcon({className:'',html:'<span class="coach-map-pin '+c+'"></span>',iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-12]});
+const stopPin=(i)=>L.divIcon({className:'',html:'<span class="coach-stop-pin">'+(i+1)+'</span>',iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-14]});
+let routeLine=null,startMarker=null,endMarker=null,waypointLayer=null,directionLayer=null;
+let navigationMode='overview',watchId=null,currentGps=null,driverMarker=null,accuracyCircle=null,followDriver=false,journeyStarted=false,currentInstructionIndex=0,lastLoggedInstruction=-1,wakeLock=null,voiceEnabled=false,lastSpokenInstruction=-1,offRouteVoiceLastAt=0;
+let previousGpsPoint=null,lastCameraUpdateAt=0,currentMapBearing=null,stableNavBearing=null,currentSnappedPoint=null,currentGpsSpeedMps=0,currentTurnDistanceM=Infinity;
 let junctionZoomLevel=17,lastJunctionZoomLevel=17,lastFullscreenExitAt=0;
-setNavigationMode('overview');
+window.__COACH_SAFE_FOLLOW_ACTIVE__=false;
 const gpsIcon=L.divIcon({className:'driver-location-marker',html:'<span class="driver-location-dot"></span>',iconSize:[28,28],iconAnchor:[14,14]});
-// SATNAV_FOLLOW_BEHAVIOUR_V1_JS_START
-function ensureSatnavArrow(){try{const shell=document.getElementById('driverMapShell');if(!shell||document.getElementById('satnavFixedDriverArrow'))return;const arrow=document.createElement('div');arrow.id='satnavFixedDriverArrow';arrow.className='satnav-fixed-driver-arrow';arrow.setAttribute('aria-hidden','true');shell.appendChild(arrow);}catch(e){}}
-function bearingFromRouteProgress(progressM){try{if(!routePoints||routePoints.length<2)return routeInitialBearing()||0;const measures=routeMeasures&&routeMeasures.length?routeMeasures:buildRouteMeasures(routePoints);let idx=0;for(let i=1;i<measures.length;i++){if(Number(measures[i])>=Number(progressM||0)){idx=Math.max(0,i-1);break;}}const a=routePoints[idx]||routePoints[0];let b=routePoints[Math.min(routePoints.length-1,idx+1)]||routePoints[routePoints.length-1];for(let j=idx+1;j<routePoints.length;j++){if(haversine(a,routePoints[j])>12){b=routePoints[j];break;}}return bearingBetween(a,b)||routeInitialBearing()||0;}catch(e){return routeInitialBearing()||0;}}
-function smoothBearing(oldDeg,newDeg,weight=.35){if(!Number.isFinite(oldDeg))return newDeg;if(!Number.isFinite(newDeg))return oldDeg;let delta=((newDeg-oldDeg+540)%360)-180;return (oldDeg+(delta*weight)+360)%360;}
 
-function setNavigationMode(mode){
-  navigationMode=mode==='live'?'live':'overview';
-  window.__COACH_SAFE_FOLLOW_ACTIVE__=navigationMode==='live';
-  const shell=document.getElementById('driverMapShell');
-  shell?.classList.toggle('navigation-live',navigationMode==='live');
-  if(navigationMode==='live'){
-    try{if(startMarker&&map.hasLayer(startMarker))map.removeLayer(startMarker)}catch(e){}
-    try{if(endMarker&&map.hasLayer(endMarker))map.removeLayer(endMarker)}catch(e){}
-    try{if(waypointLayer&&map.hasLayer(waypointLayer))map.removeLayer(waypointLayer)}catch(e){}
-    try{if(directionLayer&&map.hasLayer(directionLayer))map.removeLayer(directionLayer)}catch(e){}
-  }
-}
-function navigationCameraCentre(point,zoom){
-  const size=map.getSize();
-  const projected=map.project(point,zoom);
-  /*
-   * Shift the map centre upward by 21% of the viewport.
-   * This places the vehicle at about 71% down the screen.
-   */
-  const centreProjected=L.point(projected.x,projected.y-(size.y*.21));
-  return map.unproject(centreProjected,zoom);
-}
-function focusLiveGps(options={}){
-  if(!currentGps)return false;
-  const point=[Number(currentGps.lat),Number(currentGps.lng)];
-  if(!point.every(Number.isFinite))return false;
-  setNavigationMode('live');
-  const zoom=Number(options.zoom||junctionZoomLevel||17.5);
-  const centre=navigationCameraCentre(point,zoom);
-  map.invalidateSize(false);
-  map.setView(centre,zoom,{animate:options.animate!==false});
-  return true;
-}
+function removeDirectionToggleArtifacts(){try{document.querySelectorAll('#routeUpBtn,#mapRouteUpBtn,#directionToggleBtn,.route-up-toggle').forEach((el)=>el.remove())}catch(e){}}
+function fit(){if(navigationMode!=='overview'||window.__COACH_SAFE_FOLLOW_ACTIVE__)return;if(routeLine){map.invalidateSize(true);map.fitBounds(routeLine.getBounds(),{padding:[34,34],maxZoom:15})}}
+function bearingBetween(a,b){if(!a||!b)return null;const toRad=(d)=>d*Math.PI/180,toDeg=(r)=>r*180/Math.PI;const lat1=toRad(a[0]),lat2=toRad(b[0]),dLng=toRad(b[1]-a[1]);const y=Math.sin(dLng)*Math.cos(lat2);const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);return (toDeg(Math.atan2(y,x))+360)%360}
+function routeInitialBearing(){if(!routePoints||routePoints.length<2)return null;const start=routePoints[0];for(let i=1;i<routePoints.length;i++){if(haversine(start,routePoints[i])>25)return bearingBetween(start,routePoints[i])}return bearingBetween(routePoints[0],routePoints[1])}
+function directionArrowIcon(bearing){return L.divIcon({className:'',html:'<span class="route-direction-arrow"><span style="--route-arrow-bearing:'+Number(bearing||0).toFixed(1)+'deg">➤</span></span>',iconSize:[30,30],iconAnchor:[15,15]})}
+function addRouteDirectionArrows(){try{if(directionLayer)map.removeLayer(directionLayer);directionLayer=L.layerGroup().addTo(map);if(!Array.isArray(routePoints)||routePoints.length<4)return;[.18,.36,.54,.72,.9].forEach((fraction)=>{let index=Math.max(0,Math.min(routePoints.length-2,Math.floor((routePoints.length-1)*fraction)));let next=index+1;while(next<routePoints.length-1&&haversine(routePoints[index],routePoints[next])<18)next++;const bearing=bearingBetween(routePoints[index],routePoints[next]||routePoints[index+1]);if(Number.isFinite(bearing))L.marker(routePoints[index],{icon:directionArrowIcon(bearing),interactive:false,keyboard:false,zIndexOffset:450}).addTo(directionLayer)})}catch(e){}}
+function drawRouteOnMap(){if(routeLine)map.removeLayer(routeLine);if(startMarker)map.removeLayer(startMarker);if(endMarker)map.removeLayer(endMarker);if(waypointLayer)map.removeLayer(waypointLayer);if(directionLayer)map.removeLayer(directionLayer);routeLine=null;startMarker=null;endMarker=null;waypointLayer=null;directionLayer=null;if(routePoints.length){routeLine=L.polyline(routePoints,{weight:7,opacity:.9,className:'coach-route-line'}).addTo(map);addRouteDirectionArrows();startMarker=L.marker(routePoints[0],{icon:pin('start')}).bindPopup('Start: '+(data.origin?.label||'Start')).addTo(map);endMarker=L.marker(routePoints[routePoints.length-1],{icon:pin('end')}).bindPopup('Destination: '+(data.destination?.label||'Destination')).addTo(map);const wp=(data.waypoints||[]).filter(w=>Number.isFinite(Number(w.lat))&&Number.isFinite(Number(w.lon))).map((w,i)=>L.marker([Number(w.lat),Number(w.lon)],{icon:stopPin(i)}).bindPopup('Stop '+(i+1)+': '+(w.label||'Planned stop')).bindTooltip('Stop '+(i+1),{permanent:true,direction:'top',offset:[0,-18],className:'stop-label'}));if(wp.length)waypointLayer=L.layerGroup(wp).addTo(map);[220,700,1300].forEach((d)=>setTimeout(()=>{if(navigationMode==='overview')fit()},d))}}
+function ensureFixedVehicle(){const shell=document.getElementById('driverMapShell');if(!shell||document.getElementById('coachFixedVehicleV2'))return;const el=document.createElement('div');el.id='coachFixedVehicleV2';el.className='coach-fixed-vehicle-v2';el.setAttribute('aria-hidden','true');shell.appendChild(el)}
+function setNavigationMode(mode){navigationMode=mode==='live'?'live':'overview';window.__COACH_SAFE_FOLLOW_ACTIVE__=navigationMode==='live';const shell=document.getElementById('driverMapShell');shell?.classList.toggle('navigation-live',navigationMode==='live');if(navigationMode==='live'){try{if(startMarker&&map.hasLayer(startMarker))map.removeLayer(startMarker)}catch(e){}try{if(endMarker&&map.hasLayer(endMarker))map.removeLayer(endMarker)}catch(e){}try{if(waypointLayer&&map.hasLayer(waypointLayer))map.removeLayer(waypointLayer)}catch(e){}try{if(directionLayer&&map.hasLayer(directionLayer))map.removeLayer(directionLayer)}catch(e){}if(accuracyCircle)accuracyCircle.setStyle?.({opacity:0,fillOpacity:0})}else{document.getElementById('driverMap')?.style.setProperty('--coach-nav-rotation','0deg');document.getElementById('driverMap')?.style.setProperty('--coach-nav-scale','1');try{if(startMarker&&!map.hasLayer(startMarker))startMarker.addTo(map)}catch(e){}try{if(endMarker&&!map.hasLayer(endMarker))endMarker.addTo(map)}catch(e){}try{if(waypointLayer&&!map.hasLayer(waypointLayer))waypointLayer.addTo(map)}catch(e){}try{if(directionLayer&&!map.hasLayer(directionLayer))directionLayer.addTo(map)}catch(e){}}}
+function angularDelta(a,b){if(!Number.isFinite(a)||!Number.isFinite(b))return 0;return ((b-a+540)%360)-180}
+function smoothBearing(oldDeg,newDeg,weight=.35){if(!Number.isFinite(oldDeg))return newDeg;if(!Number.isFinite(newDeg))return oldDeg;return (oldDeg+angularDelta(oldDeg,newDeg)*weight+360)%360}
+function nearestRouteSnap(point){if(!Array.isArray(routePoints)||routePoints.length<2||!point)return {point,progressM:0,distanceM:Infinity,bearing:routeInitialBearing()||0};const origin=point;const R=6371000,lat0=origin[0]*Math.PI/180,cos=Math.cos(lat0);const proj=(p)=>({x:(p[1]-origin[1])*Math.PI/180*cos*R,y:(p[0]-origin[0])*Math.PI/180*R});const unproj=(x,y)=>[origin[0]+(y/R)*180/Math.PI,origin[1]+(x/(R*cos))*180/Math.PI];let cumulative=0,best={distanceM:Infinity,point:routePoints[0],progressM:0,bearing:routeInitialBearing()||0};for(let i=0;i<routePoints.length-1;i++){const a=routePoints[i],b=routePoints[i+1],A=proj(a),B=proj(b),dx=B.x-A.x,dy=B.y-A.y,len2=dx*dx+dy*dy;let t=len2?((-A.x*dx+-A.y*dy)/len2):0;t=Math.max(0,Math.min(1,t));const x=A.x+t*dx,y=A.y+t*dy,d=Math.hypot(x,y),seg=haversine(a,b);if(d<best.distanceM)best={distanceM:d,point:unproj(x,y),progressM:cumulative+t*seg,bearing:bearingBetween(a,b)||best.bearing};cumulative+=seg}return best}
+function routePointAhead(progressM,aheadM){if(!routeMeasures||!routeMeasures.length)return currentSnappedPoint||routePoints[0];const target=Math.max(0,progressM+aheadM);let idx=routeMeasures.findIndex((m)=>Number(m)>=target);if(idx<0)idx=routePoints.length-1;if(idx<=0)return routePoints[0];const m0=Number(routeMeasures[idx-1]||0),m1=Number(routeMeasures[idx]||m0),ratio=m1>m0?Math.max(0,Math.min(1,(target-m0)/(m1-m0))):0;const a=routePoints[idx-1],b=routePoints[idx];return [a[0]+(b[0]-a[0])*ratio,a[1]+(b[1]-a[1])*ratio]}
+function navigationZoom(){if(currentTurnDistanceM<=55)return 19;if(currentTurnDistanceM<=160)return 18.35;if(currentGpsSpeedMps>=22)return 16.1;if(currentGpsSpeedMps>=13)return 16.65;return 17.35}
+function cameraCentreForAnchor(anchor,zoom){const size=map.getSize(),p=map.project(anchor,zoom);return map.unproject(L.point(p.x,p.y-(size.y*.22)),zoom)}
+function applyTurnBearing(desired,force=false){if(!Number.isFinite(desired))return;if(!Number.isFinite(stableNavBearing))stableNavBearing=desired;const delta=Math.abs(angularDelta(stableNavBearing,desired));const turning=currentTurnDistanceM<=180||currentGpsSpeedMps>1.5;if(force||delta>=18&&turning){stableNavBearing=smoothBearing(stableNavBearing,desired,force?1:.58);const rotation=-stableNavBearing;document.getElementById('driverMap')?.style.setProperty('--coach-nav-rotation',rotation.toFixed(1)+'deg')}}
+function renderNavigationCamera(force=false){if(navigationMode!=='live'||!currentGps)return;const raw=[Number(currentGps.lat),Number(currentGps.lng)];if(!raw.every(Number.isFinite))return;const snap=nearestRouteSnap(raw);currentSnappedPoint=snap.point;const accuracy=Number(currentGps.accuracy||999);if(!force&&accuracy>80)return;const now=Date.now();if(!force&&now-lastCameraUpdateAt<800)return;lastCameraUpdateAt=now;const desiredBearing=Number.isFinite(currentGps.heading)&&currentGpsSpeedMps>2?currentGps.heading:snap.bearing;applyTurnBearing(desiredBearing,force||!Number.isFinite(stableNavBearing));const zoom=navigationZoom();const aheadM=currentTurnDistanceM<=180?Math.max(35,Math.min(120,currentTurnDistanceM*.65)):Math.max(100,Math.min(260,80+currentGpsSpeedMps*7));const ahead=routePointAhead(snap.progressM,aheadM);const anchor=snap.distanceM<=65?snap.point:raw;const centre=cameraCentreForAnchor(anchor,zoom);map.invalidateSize(false);map.setView(centre,zoom,{animate:!force});if(routeLine){routeLine.setStyle({opacity:.95,weight:8})}}
+function junctionZoomForDistance(distanceM,ins){const d=Math.max(0,Number(distanceM||0));const text=((ins?.maneuver||'')+' '+(ins?.instructionType||'')+' '+(ins?.instruction||'')).toLowerCase();const isDecision=/left|right|roundabout|exit|merge|fork|u-turn|uturn|keep/.test(text);if(!isDecision)return 17.35;if(d<=55)return 19;if(d<=160)return 18.35;return 17.35}
+function applyJunctionZoom(distanceM,ins){currentTurnDistanceM=Math.max(0,Number(distanceM||0));junctionZoomLevel=junctionZoomForDistance(distanceM,ins);if(navigationMode==='live'&&currentGps)renderNavigationCamera(true)}
+function setMapBearing(deg){if(Number.isFinite(deg)){currentMapBearing=((deg%360)+360)%360}}
+function updateSatnavCamera(ll,heading){if(currentGps&&Number.isFinite(heading))currentGps.heading=heading;renderNavigationCamera(false)}
+function updateRouteUpButton(){/* removed: Navigation Engine V2 owns heading */}
 
-function updateSatnavCamera(ll,heading){
-  try{
-    ensureSatnavArrow();
-    const point=[Number(ll[0]),Number(ll[1])];
-    if(!point.every(Number.isFinite))return;
-
-    setNavigationMode('live');
-
-    const progressM=nearestRouteProgressM(point,routePoints);
-    const routeBearing=bearingFromRouteProgress(progressM);
-    const chosen=Number.isFinite(heading)?heading:routeBearing;
-    setMapBearing(smoothBearing(currentMapBearing,chosen,.24));
-
-    const accuracy=Number(currentGps?.accuracy||999);
-    const forced=forceGpsCameraFocus===true;
-
-    if(!forced&&accuracy>75)return;
-    if(forced&&accuracy>160)return;
-
-    const now=Date.now();
-    if(!forced&&now-lastCameraUpdateAt<900)return;
-    lastCameraUpdateAt=now;
-    forceGpsCameraFocus=false;
-
-    const zoom=Math.max(17,Number(junctionZoomLevel||17.5));
-    const centre=navigationCameraCentre(point,zoom);
-
-    map.invalidateSize(false);
-    map.setView(centre,zoom,{animate:!forced});
-  }catch(e){
-    console.warn('Coach Safe live camera update skipped',e);
-  }
-}
-// SATNAV_FOLLOW_BEHAVIOUR_V1_JS_END
+drawRouteOnMap();ensureFixedVehicle();setNavigationMode('overview');removeDirectionToggleArtifacts();setInterval(removeDirectionToggleArtifacts,1800);
+window.addEventListener('resize',()=>setTimeout(()=>{map.invalidateSize(true);if(navigationMode==='live')renderNavigationCamera(true);else fit()},180));
+window.addEventListener('orientationchange',()=>setTimeout(()=>{map.invalidateSize(true);if(navigationMode==='live')renderNavigationCamera(true);else fit()},350));
 
 
-/* COACH_SAFE_DRIVER_V211_JS_START */
-function junctionZoomForDistance(distanceM,ins){
-  const d=Math.max(0,Number(distanceM||0));
-  const text=((ins?.maneuver||'')+' '+(ins?.instructionType||'')+' '+(ins?.instruction||'')).toLowerCase();
-  const isDecision=/left|right|roundabout|exit|merge|fork|u-turn|uturn|keep/.test(text);
-  if(!isDecision)return 17;
-  if(d<=55)return 19;
-  if(d<=180)return 18.5;
-  if(d<=500)return 18;
-  return 17;
-}
-function applyJunctionZoom(distanceM,ins){
-  const next=junctionZoomForDistance(distanceM,ins);
-  junctionZoomLevel=next;
-  if(lastJunctionZoomLevel!==next){
-    lastJunctionZoomLevel=next;
-    try{
-      if(currentGps&&followDriver){
-        forceGpsCameraFocus=true;
-        focusLiveGps({zoom:next,animate:true});
-      }
-    }catch(e){}
-  }
-}
-function restoreMapAfterFullscreenExit(){
-  const shell=document.getElementById('driverMapShell');
-  shell?.classList.remove('large-map-mode');
-  document.body.classList.remove('coach-map-fullscreen');
-  document.body.style.overflow='';
-
-  const restore=()=>{
-    try{
-      map.invalidateSize(true);
-      if(currentGps&&followDriver){
-        forceGpsCameraFocus=true;
-        focusLiveGps({animate:false});
-      }else{
-        fit();
-      }
-      syncMapControlStates();
-    }catch(e){}
-  };
-
-  [60,180,420,850].forEach((delay)=>setTimeout(restore,delay));
-}
-function currentLaneSummary(ins,progressM){
-  const lane=currentLaneForInstruction(ins,progressM);
-  if(!lane)return 'Follow road signs';
-  return lane.text||lane.recommendedText||lane.visual||'Lane information available';
-}
-/* COACH_SAFE_DRIVER_V211_JS_END */
 
 function syncMapControlStates(){const wakeBtn=document.getElementById('mapWakeLockBtn');if(wakeBtn){wakeBtn.classList.toggle('active',!!wakeLock);wakeBtn.textContent=wakeLock?'Screen stays on':'Keep screen on'}const fullBtn=document.getElementById('mapFullscreenBtn');if(fullBtn){fullBtn.textContent=document.getElementById('driverMapShell')?.classList.contains('large-map-mode')?'Exit full screen':'Full screen'}updateRouteUpButton()}
 async function requestWakeLock(){if(!('wakeLock' in navigator)){toast('Screen wake lock is not supported in this browser. Keep your device display settings active for this journey.','error');return}try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;syncMapControlStates();logEvent('Screen wake lock released.')});syncMapControlStates();toast('Screen will stay awake while this page is visible.','success');postJourneyEvent('screen_wake_lock_enabled','Driver enabled keep-screen-on mode.',{})}catch(err){toast('Could not keep screen awake: '+(err.message||'permission denied'),'error')}}
@@ -1910,31 +1700,14 @@ function maybeSpeakInstruction(idx,ins,distanceM){if(!voiceEnabled||!journeyStar
 function updateGuidance(progressM,offRouteM){const routeTotal=totalRouteM || routeMeasures[routeMeasures.length-1] || 0;let idx=instructions.findIndex((ins)=>Number(ins.distanceM||0)>progressM+20);if(idx<0)idx=Math.max(0,instructions.length-1);currentInstructionIndex=idx;const ins=instructions[idx]||{instruction:'Continue on approved route',distanceM:progressM};const distToNext=Math.max(0,Number(ins.distanceM||0)-progressM);const progressPct=routeTotal?Math.min(100,Math.max(0,(progressM/routeTotal)*100)):0;const remainingM=Math.max(0,routeTotal-progressM);const remainingS=routeTotal&&totalTravelS?totalTravelS*(remainingM/routeTotal):0;setText('navCurrentInstruction',ins.instruction);setText('navDistanceToNext',metersText(distToNext));setText('mapNextTurn',ins.instruction||'Continue on route');setText('mapNextDistance',distToNext<=35?'Now':'Next in '+metersText(distToNext));applyJunctionZoom(distToNext,ins);setText('navProgressText',Math.round(progressPct)+'%');setText('navRemainingDistance',metersText(remainingM));setText('navEtaRemaining',timeText(remainingS));updateProfessionalNav(ins,remainingM,remainingS,offRouteM);setAdvancedInstructionPanel(ins,progressM,distToNext);const fill=document.getElementById('navProgressFill');if(fill)fill.style.width=progressPct.toFixed(1)+'%';updateInstructionHighlight(idx);if(journeyStarted&&idx!==lastLoggedInstruction){lastLoggedInstruction=idx;logEvent('Next instruction: '+ins.instruction)}if(journeyStarted&&voiceEnabled){maybeSpeakInstruction(idx,ins,distToNext)}if(offRouteM>250){logEvent('Off-route warning: approx '+Math.round(offRouteM)+'m from approved route.');const now=Date.now();if(voiceEnabled&&now-offRouteVoiceLastAt>120000){offRouteVoiceLastAt=now;speak('Warning. You appear to be away from the approved route. Stop when safe and check with operations before continuing.')}if(now-lastOffRouteSentAt>120000){lastOffRouteSentAt=now;postJourneyEvent('off_route_warning','Driver is approx '+Math.round(offRouteM)+'m from the approved route.',{distanceM:Math.round(offRouteM)})}}}
 
 function updateReportGpsFields(){if(!currentGps)return;document.getElementById('reportLat').value=currentGps.lat.toFixed(7);document.getElementById('reportLng').value=currentGps.lng.toFixed(7);document.getElementById('reportAccuracy').value=Math.round(currentGps.accuracy||0)}
-function onGps(pos){updateProfessionalGps(pos);const lat=pos.coords.latitude,lng=pos.coords.longitude,acc=pos.coords.accuracy||0;const ll=[lat,lng];let heading=Number(pos.coords.heading);if(previousGpsPoint&&haversine(previousGpsPoint,ll)>6){heading=bearingBetween(previousGpsPoint,ll)}previousGpsPoint=ll;currentGps={lat,lng,accuracy:acc,heading:Number.isFinite(heading)?heading:currentMapBearing,when:new Date()};if(Number.isFinite(heading))setMapBearing(heading);if(!driverMarker){driverMarker=L.marker(ll,{icon:gpsIcon,zIndexOffset:1000}).bindPopup('Your current position').addTo(map)}else{driverMarker.setLatLng(ll)}const markerEl=driverMarker?.getElement?.();if(markerEl&&Number.isFinite(currentGps.heading))markerEl.style.setProperty('--driver-heading',currentGps.heading.toFixed(1)+'deg');const visualAccuracy=Math.max(5,Math.min(Number(acc||0),18));
-if(accuracyCircle){
-  accuracyCircle.setLatLng(ll).setRadius(visualAccuracy);
-  accuracyCircle.setStyle?.({weight:1,opacity:.22,fillOpacity:.035});
-}else{
-  accuracyCircle=L.circle(ll,{radius:visualAccuracy,weight:1,opacity:.22,fillOpacity:.035,interactive:false}).addTo(map);
-}setText('gpsStatus','Active');setText('gpsTracking','On');setText('gpsAccuracy',Math.round(acc)+'m');const dist=distanceFromRoute(ll,routePoints);const alert=document.getElementById('offRouteAlert');const progressM=nearestRouteProgressM(ll,routePoints);if(dist!==null&&Number.isFinite(dist)){setText('gpsDistance',Math.round(dist)+'m');if(dist>250){alert?.classList.add('show')}else{alert?.classList.remove('show')}updateGuidance(progressM,dist)}if(followDriver){updateSatnavCamera(ll,currentGps.heading)}updateReportGpsFields()}
+function onGps(pos){updateProfessionalGps(pos);const lat=Number(pos.coords.latitude),lng=Number(pos.coords.longitude),acc=Number(pos.coords.accuracy||0),ll=[lat,lng];currentGpsSpeedMps=Math.max(0,Number(pos.coords.speed||0));let heading=Number(pos.coords.heading);const moved=previousGpsPoint?haversine(previousGpsPoint,ll):0;if(previousGpsPoint&&moved>=6){const movementBearing=bearingBetween(previousGpsPoint,ll);if(Number.isFinite(movementBearing))heading=Number.isFinite(heading)?smoothBearing(heading,movementBearing,.55):movementBearing}previousGpsPoint=ll;currentGps={lat,lng,accuracy:acc,heading:Number.isFinite(heading)?heading:currentMapBearing,when:new Date()};const snap=nearestRouteSnap(ll);currentSnappedPoint=snap.point;if(!driverMarker){driverMarker=L.marker(ll,{icon:gpsIcon,zIndexOffset:1000,interactive:false}).addTo(map)}else{driverMarker.setLatLng(ll)}const visualAccuracy=Math.max(5,Math.min(acc,18));if(accuracyCircle){accuracyCircle.setLatLng(ll).setRadius(visualAccuracy)}else{accuracyCircle=L.circle(ll,{radius:visualAccuracy,weight:1,opacity:.18,fillOpacity:.025,interactive:false}).addTo(map)}if(navigationMode==='live')accuracyCircle.setStyle?.({opacity:0,fillOpacity:0});setText('gpsStatus','Active · ±'+Math.round(acc)+'m');setText('gpsTracking','On');setText('gpsLastUpdate',currentGps.when.toLocaleTimeString());const offRoute=snap.distanceM;updateGuidance(snap.progressM,offRoute);if(followDriver)renderNavigationCamera(false);updateReportGpsFields()}
 function onGpsError(err){setText('gpsStatus',err.message||'Location unavailable');toast('GPS error: '+(err.message||'location unavailable'),'error')}
-document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!navigator.geolocation){toast('This browser does not support GPS location.','error');return}followDriver=true;setNavigationMode('live');forceGpsCameraFocus=true;setText('gpsStatus','Requesting permission…');watchId=navigator.geolocation.watchPosition(onGps,onGpsError,{enableHighAccuracy:true,maximumAge:3000,timeout:15000});document.getElementById('startGpsBtn').disabled=true;document.getElementById('centerGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=false;postJourneyEvent('gps_started','Driver started live GPS tracking.',{})});
-document.getElementById('centerGpsBtn')?.addEventListener('click',()=>{if(currentGps){followDriver=true;forceGpsCameraFocus=true;window.__COACH_SAFE_FOLLOW_ACTIVE__=true;focusLiveGps({zoom:18,animate:true});toast('Map centred on your location.','success')}else{toast('Start GPS first.','error')}});
+document.getElementById('startGpsBtn')?.addEventListener('click',()=>{if(!navigator.geolocation){toast('This browser does not support GPS location.','error');return}if(watchId!==null){try{navigator.geolocation.clearWatch(watchId)}catch(e){}watchId=null}followDriver=true;setNavigationMode('live');stableNavBearing=null;setText('gpsStatus','Requesting permission…');watchId=navigator.geolocation.watchPosition(onGps,onGpsError,{enableHighAccuracy:true,maximumAge:1000,timeout:15000});document.getElementById('startGpsBtn').disabled=true;document.getElementById('centerGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=false;postJourneyEvent('gps_started','Driver started live GPS tracking.',{})});
+document.getElementById('centerGpsBtn')?.addEventListener('click',()=>{if(currentGps){followDriver=true;window.__COACH_SAFE_FOLLOW_ACTIVE__=true;renderNavigationCamera(true);toast('Map centred on your location.','success')}else{toast('Start GPS first.','error')}});
 document.getElementById('mapCenterBtn')?.addEventListener('click',()=>document.getElementById('centerGpsBtn')?.click());
 document.getElementById('mapRecalcBtn')?.addEventListener('click',(e)=>recalcRouteFromGps(e.currentTarget));
 
-window.coachSafeCentrePosition=function(){
-      if(currentGps){
-        followDriver=true;
-        forceGpsCameraFocus=true;
-        window.__COACH_SAFE_FOLLOW_ACTIVE__=true;
-        focusLiveGps({zoom:18,animate:true});
-        toast('Map centred on your position.','success');
-        return true;
-      }
-      toast('Start live GPS first.','error');
-      return false;
-    };
+window.coachSafeCentrePosition=function(){if(!currentGps){toast('Start live GPS first.','error');return false}followDriver=true;setNavigationMode('live');renderNavigationCamera(true);toast('Navigation centred on the vehicle.','success');return true};
     window.coachSafeRecalculate=function(){
       recalcRouteFromGps(null);
       return true;
@@ -1965,12 +1738,7 @@ window.coachSafeCentrePosition=function(){
       const restoreCamera=()=>{
         try{
           map.invalidateSize(true);
-          if(currentGps&&followDriver){
-            forceGpsCameraFocus=true;
-            focusLiveGps({animate:false});
-          }else{
-            fit();
-          }
+          if(currentGps&&followDriver){renderNavigationCamera(true)}else{fit()}
           syncMapControlStates();
         }catch(e){
           console.warn('Fullscreen map restore failed',e);
@@ -1993,8 +1761,8 @@ window.addEventListener('pageshow',()=>{
     try{
       map.invalidateSize(true);
       if(currentGps&&followDriver){
-        forceGpsCameraFocus=true;
-        focusLiveGps({animate:false});
+        
+        renderNavigationCamera(true);
       }else{
         fit();
       }
@@ -2002,36 +1770,16 @@ window.addEventListener('pageshow',()=>{
   },180);
 });
 
-document.getElementById('stopGpsBtn')?.addEventListener('click',()=>{if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}followDriver=false;setNavigationMode('overview');setText('gpsTracking','Off');setText('gpsStatus','Stopped');document.getElementById('startGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=true;postJourneyEvent('gps_stopped','Driver stopped live GPS tracking.',{})});
+document.getElementById('stopGpsBtn')?.addEventListener('click',()=>{if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}followDriver=false;setNavigationMode('overview');stableNavBearing=null;setText('gpsTracking','Off');setText('gpsStatus','Stopped');document.getElementById('startGpsBtn').disabled=false;document.getElementById('stopGpsBtn').disabled=true;postJourneyEvent('gps_stopped','Driver stopped live GPS tracking.',{});setTimeout(fit,120)});
 document.getElementById('useGpsReportBtn')?.addEventListener('click',()=>{if(!currentGps){toast('Start GPS first, then tap this again.','error');return}updateReportGpsFields();document.getElementById('roadNameInput').value='GPS: '+currentGps.lat.toFixed(6)+', '+currentGps.lng.toFixed(6);toast('GPS position attached to report.','success')});
-document.getElementById('journeyStartBtn')?.addEventListener('click',()=>{journeyStarted=true;followDriver=true;document.getElementById('journeyStartBtn').textContent='Journey in progress';document.getElementById('journeyStartBtn').disabled=true;logEvent('Journey started.');postJourneyEvent('journey_started','Driver tapped Start journey.',currentGps?{lat:currentGps.lat,lng:currentGps.lng,accuracyM:Math.round(currentGps.accuracy||0)}:{});if(!currentGps)toast('Start live GPS to enable spoken turn-by-turn.','error');if(voiceEnabled)speakCurrentInstruction()});
+document.getElementById('journeyStartBtn')?.addEventListener('click',()=>{journeyStarted=true;followDriver=true;if(currentGps){setNavigationMode('live');renderNavigationCamera(true)}document.getElementById('journeyStartBtn').textContent='Journey in progress';document.getElementById('journeyStartBtn').disabled=true;logEvent('Journey started.');postJourneyEvent('journey_started','Driver tapped Start journey.',currentGps?{lat:currentGps.lat,lng:currentGps.lng,accuracyM:Math.round(currentGps.accuracy||0)}:{});if(!currentGps)toast('Start live GPS to enable spoken turn-by-turn.','error');if(voiceEnabled)speakCurrentInstruction()});
 function toggleVoiceGuidance(){if(!speechAvailable()){toast('Spoken guidance is not supported in this browser.','error');setVoiceStatus('Not supported');return}voiceEnabled=!voiceEnabled;if(voiceEnabled&&!journeyStarted){journeyStarted=true;logEvent('Journey started for spoken guidance.');postJourneyEvent('journey_started','Driver started journey with map voice control.',currentGps?{lat:currentGps.lat,lng:currentGps.lng,accuracyM:Math.round(currentGps.accuracy||0)}:{})}setVoiceStatus(voiceEnabled?'On':'Off');if(voiceEnabled){toast('Voice guidance on. The next turn will now be spoken.','success');logEvent('Voice guidance on.');postJourneyEvent('voice_guidance_enabled','Driver enabled spoken turn-by-turn guidance from the live map.',{});lastSpokenInstruction=-1;const ins=instructions[currentInstructionIndex]||instructions[0]||{};const progress=currentGps?nearestRouteProgressM([currentGps.lat,currentGps.lng],routePoints):0;const dist=Math.max(0,Number(ins.distanceM||0)-progress);const instruction=ins.instruction||'Continue on route';speak('Voice guidance is on. Next turn. '+(dist>25?'In '+metersText(dist)+', ':'')+instruction, true)}else{try{window.speechSynthesis.cancel()}catch(e){}toast('Voice guidance off.','success');logEvent('Voice guidance off.');postJourneyEvent('voice_guidance_disabled','Driver muted spoken turn-by-turn guidance from the live map.',{})}}
 document.getElementById('voiceGuidanceBtn')?.addEventListener('click',toggleVoiceGuidance);
 document.getElementById('mapVoiceBtn')?.addEventListener('click',toggleVoiceGuidance);
 document.getElementById('nextInstructionBtn')?.addEventListener('click',()=>{const ins=instructions[currentInstructionIndex]||instructions[0];if(ins){toast(ins.instruction,'success');speakCurrentInstruction(true);logEvent('Instruction repeated: '+ins.instruction)}else{toast('No spoken instruction available.','error')}});
 function rebuildInstructionList(){const list=document.getElementById('instructionList');if(!list)return;list.innerHTML='';const rows=instructions.length?instructions:[{instruction:'No guidance returned.'}];rows.forEach((ins,idx)=>{const li=document.createElement('li');const sp=document.createElement('span');sp.textContent=String(idx+1);const wrap=document.createElement('div');const main=document.createElement('strong');main.textContent=ins.instruction||'Continue';wrap.appendChild(main);const details=[];if(ins.laneGuidance?.text)details.push(ins.laneGuidance.text);if(ins.speedLimit?.maxSpeedLimitMph)details.push('Speed limit: '+ins.speedLimit.maxSpeedLimitMph+' mph');if(ins.street)details.push(ins.street);if(details.length){const p=document.createElement('p');p.className='muted';p.textContent=details.join(' · ');wrap.appendChild(p)}li.appendChild(sp);li.appendChild(wrap);list.appendChild(li)})}
-function applyReroute(newRoute){data=newRoute||data;routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];totalRouteM=Number(data.summary?.lengthInMeters||0);totalTravelS=Number(data.summary?.travelTimeInSeconds||0);routeMeasures=buildRouteMeasures(routePoints);currentInstructionIndex=0;lastLoggedInstruction=-1;lastSpokenInstruction=-1;spokenInstructionCache={};lastVoiceAt=0;drawRouteOnMap();rebuildInstructionList();if(routeUpEnabled)setMapBearing((currentGps&&Number.isFinite(currentGps.heading)?currentGps.heading:routeInitialBearing())||0);if(currentGps){const ll=[currentGps.lat,currentGps.lng];const dist=distanceFromRoute(ll,routePoints)||0;const progressM=nearestRouteProgressM(ll,routePoints);updateGuidance(progressM,dist)}else{updateGuidance(0,0)}
-    if(currentGps&&followDriver){
-      setNavigationMode('live');
-      [80,300,750].forEach((delay)=>setTimeout(()=>{
-        forceGpsCameraFocus=true;
-        focusLiveGps({zoom:18,animate:delay>80});
-      },delay));
-    }else{
-      setNavigationMode('overview');
-      fit();
-    }
-  }
-async function recalcRouteFromGps(triggerBtn){const btn=triggerBtn||document.getElementById('recalcBtn')||document.getElementById('mapRecalcBtn');if(!currentGps){toast('Start live GPS first so the app can reroute from your current position.','error');return}if(btn)btn.disabled=true;const oldText=btn?btn.textContent:'';if(btn)btn.textContent='Recalculating…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/reroute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:currentGps.lat,lng:currentGps.lng,accuracyM:currentGps.accuracy})});const payload=await r.json();if(!r.ok)throw new Error(payload.error||'Could not recalculate route.');applyReroute(payload.route);
-      forceGpsCameraFocus=true;
-      window.__COACH_SAFE_FOLLOW_ACTIVE__=true;
-      [120,500,1100,1700].forEach((delay)=>setTimeout(()=>{
-        if(currentGps){
-          forceGpsCameraFocus=true;
-          focusLiveGps({zoom:18,animate:true});
-        }
-      },delay));
-      toast('Coach-safe route recalculated from your GPS position.','success');logEvent('Coach-safe reroute calculated from driver GPS.');if(voiceEnabled)speak('Coach-safe route recalculated. Follow the updated spoken instructions.')}catch(err){toast(err.message,'error');logEvent('Reroute failed: '+err.message)}finally{if(btn){btn.disabled=false;btn.textContent=oldText}}}
+function applyReroute(newRoute){data=newRoute||data;routePoints=maybeCorrectRoutePointDirection((data.points||[]),data.origin,data.destination);instructions=(data.instructions||[]).map(normalizeDriverInstruction).sort((a,b)=>a.distanceM-b.distanceM);speedLimitSections=(data.sections&&Array.isArray(data.sections.speedLimits)?data.sections.speedLimits:[]);laneSections=(data.sections&&Array.isArray(data.sections.lanes)?data.sections.lanes:[]);safetyAlerts=Array.isArray(data.safetyAlerts)?data.safetyAlerts:[];totalRouteM=Number(data.summary?.lengthInMeters||0);totalTravelS=Number(data.summary?.travelTimeInSeconds||0);routeMeasures=buildRouteMeasures(routePoints);currentInstructionIndex=0;lastLoggedInstruction=-1;lastSpokenInstruction=-1;spokenInstructionCache={};lastVoiceAt=0;drawRouteOnMap();rebuildInstructionList();if(currentGps){const snap=nearestRouteSnap([currentGps.lat,currentGps.lng]);currentSnappedPoint=snap.point;updateGuidance(snap.progressM,snap.distanceM)}else{updateGuidance(0,0)}if(currentGps&&followDriver){setNavigationMode('live');stableNavBearing=null;[80,280,700].forEach((delay)=>setTimeout(()=>renderNavigationCamera(true),delay))}else{setNavigationMode('overview');fit()}}
+async function recalcRouteFromGps(triggerBtn){const btn=triggerBtn||document.getElementById('recalcBtn')||document.getElementById('mapRecalcBtn');if(!currentGps){toast('Start live GPS first so the app can reroute from your current position.','error');return}if(btn)btn.disabled=true;const oldText=btn?btn.textContent:'';if(btn)btn.textContent='Recalculating…';try{const r=await fetch('/driver/route/'+encodeURIComponent(window.DRIVER_ROUTE_ID)+'/reroute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:currentGps.lat,lng:currentGps.lng,accuracyM:currentGps.accuracy})});const payload=await r.json();if(!r.ok)throw new Error(payload.error||'Could not recalculate route.');applyReroute(payload.route);toast('Coach-safe route recalculated from your GPS position.','success');logEvent('Coach-safe reroute calculated from driver GPS.');if(voiceEnabled)speak('Coach-safe route recalculated. Follow the updated spoken instructions.')}catch(err){toast(err.message,'error');logEvent('Reroute failed: '+err.message)}finally{if(btn){btn.disabled=false;btn.textContent=oldText}}}
 document.getElementById('recalcBtn')?.addEventListener('click',()=>recalcRouteFromGps(document.getElementById('recalcBtn')));
 rebuildInstructionList();
 if(instructions.length){updateGuidance(0,0)}
@@ -2041,6 +1789,7 @@ document.getElementById('driverReportForm')?.addEventListener('submit',async(e)=
 </script>
 
 <script src="/driver-controls.js?v=clean7" defer></script>
+<script src="/coach-safe-pwa.js?v=1" defer></script>
 </body>
 </html>`;
 }
@@ -2248,13 +1997,7 @@ function isPublicApiRequest(req) {
   return false;
 }
 
-async function ensureCompany(req = null) {
-  const authenticatedCompanyId =
-    String(req?.user?.companyId || '').trim();
-
-  if (authenticatedCompanyId) {
-    return authenticatedCompanyId;
-  }
+async function ensureCompany() {
   if (cachedCompanyId) return cachedCompanyId;
   const db = dbRequired();
   let result = await db.query('SELECT * FROM "Company" ORDER BY "createdAt" ASC LIMIT 1');
@@ -2440,347 +2183,6 @@ const ROUTE_SELECT_SQL = `
 `;
 
 
-
-
-/* COACH_SAFE_PUBLIC_ROUTE_ID_RESOLVER_V1 */
-function cleanPublicRouteId(rawId) {
-  return String(rawId || '')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/["'<>]/g, '')
-    .trim()
-    .replace(/[).,;:\/]+$/g, '');
-}
-
-function publicRouteIdCandidates(rawId) {
-  const cleaned = cleanPublicRouteId(rawId);
-  if (!cleaned) return [];
-
-  const candidates = [cleaned];
-
-  if (/^route_/i.test(cleaned)) {
-    const withoutPrefix = cleaned.replace(/^route_/i, '');
-    if (withoutPrefix) candidates.push(withoutPrefix);
-  } else {
-    candidates.push(`route_${cleaned}`);
-  }
-
-  return [...new Set(candidates)];
-}
-
-async function resolvePublicRouteRow(rawId, companyId) {
-  const candidates = publicRouteIdCandidates(rawId);
-  if (!candidates.length) return null;
-
-  const result = await dbRequired().query(
-    `${ROUTE_SELECT_SQL}
-     WHERE r.id = ANY($1::text[])
-       AND r."companyId" = $2
-     ORDER BY CASE WHEN r.id = $3 THEN 0 ELSE 1 END
-     LIMIT 1`,
-    [candidates, companyId, candidates[0]]
-  );
-
-  return result.rows[0] || null;
-}
-
-async function resolvePublicRouteId(rawId, companyId) {
-  const row = await resolvePublicRouteRow(rawId, companyId);
-  return row ? String(row.id) : '';
-}
-/* COACH_SAFE_PUBLIC_ROUTE_ID_RESOLVER_V1_END */
-
-/* COACH_SAFE_DRIVER_V212_TILE_ROUTE */
-app.get('/driver-v2/tiles/:z/:x/:y.png', async (req, res) => {
-  try {
-    if (!HAS_LIVE_HERE_KEY) {
-      return res.status(503).type('text/plain').send('HERE_API_KEY is not configured.');
-    }
-
-    const z = Number(req.params.z);
-    const x = Number(req.params.x);
-    const y = Number(req.params.y);
-
-    const maxTile = Math.pow(2, z);
-
-    if (
-      !Number.isInteger(z) ||
-      !Number.isInteger(x) ||
-      !Number.isInteger(y) ||
-      z < 0 ||
-      z > 20 ||
-      x < 0 ||
-      y < 0 ||
-      x >= maxTile ||
-      y >= maxTile
-    ) {
-      return res.status(400).type('text/plain').send('Invalid map tile coordinates.');
-    }
-
-    const tileUrl = new URL(
-      `https://maps.hereapi.com/v3/base/mc/${z}/${x}/${y}/png8`
-    );
-
-    tileUrl.searchParams.set('lang', 'en');
-    tileUrl.searchParams.set('size', '512');
-    tileUrl.searchParams.set('ppi', '400');
-    tileUrl.searchParams.set('apiKey', HERE_API_KEY);
-
-    const response = await fetch(tileUrl, {
-      headers: {
-        Accept: 'image/png,image/*;q=0.8,*/*;q=0.5',
-        'User-Agent': 'CoachSafe-Driver-V2/2.1.2'
-      }
-    });
-
-    if (!response.ok) {
-      const message = await response.text().catch(() => '');
-      console.error(
-        'HERE Raster Tile API failed',
-        response.status,
-        { z, x, y, message: message.slice(0, 300) }
-      );
-      return res
-        .status(response.status)
-        .type('text/plain')
-        .send('HERE map tile failed (' + response.status + ').');
-    }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-
-    res.set({
-      'Content-Type': response.headers.get('content-type') || 'image/png',
-      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-      'X-Content-Type-Options': 'nosniff',
-      'Access-Control-Allow-Origin': '*'
-    });
-
-    return res.send(buffer);
-  } catch (error) {
-    console.error('Driver V2 HERE tile proxy error', error);
-    return res.status(500).type('text/plain').send(
-      'Map tile proxy failed: ' + (error.message || 'Unknown error')
-    );
-  }
-});
-
-/* COACH_SAFE_DRIVER_V231_PUBLIC_DATA */
-app.get('/driver-v2/data/:id', async (req, res) => {
-  try {
-    const companyId = await ensureCompany();
-    const routeRow = await resolvePublicRouteRow(req.params.id, companyId);
-
-    if (!routeRow) {
-      console.warn('Driver public route-data lookup failed', {
-        requestedId: cleanPublicRouteId(req.params.id),
-        candidates: publicRouteIdCandidates(req.params.id),
-        companyId
-      });
-
-      return res.status(404).json({
-        error: 'Driver route not found.'
-      });
-    }
-
-    const route = apiRoute(routeRow);
-
-    /*
-     * This endpoint is public and read-only.
-     * Do not expose operator credentials, passwords or admin data.
-     */
-    res.set({
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
-      'Pragma': 'no-cache',
-      'X-Content-Type-Options': 'nosniff'
-    });
-
-    return res.json(route);
-  } catch (error) {
-    console.error('Driver V2 public route-data error', error);
-    return res.status(500).json({
-      error: error.message || 'Could not load driver route.'
-    });
-  }
-});
-
-/* COACH_SAFE_DRIVER_V3_HERE_VECTOR */
-app.get('/driver-v3/config', (req, res) => {
-  if (!HAS_LIVE_HERE_KEY) {
-    return res.status(503).json({
-      error: 'HERE_API_KEY is not configured.'
-    });
-  }
-
-  /*
-   * Browser map API keys are visible to the browser by design.
-   * Restrict this key to coach.point2point.site in the HERE portal.
-   */
-  res.set({
-    'Cache-Control': 'no-store, no-cache, must-revalidate',
-    'Pragma': 'no-cache',
-    'X-Content-Type-Options': 'nosniff'
-  });
-
-  return res.json({
-    apiKey: HERE_API_KEY,
-    apiVersion: '3.2'
-  });
-});
-
-app.get('/driver-v3/route/:id', async (req, res) => {
-  try {
-    const companyId = await ensureCompany();
-    const requestedId = cleanPublicRouteId(req.params.id);
-    const canonicalId = await resolvePublicRouteId(requestedId, companyId);
-
-    if (!canonicalId) {
-      console.warn('Driver V3 route lookup failed', {
-        requestedId,
-        candidates: publicRouteIdCandidates(requestedId),
-        companyId
-      });
-
-      return res.status(404).send('Driver route not found.');
-    }
-
-    /*
-     * Redirect raw UUIDs, mobile-corrupted IDs and other legacy forms to
-     * the exact database ID. This keeps all later API/reroute requests
-     * consistent and prevents repeated route-ID mismatches.
-     */
-    if (requestedId !== canonicalId) {
-      const queryIndex = req.originalUrl.indexOf('?');
-      const query = queryIndex >= 0
-        ? req.originalUrl.slice(queryIndex)
-        : '';
-
-      return res.redirect(
-        302,
-        '/driver-v3/route/' +
-          encodeURIComponent(canonicalId) +
-          query
-      );
-    }
-
-    res.set({
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
-      'Pragma': 'no-cache',
-      'X-Content-Type-Options': 'nosniff'
-    });
-
-    return res.sendFile(
-      path.join(__dirname, 'public', 'driver-v3', 'index.html')
-    );
-  } catch (error) {
-    console.error('Driver V3 page error', error);
-
-    return res.status(500).send(
-      error.message || 'Driver V3 page failed.'
-    );
-  }
-});
-
-app.get('/drive-v3/:id', (req, res) => {
-  const routeId = cleanPublicRouteId(req.params.id);
-
-  return res.redirect(
-    302,
-    '/driver-v3/route/' + encodeURIComponent(routeId)
-  );
-});
-
-
-/* COACH_SAFE_NATIONAL_ROAD_INCIDENT_NEWS */
-app.get('/api/national-road-incidents', async (req, res) => {
-  try {
-    const query = encodeURIComponent(
-      'UK road incident OR motorway closure OR major road disruption'
-    );
-
-    const feedUrl =
-      'https://news.google.com/rss/search?q=' +
-      query +
-      '&hl=en-GB&gl=GB&ceid=GB:en';
-
-    const response = await fetch(feedUrl, {
-      headers: {
-        'User-Agent': 'CoachSafeOperations/2.1'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        'Incident feed returned ' + response.status
-      );
-    }
-
-    const xml = await response.text();
-
-    const decode = (value = '') =>
-      value
-        .replace(/<!\[CDATA\[|\]\]>/g, '')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>');
-
-    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)]
-      .slice(0, 12)
-      .map((match) => {
-        const block = match[1];
-
-        const get = (tag) => {
-          const found = block.match(
-            new RegExp('<' + tag + '>([\\\\s\\\\S]*?)<\\\\/' + tag + '>')
-          );
-          return found ? decode(found[1]).trim() : '';
-        };
-
-        const title = get('title');
-        const lower = title.toLowerCase();
-
-        const severity =
-          /closed|closure|serious|major|fatal|collision/.test(lower)
-            ? 'major'
-            : /delay|congestion|blocked|incident/.test(lower)
-              ? 'moderate'
-              : 'info';
-
-        return {
-          title,
-          description: get('description')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 280),
-          url: get('link'),
-          publishedAt: get('pubDate'),
-          severity
-        };
-      })
-      .filter((item) => item.title);
-
-    res.set({
-      'Cache-Control': 'public, max-age=300',
-      'X-Content-Type-Options': 'nosniff'
-    });
-
-    return res.json({
-      source: 'Google News search headlines',
-      officialTravelUpdates:
-        'https://nationalhighways.co.uk/roads-and-travel/live-travel-updates/',
-      items
-    });
-  } catch (error) {
-    console.error('National road incident news error', error);
-
-    return res.status(502).json({
-      error: 'National incident headlines are unavailable.',
-      items: []
-    });
-  }
-});
-
 app.post('/api/auth/login', async (req, res) => {
   try {
     const companyId = await ensureCompany();
@@ -2810,7 +2212,7 @@ app.use('/api', (req, res, next) => {
 
 app.get('/api/settings', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query('SELECT * FROM "Company" WHERE id=$1', [companyId]);
     res.json(companyToSettings(result.rows[0] || {}));
   } catch (error) {
@@ -2820,7 +2222,7 @@ app.get('/api/settings', async (req, res) => {
 
 app.patch('/api/settings', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const settings = cleanSettings(req.body || {});
     const result = await dbRequired().query(
       'UPDATE "Company" SET name=$1, "brandingName"=$2, "logoUrl"=$3, "updatedAt"=NOW() WHERE id=$4 RETURNING *',
@@ -2834,7 +2236,7 @@ app.patch('/api/settings', async (req, res) => {
 
 app.get('/api/journey-events', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const limit = Math.min(250, Math.max(1, Number(req.query.limit || 100)));
     const result = await dbRequired().query(
       `SELECT e.*, d.name AS "driverName" FROM "JourneyEvent" e
@@ -2852,7 +2254,7 @@ app.get('/api/journey-events', async (req, res) => {
 
 app.get('/api/routes/:id/events', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const routeExists = await dbRequired().query('SELECT id FROM "Route" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     if (!routeExists.rows.length) return res.status(404).json({ error: 'Route not found.' });
     const result = await dbRequired().query(
@@ -2871,7 +2273,7 @@ app.get('/api/routes/:id/events', async (req, res) => {
 
 app.get('/api/routes/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
     if (!result.rows.length) return res.status(404).json({ error: 'Route not found.' });
     res.json(apiRoute(result.rows[0]));
@@ -2882,7 +2284,7 @@ app.get('/api/routes/:id', async (req, res) => {
 
 app.patch('/api/routes/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     let statusSql = '';
     const values = [];
     let i = 1;
@@ -2923,50 +2325,6 @@ app.patch('/api/routes/:id', async (req, res) => {
   }
 });
 
-/* COACH_SAFE_DRIVER_V2_BETA */
-/* COACH_SAFE_DRIVER_V21_HERE_TILES */
-
-app.get('/api/driver-v2/route/:id', async (req, res) => {
-  try {
-    const companyId = await ensureCompany();
-    const result = await dbRequired().query(
-      `${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`,
-      [req.params.id, companyId]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Driver route not found.' });
-    res.set('Cache-Control', 'no-store');
-    res.json(apiRoute(result.rows[0]));
-  } catch (error) {
-    res.status(500).json({ error: error.message || 'Driver route failed.' });
-  }
-});
-
-app.get('/driver-v2/route/:id', async (req, res) => {
-  try {
-    const companyId = await ensureCompany();
-    const result = await dbRequired().query(
-      'SELECT id FROM "Route" WHERE id=$1 AND "companyId"=$2',
-      [req.params.id, companyId]
-    );
-    if (!result.rows.length) return res.status(404).send('Driver route not found.');
-    await logJourneyEvent(
-      companyId,
-      req.params.id,
-      'driver_v2_opened',
-      'Driver opened the isolated V2 navigation page.',
-      { userAgent: req.headers['user-agent'] || '' }
-    );
-    res.set('Cache-Control', 'no-store');
-    res.sendFile(path.join(__dirname, 'public', 'driver-v2', 'index.html'));
-  } catch (error) {
-    res.status(500).send(error.message || 'Driver V2 page failed.');
-  }
-});
-
-app.get('/drive-v2/:id', (req, res) => {
-  res.redirect(302, '/driver-v3/route/' + encodeURIComponent(req.params.id));
-});
-
 async function sendDriverRoutePage(req, res) {
   try {
     const companyId = await ensureCompany();
@@ -2980,14 +2338,7 @@ async function sendDriverRoutePage(req, res) {
   }
 }
 
-app.get('/driver/route/:id', (req, res) => {
-  const routeId = cleanPublicRouteId(req.params.id);
-
-  return res.redirect(
-    302,
-    '/driver-v3/route/' + encodeURIComponent(routeId)
-  );
-});
+app.get('/driver/route/:id', sendDriverRoutePage);
 app.get('/driver-route/:id', sendDriverRoutePage);
 
 app.get('/driver/route/:id/route-pack', async (req, res) => {
@@ -3179,198 +2530,6 @@ app.get('/api/geocode-candidates', async (req, res) => {
 });
 /* VERIFIED_PINS_GEOCODE_CANDIDATES_V1_END */
 
-
-
-/* COACH_SAFE_SYSTEM_HEALTH_STAGE121 */
-function diagnosticError(error, stage, operation, suggestion='') {
-  return {
-    stage,
-    code:String(error?.code||error?.statusCode||''),
-    message:String(error?.message||'Unknown diagnostic error.'),
-    operation,
-    suggestion
-  };
-}
-
-async function diagnosticsTableExists(client, tableName) {
-  const result=await client.query(
-    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1) AS present",
-    [tableName]
-  );
-  return Boolean(result.rows[0]?.present);
-}
-
-async function diagnosticsColumns(client, tableName) {
-  const result=await client.query(
-    "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=$1",
-    [tableName]
-  );
-  return new Set(result.rows.map(row=>row.column_name));
-}
-
-async function diagnosticsCount(client, tableName, companyId, tests) {
-  const started=Date.now();
-  try {
-    if (!(await diagnosticsTableExists(client,tableName))) {
-      tests.push({name:tableName,ok:false,warning:true,ms:Date.now()-started,detail:'Optional table is not present'});
-      return 0;
-    }
-    const columns=await diagnosticsColumns(client,tableName);
-    if (!columns.has('companyId')) {
-      tests.push({name:tableName,ok:false,warning:true,ms:Date.now()-started,detail:'Table has no companyId column'});
-      return 0;
-    }
-    const result=await client.query(
-      'SELECT COUNT(*)::int AS count FROM "'+tableName+'" WHERE "companyId"=$1',
-      [companyId]
-    );
-    const count=Number(result.rows[0]?.count||0);
-    tests.push({name:tableName,ok:true,ms:Date.now()-started,detail:count+' visible records'});
-    return count;
-  } catch(error) {
-    tests.push({name:tableName,ok:false,ms:Date.now()-started,detail:error.message,code:error.code||''});
-    return 0;
-  }
-}
-
-app.get('/api/platform/diagnostics', requireAuth, async (req,res)=>{
-  const started=Date.now();
-  const companyId=String(req.user?.companyId||'');
-  const findings=[];
-  const apiTests=[];
-  const errors=[];
-  const counts={users:0,routes:0,vehicles:0,drivers:0,reports:0,journeyEvents:0};
-  let client=null;
-  let company=null;
-  let databaseMs=null;
-  let databaseConnected=false;
-  let companyDistribution=[];
-
-  try {
-    const dbStarted=Date.now();
-    try {
-      client=await dbRequired().connect();
-      await client.query('SELECT 1 AS healthy');
-      databaseConnected=true;
-      databaseMs=Date.now()-dbStarted;
-    } catch(error) {
-      errors.push(diagnosticError(error,'Database connection','dbRequired().connect(); SELECT 1','Verify DATABASE_URL and Render database connectivity.'));
-    }
-
-    if (!client || !databaseConnected) {
-      return res.status(200).json({
-        generatedAt:new Date().toISOString(),
-        diagnosticVersion:'1.2.1',
-        user:{id:req.user?.id,name:req.user?.name,email:req.user?.email,role:req.user?.role,companyId},
-        company:null,counts,
-        checks:{
-          database:{ok:false,detail:errors[0]?.message||'Connection failed'},
-          api:{ok:false,detail:'Database checks skipped'},
-          company:{ok:false,detail:'Company lookup skipped'},
-          operationalData:{ok:false,warning:true,detail:'Database unavailable'}
-        },
-        apiTests,performance:{databaseMs,totalMs:Date.now()-started},
-        infrastructure:{database:'Connection failed',routingProvider:HAS_LIVE_TOMTOM_KEY?'TomTom connected':'Unavailable',nodeVersion:process.version,environment:process.env.NODE_ENV||'development',uptime:Math.round(process.uptime())+' seconds',memoryUsed:Math.round(process.memoryUsage().rss/1024/1024)+' MB'},
-        endpointError:errors[0],
-        findings:[{level:'error',title:'Database connection failed',detail:errors[0]?.message||'Connection failed',suggestion:'Check DATABASE_URL. Do not alter operational records.'}]
-      });
-    }
-
-    try {
-      if (!(await diagnosticsTableExists(client,'Company'))) throw Object.assign(new Error('Company table does not exist.'),{code:'TABLE_MISSING'});
-      const columns=await diagnosticsColumns(client,'Company');
-      const wanted=['id','slug','name','legalName','brandingName','logoUrl','countryCode','timezone','status','plan','onboardingComplete'].filter(c=>columns.has(c));
-      const select=wanted.length?wanted.map(c=>'"'+c+'"').join(','):'*';
-      const result=await client.query('SELECT '+select+' FROM "Company" WHERE id=$1 LIMIT 1',[companyId]);
-      company=result.rows[0]||null;
-      if(company){
-        company.slug=company.slug||'';
-        company.name=company.name||company.brandingName||'Unnamed company';
-        company.status=String(company.status||'legacy').toLowerCase();
-        company.plan=String(company.plan||'legacy').toLowerCase();
-      }
-    } catch(error) {
-      errors.push(diagnosticError(error,'Company lookup','SELECT available Company columns WHERE id=$1','Compare User.companyId with Company.id before changing records.'));
-    }
-
-    const tables={users:'User',routes:'Route',vehicles:'Vehicle',drivers:'Driver',reports:'UnsuitableRoadReport',journeyEvents:'JourneyEvent'};
-    for(const [key,table] of Object.entries(tables)) counts[key]=await diagnosticsCount(client,table,companyId,apiTests);
-
-    const globalEnabled=String(process.env.ALLOW_PLATFORM_DIAGNOSTICS_GLOBAL||'').toLowerCase()==='true';
-    const trusted=['super_admin','admin','owner'].includes(String(req.user?.role||'').toLowerCase());
-    if(globalEnabled&&trusted&&await diagnosticsTableExists(client,'Company')){
-      try {
-        const companies=await client.query('SELECT id,name FROM "Company" ORDER BY name');
-        for(const c of companies.rows){
-          const row={id:c.id,name:c.name||'Unnamed company',users:0,routes:0,vehicles:0,drivers:0,reports:0};
-          for(const [key,table] of Object.entries({users:'User',routes:'Route',vehicles:'Vehicle',drivers:'Driver',reports:'UnsuitableRoadReport'})){
-            if(!(await diagnosticsTableExists(client,table)))continue;
-            const cols=await diagnosticsColumns(client,table);
-            if(!cols.has('companyId'))continue;
-            const r=await client.query('SELECT COUNT(*)::int AS count FROM "'+table+'" WHERE "companyId"=$1',[c.id]);
-            row[key]=Number(r.rows[0]?.count||0);
-          }
-          companyDistribution.push(row);
-        }
-      } catch(error) {
-        errors.push(diagnosticError(error,'Company distribution','Read-only counts grouped by company','This support-only check is optional.'));
-      }
-    }
-
-    const otherData=companyDistribution.filter(row=>row.id!==companyId&&(Number(row.routes)||Number(row.vehicles)||Number(row.drivers)||Number(row.reports)));
-    const tenantMismatch={suspected:!counts.routes&&otherData.some(row=>Number(row.routes)>0),message:''};
-    if(tenantMismatch.suspected){
-      tenantMismatch.message='The signed-in company has zero routes while another company contains routes.';
-      findings.push({level:'warning',title:'Possible company mismatch',detail:tenantMismatch.message,suggestion:'Back up the database and verify Company IDs before reconnecting records.'});
-    }
-    if(!company) findings.push({level:'error',title:'Company record unresolved',detail:'The token contains companyId '+companyId+', but no Company row matched.',suggestion:'Check User.companyId against Company.id. Existing operational records remain present.'});
-    if(counts.routes) findings.push({level:'info',title:'Route data is present',detail:counts.routes+' routes are visible to the authenticated company ID.',suggestion:'If Saved Routes is empty, inspect the frontend status filter or route API rendering.'});
-
-    const requiredFailure=apiTests.some(t=>!t.ok&&!t.warning);
-    const memory=process.memoryUsage();
-    const primaryError=errors.find(e=>e.stage==='Company lookup'||e.stage==='Database connection')||errors[0]||null;
-
-    return res.status(200).json({
-      generatedAt:new Date().toISOString(),
-      diagnosticVersion:'1.2.1',
-      user:{id:req.user?.id,name:req.user?.name,email:req.user?.email,role:req.user?.role,companyId},
-      company,counts,tenantMismatch,
-      checks:{
-        database:{ok:databaseConnected,detail:databaseConnected?databaseMs+' ms':primaryError?.message||'Failed'},
-        api:{ok:!requiredFailure,warning:apiTests.some(t=>!t.ok),detail:apiTests.filter(t=>t.ok).length+'/'+apiTests.length+' dataset checks passed'},
-        company:{ok:!!company,warning:!company,detail:company?company.name:'No Company row matched user companyId'},
-        operationalData:{ok:!!(counts.routes||counts.vehicles||counts.drivers||counts.reports),warning:!counts.routes,detail:counts.routes+' routes · '+counts.vehicles+' vehicles · '+counts.drivers+' drivers'}
-      },
-      apiTests,
-      performance:{databaseMs,totalMs:Date.now()-started},
-      infrastructure:{database:databaseConnected?'Connected':'Failed',routingProvider:HAS_LIVE_TOMTOM_KEY?'TomTom connected':'Unavailable',nodeVersion:process.version,environment:process.env.NODE_ENV||'development',uptime:Math.round(process.uptime())+' seconds',memoryUsed:Math.round(memory.rss/1024/1024)+' MB'},
-      companyDistribution,
-      endpointError:primaryError,
-      errors,
-      findings
-    });
-  } catch(error) {
-    const endpointError=diagnosticError(error,'Unhandled diagnostics error','/api/platform/diagnostics','Inspect Render logs. No write query was attempted.');
-    return res.status(200).json({
-      generatedAt:new Date().toISOString(),diagnosticVersion:'1.2.1',
-      user:{id:req.user?.id,name:req.user?.name,email:req.user?.email,role:req.user?.role,companyId},
-      company,counts,
-      checks:{
-        database:{ok:databaseConnected,detail:databaseConnected?'Connected before endpoint error':endpointError.message},
-        api:{ok:false,detail:endpointError.message},
-        company:{ok:!!company,detail:company?.name||'Unresolved'},
-        operationalData:{ok:!!counts.routes,warning:true,detail:counts.routes+' routes counted'}
-      },
-      apiTests,performance:{databaseMs,totalMs:Date.now()-started},
-      infrastructure:{database:databaseConnected?'Connected':'Unknown',routingProvider:HAS_LIVE_TOMTOM_KEY?'TomTom connected':'Unknown',nodeVersion:process.version,environment:process.env.NODE_ENV||'development',uptime:Math.round(process.uptime())+' seconds',memoryUsed:Math.round(process.memoryUsage().rss/1024/1024)+' MB'},
-      endpointError,errors:[endpointError],
-      findings:[{level:'error',title:'Diagnostics endpoint error',detail:endpointError.message,suggestion:endpointError.suggestion}]
-    });
-  } finally { client?.release?.(); }
-});
-/* COACH_SAFE_SYSTEM_HEALTH_STAGE121_END */
-
-
 app.get('/api/health', async (req, res) => {
   let databaseReady = false;
   try {
@@ -3463,7 +2622,7 @@ app.post('/api/route', async (req, res) => {
 
 app.get('/api/vehicles', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query('SELECT * FROM "Vehicle" WHERE "companyId"=$1 ORDER BY "createdAt" DESC', [companyId]);
     res.json(result.rows.map(apiVehicle));
   } catch (error) {
@@ -3473,7 +2632,7 @@ app.get('/api/vehicles', async (req, res) => {
 
 app.post('/api/vehicles', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const vehicle = cleanSavedVehicle(req.body || {});
     const result = await dbRequired().query(
       'INSERT INTO "Vehicle" (id,"companyId",registration,name,"coachType","heightM","widthM","lengthM","weightKg","createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW()) RETURNING *',
@@ -3487,7 +2646,7 @@ app.post('/api/vehicles', async (req, res) => {
 
 app.delete('/api/vehicles/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query('DELETE FROM "Vehicle" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     res.json({ ok: true, deleted: result.rowCount });
   } catch (error) {
@@ -3497,7 +2656,7 @@ app.delete('/api/vehicles/:id', async (req, res) => {
 
 app.get('/api/drivers', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query('SELECT * FROM "Driver" WHERE "companyId"=$1 ORDER BY "createdAt" DESC', [companyId]);
     res.json(result.rows.map(apiDriver));
   } catch (error) {
@@ -3507,7 +2666,7 @@ app.get('/api/drivers', async (req, res) => {
 
 app.post('/api/drivers', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const driver = cleanDriver(req.body || {});
     const result = await dbRequired().query(
       'INSERT INTO "Driver" (id,"companyId",name,phone,email,"createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,NOW(),NOW()) RETURNING *',
@@ -3521,7 +2680,7 @@ app.post('/api/drivers', async (req, res) => {
 
 app.delete('/api/drivers/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query('DELETE FROM "Driver" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     res.json({ ok: true, deleted: result.rowCount });
   } catch (error) {
@@ -3531,7 +2690,7 @@ app.delete('/api/drivers/:id', async (req, res) => {
 
 app.get('/api/routes', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r."companyId"=$1 ORDER BY r."createdAt" DESC`, [companyId]);
     res.json(result.rows.map(apiRoute));
   } catch (error) {
@@ -3541,7 +2700,7 @@ app.get('/api/routes', async (req, res) => {
 
 app.post('/api/routes', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const route = stripRouteForStorage(req.body.route || {});
     if (!route.origin || !route.destination || !route.points?.length) return res.status(400).json({ error: 'A calculated route is required before approval.' });
     const driverId = String(req.body.driverId || '') || null;
@@ -3565,7 +2724,7 @@ app.post('/api/routes', async (req, res) => {
 
 app.delete('/api/routes/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query('DELETE FROM "Route" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     res.json({ ok: true, deleted: result.rowCount });
   } catch (error) {
@@ -3575,7 +2734,7 @@ app.delete('/api/routes/:id', async (req, res) => {
 
 app.get('/api/routes/:id/report', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query(`${ROUTE_SELECT_SQL} WHERE r.id=$1 AND r."companyId"=$2`, [req.params.id, companyId]);
     if (!result.rows.length) return res.status(404).send('Route report not found.');
     res.type('html').send(buildRouteReportHtml(apiRoute(result.rows[0])));
@@ -3586,7 +2745,7 @@ app.get('/api/routes/:id/report', async (req, res) => {
 
 app.get('/api/reports', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query('SELECT * FROM "UnsuitableRoadReport" WHERE "companyId"=$1 ORDER BY "createdAt" DESC', [companyId]);
     res.json(result.rows.map(apiReport));
   } catch (error) {
@@ -3596,7 +2755,7 @@ app.get('/api/reports', async (req, res) => {
 
 app.post('/api/reports', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const report = {
       id: id('issue'),
       routeId: String(req.body.routeId || '') || null,
@@ -3616,7 +2775,7 @@ app.post('/api/reports', async (req, res) => {
 
 app.delete('/api/reports/:id', async (req, res) => {
   try {
-    const companyId = await ensureCompany(req);
+    const companyId = await ensureCompany();
     const result = await dbRequired().query('DELETE FROM "UnsuitableRoadReport" WHERE id=$1 AND "companyId"=$2', [req.params.id, companyId]);
     res.json({ ok: true, deleted: result.rowCount });
   } catch (error) {
@@ -3638,8 +2797,3 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('No live TOMTOM_API_KEY found. Mock routes are disabled. Add .env and restart before calculating routes.');
   }
 });
-
-/* COACH_SAFE_OPERATIONAL_VISIBILITY_STAGE13
-   Protected operational handlers patched: 19
-   ensureCompany() calls changed to ensureCompany(req): 19
-*/

@@ -1,4 +1,4 @@
-import { HereMapController } from './here-map-controller.js?v=63';
+import { HereMapController } from './here-map-controller.js?v=68';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
@@ -23,7 +23,35 @@ const state = {
   lifecycle: 'preview',
   firstReliableNavigationFix: false,
   lastGpsTimestamp: 0,
-  provisionalNavigation: false
+  provisionalNavigation: false,
+
+  /* COACH_SAFE_STAGE17A_LIVE_INTELLIGENCE */
+  journeyStartedAt: 0,
+  lastMovingAt: 0,
+  lastLiveEventAt: 0,
+  lastJourneyStatus: '',
+  liveStatus: 'Waiting',
+  remainingM: 0,
+  remainingSeconds: 0,
+
+  /* COACH_SAFE_STAGE17B_TRAFFIC */
+  lastTrafficCheckAt: 0,
+  trafficCheckBusy: false,
+  trafficOffer: null,
+  lastTrafficOfferKey: '',
+  lastRawGpsHeartbeatAt: 0,
+
+  /* COACH_SAFE_STAGE191D_DRIVER_REFINEMENT */
+  offRouteSince: 0,
+  lastAutoRerouteAt: 0,
+  autoRerouteBusy: false,
+  lastCameraUpdateAt: 0,
+
+  /* COACH_SAFE_STAGE191D1_VERIFIED_START_LOCK */
+  verifiedStartLock: true,
+  verifiedStartReleased: false,
+  verifiedStartReleaseAt: 0,
+  verifiedStartLastDistanceM: Infinity
 };
 
 const mapCtl = new HereMapController('map');
@@ -32,8 +60,10 @@ let gps = null;
 
 let driverMenuTimer = null;
 
-let nightModeEnabled =
-  window.localStorage.getItem('coachSafeNightMode') === 'true';
+/* COACH_SAFE_DAY_MAP_STAGE14 */
+window.localStorage.removeItem('coachSafeNightMode');
+window.localStorage.removeItem('coachSafeNightMode');
+let nightModeEnabled = false;
 
 function applyNightMode(enabled) {
   nightModeEnabled = !!enabled;
@@ -47,7 +77,13 @@ function applyNightMode(enabled) {
    * Switch the actual HERE base layer. This avoids the black-screen
    * effect caused by filtering the complete map canvas.
    */
-  mapCtl?.setNightMode?.(nightModeEnabled);
+  const layerApplied =
+    mapCtl?.setNightMode?.(nightModeEnabled);
+
+  if (nightModeEnabled && layerApplied === false) {
+    nightModeEnabled = false;
+    $('app').classList.remove('night-mode');
+  }
 
   $('nightBtn')?.classList.toggle(
     'active',
@@ -86,7 +122,7 @@ function setDriverMenu(open, { autoHide = true } = {}) {
   );
 
   const glyph = toggle.querySelector('span');
-  if (glyph) glyph.textContent = open ? '▼' : '▲';
+  if (glyph) glyph.textContent = open ? 'â–¼' : 'â–²';
 
   clearTimeout(driverMenuTimer);
 
@@ -258,22 +294,43 @@ function routeSegmentBearing(index) {
 }
 
 function navigationBearing(nearest, gpsHeading, speedMps) {
-  const routeHeading = routeSegmentBearing(nearest.index);
+  const routeHeading =
+    routeSegmentBearing(nearest.index);
 
   const movingReliably =
     Number.isFinite(speedMps) &&
-    speedMps >= 4.5 &&
+    speedMps >= 3.5 &&
     Number.isFinite(gpsHeading) &&
     state.gpsReliable;
 
-  if (!movingReliably) return routeHeading;
+  if (!movingReliably) {
+    return routeHeading;
+  }
 
-  const delta = ((gpsHeading - routeHeading + 540) % 360) - 180;
-  return (routeHeading + delta * 0.55 + 360) % 360;
+  const delta =
+    ((gpsHeading - routeHeading + 540) % 360) - 180;
+
+  /*
+   * GPS course can briefly flip on phones, especially at low speed or near a
+   * junction. Never let an implausible GPS course rotate the map backwards.
+   */
+  if (Math.abs(delta) > 65) {
+    return routeHeading;
+  }
+
+  /*
+   * Route geometry remains dominant. GPS heading only adds enough movement
+   * information to make bends feel natural.
+   */
+  return (
+    routeHeading +
+    delta * 0.30 +
+    360
+  ) % 360;
 }
 
 function metresText(metres) {
-  if (!Number.isFinite(metres)) return '—';
+  if (!Number.isFinite(metres)) return 'â€”';
   if (metres < 950) return `${Math.max(0, Math.round(metres / 10) * 10)}m`;
   return `${(metres / 1609.344).toFixed(1)} miles`;
 }
@@ -293,11 +350,11 @@ function etaText(seconds) {
 function iconFor(instruction) {
   const text = `${instruction?.maneuver || ''} ${instruction?.instruction || ''}`
     .toLowerCase();
-  if (text.includes('roundabout')) return '↻';
-  if (text.includes('left')) return '←';
-  if (text.includes('right')) return '→';
-  if (text.includes('exit')) return '↗';
-  return '↑';
+  if (text.includes('roundabout')) return 'â†»';
+  if (text.includes('left')) return 'â†';
+  if (text.includes('right')) return 'â†’';
+  if (text.includes('exit')) return 'â†—';
+  return 'â†‘';
 }
 
 function normaliseVehicle(route) {
@@ -348,7 +405,7 @@ function applyViewMode(mode, { immediate = false } = {}) {
     mapCtl.overview();
     toast(
       state.lifecycle === 'navigation'
-        ? 'Route overview — select a navigation view to resume follow'
+        ? 'Route overview â€” select a navigation view to resume follow'
         : 'Route overview'
     );
     return;
@@ -385,6 +442,206 @@ function applyViewMode(mode, { immediate = false } = {}) {
 
 function closeViewMenu() {
   $('viewMenu').hidden = true;
+}
+
+
+/* COACH_SAFE_STAGE191D1_VERIFIED_START_LOCK */
+
+function routeVerifiedStart() {
+  const route = state.route || {};
+
+  const candidates = [
+    route.verifiedStart,
+    route.origin,
+    route.start,
+    route.route?.verifiedStart,
+    route.route?.origin
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+
+    const lat = Number(
+      candidate.lat ??
+      candidate.latitude
+    );
+
+    const lng = Number(
+      candidate.lng ??
+      candidate.lon ??
+      candidate.longitude
+    );
+
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lng)
+    ) {
+      return {
+        lat,
+        lng,
+        accuracy: 0,
+        speed: 0,
+        heading: routeSegmentBearing(0)
+      };
+    }
+  }
+
+  const first = state.points?.[0];
+
+  if (
+    Array.isArray(first) &&
+    Number.isFinite(Number(first[0])) &&
+    Number.isFinite(Number(first[1]))
+  ) {
+    return {
+      lat: Number(first[0]),
+      lng: Number(first[1]),
+      accuracy: 0,
+      speed: 0,
+      heading: routeSegmentBearing(0)
+    };
+  }
+
+  return null;
+}
+
+function shouldReleaseVerifiedStartLock({
+  lat,
+  lng,
+  accuracyM,
+  speedMps
+}) {
+  if (
+    !state.verifiedStartLock ||
+    state.verifiedStartReleased
+  ) {
+    return true;
+  }
+
+  const start = routeVerifiedStart();
+
+  if (!start) {
+    state.verifiedStartReleased = true;
+    return true;
+  }
+
+  const distanceFromStartM =
+    haversine(
+      [start.lat, start.lng],
+      [lat, lng]
+    );
+
+  state.verifiedStartLastDistanceM =
+    distanceFromStartM;
+
+  const accurateAtStart =
+    accuracyM <= 35 &&
+    distanceFromStartM <= 150;
+
+  const strongMovingFix =
+    accuracyM <= 20 &&
+    speedMps >= 2.5 &&
+    distanceFromStartM <= 350;
+
+  if (
+    accurateAtStart ||
+    strongMovingFix
+  ) {
+    state.verifiedStartReleased = true;
+    state.verifiedStartReleaseAt =
+      Date.now();
+
+    postLiveJourneyEvent(
+      'verified_start_released',
+      'Reliable GPS acquired. Verified start lock released.',
+      {
+        distanceFromStartM:
+          Math.round(distanceFromStartM),
+        accuracyM:
+          Math.round(accuracyM)
+      }
+    );
+
+    toast(
+      'GPS locked. Live navigation started.'
+    );
+
+    return true;
+  }
+
+  return false;
+}
+
+function applyVerifiedStartLockUi({
+  accuracyM,
+  distanceFromStartM
+}) {
+  const start = routeVerifiedStart();
+  if (!start) return;
+
+  state.snappedGps = {
+    ...start,
+    accuracy: Number(accuracyM || 0),
+    speed: 0
+  };
+
+  state.provisionalNavigation = true;
+  state.gpsReliable = false;
+
+  $('gpsStatus').textContent =
+    `GPS acquiring ${Math.round(accuracyM)}m`;
+
+  $('gpsStatus').className =
+    'status';
+
+  $('gpsSignal').textContent =
+    `${Math.round(accuracyM)}m`;
+
+  $('routeStatus').textContent =
+    'Holding at verified start';
+
+  $('routeStatus').className =
+    'status';
+
+  setLiveJourneyStatus(
+    'GPS acquiring',
+    Number.isFinite(distanceFromStartM)
+      ? `Navigation held at verified start · raw GPS ${Math.round(distanceFromStartM)}m away · accuracy ${Math.round(accuracyM)}m.`
+      : `Navigation held at verified start · accuracy ${Math.round(accuracyM)}m.`,
+    'warn'
+  );
+
+  /*
+   * Do not call updateGuidance while locked. It is a normal-navigation
+   * function and may replace "Holding at verified start" with "On route".
+   */
+  mapCtl.focus(
+    start,
+    {
+      heading:
+        routeSegmentBearing(0),
+      speedMps: 0,
+      nextTurnM:
+        nextTurnFromProgress(0),
+      immediate: true,
+      viewMode:
+        state.viewMode === 'overview'
+          ? state.previousNavigationView
+          : state.viewMode
+    }
+  );
+
+  /*
+   * Final write wins while Start Lock is active.
+   */
+  $('gpsStatus').textContent =
+    `GPS acquiring ${Math.round(accuracyM)}m`;
+  $('gpsSignal').textContent =
+    `${Math.round(accuracyM)}m`;
+  $('routeStatus').textContent =
+    'Holding at verified start';
+  $('routeStatus').className =
+    'status';
 }
 
 function routeStartPosition() {
@@ -437,9 +694,13 @@ function enterNavigation({ immediate = false } = {}) {
   setMode('live');
 
   const position =
-    state.snappedGps ||
-    state.gps ||
-    routeStartPosition();
+    !state.verifiedStartReleased
+      ? routeVerifiedStart()
+      : (
+          state.snappedGps ||
+          state.gps ||
+          routeStartPosition()
+        );
 
   if (!position) return;
 
@@ -495,7 +756,567 @@ function updateCameraAlert(instruction) {
     metres <= 1500;
 
   alert.hidden = !visible;
-  distance.textContent = visible ? metresText(metres) : '—';
+  distance.textContent = visible ? metresText(metres) : 'â€”';
+}
+
+
+/* COACH_SAFE_STAGE17A_LIVE_INTELLIGENCE */
+
+async function postLiveJourneyEvent(eventType, message, metadata = {}) {
+  if (!state.id) return;
+
+  try {
+    await fetch(
+      `/driver/route/${encodeURIComponent(state.id)}/event`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        keepalive: true,
+        body: JSON.stringify({
+          eventType,
+          message,
+          metadata
+        })
+      }
+    );
+  } catch (error) {
+    console.warn('Coach Safe live journey event failed.', error);
+  }
+}
+
+function setLiveJourneyStatus(label, detail = '', className = '') {
+  state.liveStatus = label;
+
+  const status = $('journeyLiveStatus');
+  const detailNode = $('journeyLiveDetail');
+
+  if (status) {
+    status.textContent = label;
+    status.className = `journey-live-value ${className}`.trim();
+  }
+
+  if (detailNode) {
+    detailNode.textContent = detail;
+  }
+}
+
+function journeyStatusFromFix({
+  nearest,
+  speedMps,
+  remainingM,
+  remainingSeconds,
+  now
+}) {
+  const offRouteM = Number(nearest.distance || 0);
+
+  if (remainingM <= 60 && offRouteM <= 90) {
+    return {
+      key: 'arrived',
+      label: 'Arrived',
+      className: 'good',
+      detail: 'Destination reached.'
+    };
+  }
+
+  if (offRouteM > 120) {
+    return {
+      key: 'off_route',
+      label: 'Off Route',
+      className: 'bad',
+      detail: `${Math.round(offRouteM)}m from approved route.`
+    };
+  }
+
+  const moving = speedMps >= 1.2;
+
+  if (moving) {
+    state.lastMovingAt = now;
+  }
+
+  const stoppedForMs =
+    state.lastMovingAt
+      ? now - state.lastMovingAt
+      : 0;
+
+  if (
+    !moving &&
+    stoppedForMs >= 90000 &&
+    remainingM > 120
+  ) {
+    return {
+      key: 'stopped',
+      label: 'Stopped',
+      className: 'warn',
+      detail: `Stationary for ${Math.max(1, Math.round(stoppedForMs / 60000))} min.`
+    };
+  }
+
+  const totalSeconds =
+    Number(state.route?.summary?.travelTimeInSeconds || 0);
+
+  if (
+    state.journeyStartedAt &&
+    totalSeconds > 0 &&
+    now - state.journeyStartedAt > 5 * 60 * 1000
+  ) {
+    const elapsedS =
+      (now - state.journeyStartedAt) / 1000;
+
+    const expectedProgress =
+      Math.min(1, elapsedS / totalSeconds);
+
+    const actualProgress =
+      state.totalM > 0
+        ? 1 - remainingM / state.totalM
+        : 0;
+
+    if (
+      expectedProgress - actualProgress > 0.18 &&
+      remainingSeconds > 5 * 60
+    ) {
+      return {
+        key: 'delayed',
+        label: 'Delayed',
+        className: 'warn',
+        detail: 'Journey progress is behind the original route pace.'
+      };
+    }
+  }
+
+  return {
+    key: 'on_route',
+    label: 'On Route',
+    className: 'good',
+    detail: `${metresText(remainingM)} remaining · ETA ${etaText(remainingSeconds)}`
+  };
+}
+
+function updateLiveJourneyIntelligence(nearest, speedMps) {
+  if (
+    state.lifecycle !== 'navigation' ||
+    !state.gpsReliable
+  ) {
+    return;
+  }
+
+  const now = Date.now();
+
+  if (!state.journeyStartedAt) {
+    state.journeyStartedAt = now;
+    state.lastMovingAt = now;
+
+    postLiveJourneyEvent(
+      'journey_started',
+      'Driver navigation journey started.',
+      {
+        lat: state.gps?.lat,
+        lng: state.gps?.lng,
+        accuracyM: state.gps?.accuracy
+      }
+    );
+  }
+
+  const remainingM =
+    Math.max(0, state.totalM - nearest.progress);
+
+  const totalSeconds =
+    Number(state.route?.summary?.travelTimeInSeconds || 0);
+
+  const remainingSeconds =
+    state.totalM > 0
+      ? totalSeconds * (remainingM / state.totalM)
+      : 0;
+
+  state.remainingM = remainingM;
+  state.remainingSeconds = remainingSeconds;
+
+  const status = journeyStatusFromFix({
+    nearest,
+    speedMps,
+    remainingM,
+    remainingSeconds,
+    now
+  });
+
+  setLiveJourneyStatus(
+    status.label,
+    status.detail,
+    status.className
+  );
+
+  if (
+    status.key === 'arrived' &&
+    state.lastJourneyStatus !== 'arrived'
+  ) {
+    toast('Destination reached. Confirm Complete route when passengers and coach are ready.');
+
+    if (voice?.enabled) {
+      voice.speak?.(
+        'Destination reached. Confirm complete route when ready.'
+      );
+    }
+
+    window.setTimeout(() => {
+      openCompleteRouteDialog();
+    }, 700);
+  }
+
+  const statusChanged =
+    status.key !== state.lastJourneyStatus;
+
+  const heartbeatDue =
+    now - state.lastLiveEventAt >= 15000;
+
+  if (statusChanged || heartbeatDue) {
+    const eventType =
+      statusChanged
+        ? `journey_status_${status.key}`
+        : 'live_position';
+
+    postLiveJourneyEvent(
+      eventType,
+      status.detail || status.label,
+      {
+        lat: state.gps?.lat,
+        lng: state.gps?.lng,
+        accuracyM: state.gps?.accuracy,
+        speedMps,
+        speedMph: Math.round(speedMps * 2.23694),
+        offRouteM: Math.round(nearest.distance || 0),
+        progressM: Math.round(nearest.progress || 0),
+        remainingM: Math.round(remainingM),
+        remainingSeconds: Math.round(remainingSeconds),
+        eta: new Date(
+          now + remainingSeconds * 1000
+        ).toISOString(),
+        journeyStatus: status.key
+      }
+    );
+
+    state.lastLiveEventAt = now;
+    state.lastJourneyStatus = status.key;
+  }
+}
+
+
+/* COACH_SAFE_STAGE17B_LIVE_TRAFFIC */
+
+function trafficOfferKey(payload = {}) {
+  const route = payload.route || {};
+  const summary = route.summary || {};
+
+  return [
+    Math.round(Number(summary.lengthInMeters || 0) / 100),
+    Math.round(Number(summary.travelTimeInSeconds || 0) / 60),
+    Math.round(Number(payload.savingSeconds || 0) / 60)
+  ].join(':');
+}
+
+function hideTrafficOffer() {
+  const panel = $('trafficAlternativePanel');
+  if (panel) panel.hidden = true;
+}
+
+function renderTrafficOffer(payload) {
+  if (!payload?.offer || !payload.route) {
+    return;
+  }
+
+  const panel = $('trafficAlternativePanel');
+  if (!panel) return;
+
+  state.trafficOffer = payload;
+
+  const savingMinutes =
+    Math.max(
+      1,
+      Math.round(
+        Number(payload.savingSeconds || 0) / 60
+      )
+    );
+
+  const currentMinutes =
+    Math.max(
+      1,
+      Math.round(
+        Number(payload.currentRemainingSeconds || 0) / 60
+      )
+    );
+
+  const alternativeMinutes =
+    Math.max(
+      1,
+      Math.round(
+        Number(payload.alternativeSeconds || 0) / 60
+      )
+    );
+
+  $('trafficSaving').textContent =
+    `${savingMinutes} min`;
+
+  $('trafficCurrentTime').textContent =
+    `${currentMinutes} min`;
+
+  $('trafficAlternativeTime').textContent =
+    `${alternativeMinutes} min`;
+
+  $('trafficAlternativeDistance').textContent =
+    metresText(
+      Number(payload.alternativeDistanceM || 0)
+    );
+
+  panel.hidden = false;
+
+  toast(
+    `Traffic alternative available — saves about ${savingMinutes} min.`
+  );
+}
+
+async function checkLiveTraffic({
+  force = false
+} = {}) {
+  if (
+    !state.gpsReliable ||
+    !state.gps ||
+    state.lifecycle !== 'navigation'
+  ) {
+    return;
+  }
+
+  if (state.trafficCheckBusy) return;
+
+  const now = Date.now();
+
+  /*
+   * Automatic checks every 3 minutes. This is deliberately slower than
+   * GPS telemetry to avoid unnecessary routing API traffic.
+   */
+  if (
+    !force &&
+    now - state.lastTrafficCheckAt < 180000
+  ) {
+    return;
+  }
+
+  state.trafficCheckBusy = true;
+  state.lastTrafficCheckAt = now;
+
+  try {
+    const response = await fetch(
+      `/driver/route/${encodeURIComponent(state.id)}/traffic-check`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({
+          lat: state.gps.lat,
+          lng: state.gps.lng,
+          accuracyM: state.gps.accuracy,
+          currentRemainingSeconds:
+            state.remainingSeconds
+        })
+      }
+    );
+
+    const payload =
+      await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        payload.error ||
+        'Live traffic check failed.'
+      );
+    }
+
+    if (payload.offer) {
+      const key = trafficOfferKey(payload);
+
+      if (key !== state.lastTrafficOfferKey) {
+        state.lastTrafficOfferKey = key;
+        renderTrafficOffer(payload);
+      }
+    }
+  } catch (error) {
+    console.warn(
+      'Coach Safe live traffic check failed.',
+      error
+    );
+  } finally {
+    state.trafficCheckBusy = false;
+  }
+}
+
+function previewTrafficAlternative() {
+  const route = state.trafficOffer?.route;
+  if (!route?.points?.length) return;
+
+  mapCtl.previewAlternative?.(
+    route.points,
+    {
+      durationMs: 6000
+    }
+  );
+
+  postLiveJourneyEvent(
+    'traffic_alternative_previewed',
+    'Driver previewed the live traffic alternative.',
+    {
+      savingSeconds:
+        state.trafficOffer?.savingSeconds || 0
+    }
+  );
+
+  toast(
+    'Alternative highlighted on the map for 6 seconds.'
+  );
+}
+
+function keepCurrentTrafficRoute() {
+  if (!state.trafficOffer) return;
+
+  postLiveJourneyEvent(
+    'traffic_alternative_kept_current',
+    'Driver kept the current approved route.',
+    {
+      savingSeconds:
+        state.trafficOffer.savingSeconds || 0
+    }
+  );
+
+  state.trafficOffer = null;
+  hideTrafficOffer();
+
+  toast('Current approved route retained.');
+}
+
+function acceptTrafficAlternative() {
+  const payload = state.trafficOffer;
+  const route = payload?.route;
+
+  if (!route?.points?.length) return;
+
+  voice.reset();
+  drawRoute(route, false);
+
+  /*
+   * Stay in live follow mode after the route geometry changes.
+   */
+  if (state.snappedGps || state.gps) {
+    const position =
+      state.snappedGps || state.gps;
+
+    const nearest =
+      nearestProgress([
+        position.lat,
+        position.lng
+      ]);
+
+    mapCtl.focus(
+      position,
+      {
+        heading:
+          navigationBearing(
+            nearest,
+            state.lastHeading,
+            state.gps?.speed
+          ),
+        speedMps:
+          state.gps?.speed || 0,
+        immediate: true,
+        viewMode:
+          state.viewMode === 'overview'
+            ? state.previousNavigationView
+            : state.viewMode
+      }
+    );
+  }
+
+  postLiveJourneyEvent(
+    'traffic_alternative_accepted',
+    `Driver accepted live traffic alternative saving about ${Math.max(1, Math.round(Number(payload.savingSeconds || 0) / 60))} min.`,
+    {
+      savingSeconds:
+        payload.savingSeconds || 0,
+      savingPercent:
+        payload.savingPercent || 0,
+      alternativeSeconds:
+        payload.alternativeSeconds || 0,
+      alternativeDistanceM:
+        payload.alternativeDistanceM || 0
+    }
+  );
+
+  state.trafficOffer = null;
+  hideTrafficOffer();
+
+  toast('Traffic alternative accepted.');
+}
+
+
+async function maybeAutoReroute(offRouteM) {
+  if (
+    state.lifecycle !== 'navigation' ||
+    !state.gpsReliable ||
+    state.autoRerouteBusy
+  ) {
+    return;
+  }
+
+  const now = Date.now();
+
+  if (offRouteM <= 120) {
+    state.offRouteSince = 0;
+    return;
+  }
+
+  if (!state.offRouteSince) {
+    state.offRouteSince = now;
+    return;
+  }
+
+  /*
+   * Require a sustained deviation. This avoids rerouting merely because a
+   * phone GPS fix briefly jumps onto a parallel road.
+   */
+  const sustainedForMs =
+    now - state.offRouteSince;
+
+  const rerouteCooldownMs =
+    now - state.lastAutoRerouteAt;
+
+  if (
+    offRouteM < 150 ||
+    sustainedForMs < 20000 ||
+    rerouteCooldownMs < 60000
+  ) {
+    return;
+  }
+
+  state.autoRerouteBusy = true;
+  state.lastAutoRerouteAt = now;
+
+  try {
+    toast('Off route confirmed. Recalculating…');
+
+    if (voice.enabled) {
+      voice.speak(
+        'You appear to be off route. Recalculating.',
+        { interrupt: true }
+      );
+    }
+
+    await reroute({
+      automatic: true
+    });
+
+    state.offRouteSince = 0;
+  } finally {
+    state.autoRerouteBusy = false;
+  }
 }
 
 function updateGuidance(progress, offRoute) {
@@ -537,14 +1358,14 @@ function updateGuidance(progress, offRoute) {
 
   const road =
     instruction.street ||
-    instruction.roadNumbers?.join(' · ') ||
+    instruction.roadNumbers?.join(' Â· ') ||
     'Route';
 
   $('roadStatus').textContent = road;
   $('currentRoad').textContent = road;
 
   const speedLimit = instruction.speedLimit?.maxSpeedLimitMph;
-  $('speedLimit').textContent = speedLimit ? `${speedLimit} mph` : 'Limit —';
+  $('speedLimit').textContent = speedLimit ? `${speedLimit} mph` : 'Limit â€”';
   $('speedLimitLarge').textContent = speedLimit || 30;
 
   $('routeStatus').textContent = offRoute > 120 ? 'Off route' : 'On route';
@@ -557,6 +1378,10 @@ function updateGuidance(progress, offRoute) {
 
 function drawRoute(route, overview = true) {
   state.route = route;
+
+  state.verifiedStartReleased = false;
+  state.verifiedStartReleaseAt = 0;
+  state.verifiedStartLastDistanceM = Infinity;
   state.points = (route.points || [])
     .map((point) => [Number(point[0]), Number(point[1])])
     .filter((point) => point.every(Number.isFinite));
@@ -576,6 +1401,67 @@ function drawRoute(route, overview = true) {
   updateCoachProfile(route);
   setMode(overview ? 'overview' : 'live');
   updateGuidance(0, Infinity);
+}
+
+
+function postRawGpsHeartbeat(nearest, speedMps) {
+  if (
+    state.lifecycle !== 'navigation' ||
+    !state.gps
+  ) {
+    return;
+  }
+
+  const now = Date.now();
+
+  if (
+    now - state.lastRawGpsHeartbeatAt < 15000
+  ) {
+    return;
+  }
+
+  state.lastRawGpsHeartbeatAt = now;
+
+  /*
+   * This heartbeat deliberately does NOT wait for the strict road-snapping
+   * GPS threshold. It tells Mission Control that the driver session is live
+   * while the phone is still improving its accuracy.
+   */
+  postLiveJourneyEvent(
+    'live_position',
+    state.gpsReliable
+      ? 'Live driver position received.'
+      : `Driver GPS active — accuracy ${Math.round(state.gps.accuracy || 0)}m.`,
+    {
+      lat: state.gps.lat,
+      lng: state.gps.lng,
+      accuracyM:
+        Math.round(state.gps.accuracy || 0),
+      speedMps:
+        Number(speedMps || 0),
+      speedMph:
+        Math.round(
+          Number(speedMps || 0) * 2.23694
+        ),
+      offRouteM:
+        Math.round(
+          Number(nearest?.distance || 0)
+        ),
+      gpsReliable:
+        Boolean(state.gpsReliable),
+      telemetryState:
+        state.gpsReliable
+          ? 'navigation'
+          : 'gps-settling'
+    }
+  );
+
+  /*
+   * Share the heartbeat timestamp with the stricter live-intelligence loop
+   * so reliable GPS does not immediately emit a duplicate heartbeat.
+   * Status changes still post immediately.
+   */
+  state.lastLiveEventAt = now;
 }
 
 function onGps(position) {
@@ -598,14 +1484,35 @@ function onGps(position) {
 
   let course = Number(heading);
 
-  if (
-    state.gps &&
-    haversine([state.gps.lat, state.gps.lng], [lat, lng]) > 5
-  ) {
-    course = bearing(
-      [state.gps.lat, state.gps.lng],
-      [lat, lng]
-    );
+  if (state.gps) {
+    const movementM =
+      haversine(
+        [state.gps.lat, state.gps.lng],
+        [lat, lng]
+      );
+
+    /*
+     * Do not derive a heading from tiny GPS position movements. A few metres
+     * of location noise can otherwise make the coach appear to turn around.
+     */
+    const courseMovementThreshold =
+      Math.max(
+        8,
+        Math.min(
+          20,
+          Number(accuracy || 0) * 0.30
+        )
+      );
+
+    if (
+      movementM >= courseMovementThreshold &&
+      Number(speed || 0) >= 2.0
+    ) {
+      course = bearing(
+        [state.gps.lat, state.gps.lng],
+        [lat, lng]
+      );
+    }
   }
 
   const firstFix = !state.gps;
@@ -621,7 +1528,7 @@ function onGps(position) {
     course = routeHeading;
   }
 
-  course = smoothAngle(state.lastHeading, course, 0.22);
+  course = smoothAngle(state.lastHeading, course, 0.16);
   if (Number.isFinite(course)) {
     state.lastHeading = course;
   }
@@ -633,6 +1540,57 @@ function onGps(position) {
     speed: speedMps,
     heading: course
   };
+
+  const startLockReleased =
+    shouldReleaseVerifiedStartLock({
+      lat,
+      lng,
+      accuracyM,
+      speedMps
+    });
+
+  if (!startLockReleased) {
+    const verifiedStart =
+      routeVerifiedStart();
+
+    const distanceFromStartM =
+      verifiedStart
+        ? haversine(
+            [verifiedStart.lat, verifiedStart.lng],
+            [lat, lng]
+          )
+        : Infinity;
+
+    /*
+     * D2 AUTHORITY RULE:
+     * Start Lock owns the navigation UI until it explicitly releases.
+     * Do not call downstream route-status/progress helpers here because they
+     * can legitimately classify the raw fix as "on route" and overwrite the
+     * acquisition state.
+     */
+    applyVerifiedStartLockUi({
+      accuracyM,
+      distanceFromStartM
+    });
+
+    $('speed').textContent = '0 mph';
+    $('speedLarge').textContent = '0';
+
+    updateButtons();
+
+    /*
+     * Telemetry is intentionally posted last and asynchronously; it must not
+     * be allowed to determine the local navigation state.
+     */
+    Promise.resolve(
+      postRawGpsHeartbeat(
+        nearest,
+        speedMps
+      )
+    ).catch(() => {});
+
+    return;
+  }
 
   state.gpsReliable =
     accuracyM <= 35 &&
@@ -660,6 +1618,11 @@ function onGps(position) {
 
   state.provisionalNavigation = !state.gpsReliable;
 
+  postRawGpsHeartbeat(
+    nearest,
+    speedMps
+  );
+
   $('gpsStatus').textContent = state.gpsReliable
     ? `GPS ${Math.round(accuracyM)}m`
     : `GPS settling ${Math.round(accuracyM)}m`;
@@ -680,12 +1643,29 @@ function onGps(position) {
       nearest.progress,
       nearest.distance
     );
+
+    maybeAutoReroute(
+      nearest.distance
+    );
   } else {
     $('routeStatus').textContent = softSnapAllowed
-      ? 'GPS settling — route held'
-      : 'GPS settling';
+      ? 'GPS settling - route held'
+      : 'GPS accuracy low';
     $('routeStatus').className = 'status';
+
+    setLiveJourneyStatus(
+      'GPS active',
+      `Waiting for a more accurate fix (${Math.round(accuracyM)}m).`,
+      'warn'
+    );
   }
+
+  updateLiveJourneyIntelligence(
+    nearest,
+    speedMps
+  );
+
+  checkLiveTraffic();
 
   if (state.lifecycle !== 'navigation') {
     updateButtons();
@@ -697,7 +1677,7 @@ function onGps(position) {
   const cameraHeading = smoothAngle(
     mapCtl.lastHeading,
     navigationBearing(nearest, course, speedMps),
-    firstFix ? 1 : 0.14
+    firstFix ? 1 : 0.10
   );
 
   const forceCamera =
@@ -708,18 +1688,27 @@ function onGps(position) {
     state.firstReliableNavigationFix = true;
   }
 
-  mapCtl.focus(
-    state.snappedGps,
-    {
-      heading: cameraHeading,
+  const nowForCamera = Date.now();
+  const cameraDue =
+    forceCamera ||
+    nowForCamera - state.lastCameraUpdateAt >= 200;
+
+  if (cameraDue) {
+    state.lastCameraUpdateAt = nowForCamera;
+
+    mapCtl.focus(
+      state.snappedGps,
+      {
+        heading: cameraHeading,
       speedMps,
       nextTurnM,
       immediate: forceCamera,
-      viewMode: state.viewMode === 'overview'
-        ? state.previousNavigationView
-        : state.viewMode
-    }
-  );
+        viewMode: state.viewMode === 'overview'
+          ? state.previousNavigationView
+          : state.viewMode
+      }
+    );
+  }
 
   updateButtons();
 }
@@ -736,6 +1725,30 @@ function toggleGps() {
     gps.stop();
     $('gpsStatus').textContent = 'GPS off';
     $('gpsStatus').className = 'status';
+    postLiveJourneyEvent(
+      'gps_stopped',
+      'Driver stopped live GPS tracking.',
+      {
+        lat: state.gps?.lat,
+        lng: state.gps?.lng,
+        remainingM: state.remainingM
+      }
+    );
+
+    state.journeyStartedAt = 0;
+    state.lastMovingAt = 0;
+    state.lastJourneyStatus = '';
+    state.lastRawGpsHeartbeatAt = 0;
+    state.offRouteSince = 0;
+    state.autoRerouteBusy = false;
+    state.verifiedStartReleased = false;
+    state.verifiedStartReleaseAt = 0;
+    state.verifiedStartLastDistanceM = Infinity;
+    setLiveJourneyStatus(
+      'Navigation stopped',
+      'Start navigation to resume live journey intelligence.'
+    );
+
     enterPreview();
     toast('Navigation stopped.');
   } else {
@@ -743,7 +1756,33 @@ function toggleGps() {
 
     try {
       gps.start();
-      $('gpsStatus').textContent = 'Acquiring GPS…';
+
+      postLiveJourneyEvent(
+        'gps_started',
+        'Driver started live GPS tracking.',
+        {}
+      );
+
+      postLiveJourneyEvent(
+        'journey_started',
+        'Live Driver V3 navigation session started.',
+        {
+          source: 'driver-v3',
+          device:
+            /Mobi|Android|iPhone|iPad/i.test(
+              navigator.userAgent
+            )
+              ? 'mobile'
+              : 'desktop'
+        }
+      );
+
+      setLiveJourneyStatus(
+        'Acquiring GPS',
+        'Coach Safe is waiting for a reliable location fix.'
+      );
+
+      $('gpsStatus').textContent = 'Acquiring GPSâ€¦';
       $('gpsStatus').className = 'status';
       toast('Navigation started.');
     } catch (error) {
@@ -756,7 +1795,17 @@ function toggleGps() {
   updateButtons();
 }
 
-async function reroute() {
+async function reroute({ automatic = false } = {}) {
+  if (
+    state.verifiedStartLock &&
+    !state.verifiedStartReleased
+  ) {
+    toast(
+      'Wait for verified start GPS lock before recalculating.'
+    );
+    return;
+  }
+
   if (!state.gps) {
     toast('Start GPS first.');
     return;
@@ -767,7 +1816,7 @@ async function reroute() {
   }
 
   const button = $('rerouteBtn');
-  button.disabled = true;
+  if (button) button.disabled = true;
 
   try {
     const response = await fetch(
@@ -790,11 +1839,174 @@ async function reroute() {
 
     voice.reset();
     drawRoute(payload.route, false);
-    toast('Route recalculated.');
+
+    postLiveJourneyEvent(
+      'route_recalculated',
+      automatic
+        ? 'Coach Safe automatically recalculated after a sustained route deviation.'
+        : 'Driver recalculated the route.',
+      {
+        automatic,
+        lat: state.gps?.lat,
+        lng: state.gps?.lng,
+        accuracyM: state.gps?.accuracy
+      }
+    );
+
+    toast(
+      automatic
+        ? 'New route ready.'
+        : 'Route recalculated.'
+    );
   } catch (error) {
     toast(error.message);
   } finally {
-    button.disabled = false;
+    if (button) button.disabled = false;
+  }
+}
+
+
+/* COACH_SAFE_STAGE17B4_JOURNEY_COMPLETION */
+
+function openCompleteRouteDialog() {
+  const dialog = $('completeRouteDialog');
+  if (!dialog) return;
+
+  const remainingM = Number(state.remainingM);
+  const warning = $('completeRouteDistanceWarning');
+  const confirmButton = $('completeRouteConfirmBtn');
+
+  const farFromDestination =
+    Number.isFinite(remainingM) &&
+    remainingM > 500;
+
+  if (warning) {
+    warning.hidden = !farFromDestination;
+    warning.textContent = farFromDestination
+      ? `You are still approximately ${metresText(remainingM)} from the destination. Only complete the journey if operations have confirmed it should end here.`
+      : '';
+  }
+
+  if (confirmButton) {
+    confirmButton.textContent =
+      farFromDestination
+        ? 'Complete anyway'
+        : 'Yes, complete route';
+  }
+
+  dialog.hidden = false;
+
+  window.setTimeout(() => {
+    $('completeRouteConfirmBtn')?.focus();
+  }, 30);
+}
+
+function closeCompleteRouteDialog() {
+  const dialog = $('completeRouteDialog');
+  if (dialog) dialog.hidden = true;
+}
+
+async function completeCurrentJourney() {
+  const confirmButton =
+    $('completeRouteConfirmBtn');
+
+  if (confirmButton) {
+    confirmButton.disabled = true;
+    confirmButton.textContent = 'Completing…';
+  }
+
+  try {
+    const response = await fetch(
+      `/driver/route/${encodeURIComponent(state.id)}/complete`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({
+          actor: 'driver',
+          lat: state.gps?.lat,
+          lng: state.gps?.lng,
+          accuracyM: state.gps?.accuracy,
+          remainingM: Number.isFinite(state.remainingM)
+            ? Math.round(state.remainingM)
+            : null
+        })
+      }
+    );
+
+    const payload =
+      await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        payload.error ||
+        'Could not complete the route.'
+      );
+    }
+
+    /*
+     * End the local navigation session WITHOUT posting gps_stopped after
+     * route_completed. This preserves route_completed as the latest event
+     * Mission Control sees.
+     */
+    if (gps?.active) {
+      gps.stop();
+    }
+
+    state.journeyStartedAt = 0;
+    state.lastMovingAt = 0;
+    state.lastJourneyStatus = '';
+    state.lastRawGpsHeartbeatAt = 0;
+    state.trafficOffer = null;
+
+    hideTrafficOffer();
+
+    setLiveJourneyStatus(
+      'Completed',
+      'Journey completed and reported to Mission Control.',
+      'good'
+    );
+
+    $('gpsStatus').textContent = 'Journey complete';
+    $('gpsStatus').className = 'status good';
+    $('routeStatus').textContent = 'Completed';
+    $('routeStatus').className = 'status good';
+
+    const completeButton =
+      $('completeRouteBtn');
+
+    if (completeButton) {
+      completeButton.disabled = true;
+      completeButton.classList.add('completed');
+      const label =
+        completeButton.querySelector('span');
+      if (label) label.textContent = 'Completed';
+    }
+
+    enterPreview();
+    closeCompleteRouteDialog();
+
+    toast('Journey completed.');
+
+    if (voice?.enabled) {
+      voice.speak?.(
+        'Journey completed.'
+      );
+    }
+  } catch (error) {
+    toast(
+      error.message ||
+      'Could not complete the route.'
+    );
+  } finally {
+    if (confirmButton) {
+      confirmButton.disabled = false;
+      confirmButton.textContent =
+        'Yes, complete route';
+    }
   }
 }
 
@@ -915,7 +2127,7 @@ async function load() {
 
   $('loading').classList.add('hidden');
   $('routeStatus').textContent = 'Route ready';
-  applyNightMode(nightModeEnabled);
+  applyNightMode(false);
   setDriverMenu(true);
   syncMinimalDrivingMode();
   updateButtons();
@@ -957,6 +2169,33 @@ $('reportBtn').addEventListener('click', () => {
     '_blank'
   );
 });
+
+$('completeRouteBtn')?.addEventListener(
+  'click',
+  openCompleteRouteDialog
+);
+
+$('completeRouteCancelBtn')?.addEventListener(
+  'click',
+  closeCompleteRouteDialog
+);
+
+$('completeRouteConfirmBtn')?.addEventListener(
+  'click',
+  completeCurrentJourney
+);
+
+$('completeRouteDialog')?.addEventListener(
+  'click',
+  (event) => {
+    if (
+      event.target ===
+      $('completeRouteDialog')
+    ) {
+      closeCompleteRouteDialog();
+    }
+  }
+);
 
 $('zoomInBtn').addEventListener('click', () => mapCtl.zoomBy(1));
 $('zoomOutBtn').addEventListener('click', () => mapCtl.zoomBy(-1));
@@ -1062,9 +2301,49 @@ document.addEventListener('webkitfullscreenchange', () => {
   updateButtons();
 });
 
+
+$('trafficPreviewBtn')?.addEventListener(
+  'click',
+  previewTrafficAlternative
+);
+
+$('trafficKeepBtn')?.addEventListener(
+  'click',
+  keepCurrentTrafficRoute
+);
+
+$('trafficAcceptBtn')?.addEventListener(
+  'click',
+  acceptTrafficAlternative
+);
+
+$('trafficCheckBtn')?.addEventListener(
+  'click',
+  () => {
+    state.lastTrafficCheckAt = 0;
+    checkLiveTraffic({ force: true });
+    toast('Checking live traffic…');
+  }
+);
+
 window.addEventListener('beforeunload', () => mapCtl.dispose());
 
 load().catch((error) => {
   $('loading').textContent = error.message;
   toast(error.message);
 });
+
+
+/* COACH_SAFE_STAGE17B_DRIVER_TRAFFIC_INSTALLED */
+
+/* COACH_SAFE_STAGE17B1_MOBILE_HEARTBEAT */
+
+/* COACH_SAFE_STAGE17B4_DRIVER_COMPLETE_ROUTE */
+
+/* COACH_SAFE_STAGE18_DRIVER_ARRIVAL_COMPLETION */
+
+/* COACH_SAFE_STAGE191D_DRIVER_APP */
+
+/* COACH_SAFE_STAGE191D1_VERIFIED_START_LOCK_INSTALLED */
+
+/* COACH_SAFE_STAGE191D2_START_LOCK_AUTHORITY */

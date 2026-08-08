@@ -1,0 +1,1005 @@
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+}
+
+:root{
+  color-scheme:dark;
+  --bg:#080d13;
+  --panel:rgba(6,11,17,.96);
+  --panel-soft:rgba(8,14,21,.92);
+  --gold:#f2c94c;
+  --gold-bright:#ffe184;
+  --blue:#096df3;
+  --green:#55d58b;
+  --red:#b51f2b;
+  --text:#fff;
+  --muted:#aeb8c2;
+  --border:rgba(242,201,76,.42);
+  --shadow:0 16px 42px rgba(0,0,0,.42);
+  --safe-top:max(.65rem,env(safe-area-inset-top));
+  --safe-bottom:max(.55rem,env(safe-area-inset-bottom));
+}
+
+html,
+body{
+  width:100%;
+  height:100%;
+  margin:0;
+  overflow:hidden;
+  background:var(--bg);
+  font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+button{
+  font:inherit;
+  cursor:pointer;
+  touch-action:manipulation;
+}
+
+.app{
+  position:fixed;
+  inset:0;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--text);
+}
+
+.map{
+  position:absolute;
+  inset:0;
+  z-index:1;
+  background:#dce8ef;
+}
+
+/* A richer and less washed-out presentation while preserving HERE labels. */
+.map canvas{
+  filter:saturate(1.25) contrast(1.07) brightness(.94);
+}
+
+.hud-card{
+  position:absolute;
+  z-index:800;
+  top:var(--safe-top);
+  height:7rem;
+  min-height:7rem;
+  border:1px solid var(--border);
+  border-radius:1.1rem;
+  background:linear-gradient(145deg,rgba(8,14,21,.985),rgba(4,8,13,.96));
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(16px);
+}
+
+.guidance-card{
+  left:.75rem;
+  width:min(29rem,calc(50vw - 1.15rem));
+  display:grid;
+  grid-template-columns:4.8rem minmax(0,1fr);
+  gap:.9rem;
+  align-items:center;
+  padding:.8rem 1rem;
+}
+
+.turn-icon{
+  width:4.55rem;
+  height:4.55rem;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:linear-gradient(150deg,#167dff,#064ac8);
+  color:#fff;
+  font-size:2.45rem;
+  font-weight:950;
+  box-shadow:0 10px 26px rgba(0,72,210,.36);
+}
+
+.guidance-copy{
+  min-width:0;
+}
+
+#instruction{
+  display:block;
+  max-height:3.2rem;
+  overflow:hidden;
+  color:#fff;
+  font-size:1.42rem;
+  line-height:1.12;
+  font-weight:930;
+}
+
+.turn-distance{
+  display:block;
+  margin-top:.32rem;
+  color:var(--gold);
+  font-size:1.42rem;
+  font-weight:950;
+}
+
+.lane-text{
+  display:block;
+  margin-top:.22rem;
+  color:#f9df91;
+  font-size:.65rem;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.lane-text[hidden]{
+  display:none;
+}
+
+.speed-card{
+  right:.75rem;
+  width:min(23rem,calc(50vw - 1.15rem));
+  display:grid;
+  grid-template-columns:auto auto auto auto;
+  align-items:center;
+  justify-content:center;
+  gap:.9rem;
+  padding:.75rem .9rem;
+}
+
+.speed-limit-sign{
+  width:4.4rem;
+  height:4.4rem;
+  display:grid;
+  place-items:center;
+  border:.5rem solid #d71920;
+  border-radius:50%;
+  background:#fff;
+  color:#111;
+  box-shadow:0 4px 14px rgba(0,0,0,.35);
+}
+
+.speed-limit-sign span{
+  font-size:1.55rem;
+  font-weight:950;
+}
+
+.current-speed{
+  min-width:4rem;
+  text-align:center;
+}
+
+.current-speed strong,
+.current-speed span{
+  display:block;
+}
+
+.current-speed strong{
+  font-size:2.35rem;
+  line-height:1;
+  font-weight:950;
+}
+
+.current-speed span{
+  margin-top:.25rem;
+  color:#e7edf3;
+  font-size:.78rem;
+  font-weight:800;
+}
+
+.camera-alert{
+  min-width:3.6rem;
+  display:grid;
+  justify-items:center;
+  gap:.2rem;
+  color:#ffc83d;
+}
+
+.camera-alert[hidden]{
+  display:none;
+}
+
+.camera-icon{
+  width:1.9rem;
+  height:1.45rem;
+  display:grid;
+  place-items:center;
+  border-radius:.3rem;
+  background:#ffc83d;
+  color:#111;
+  font-size:.65rem;
+}
+
+.camera-alert strong{
+  font-size:.83rem;
+}
+
+.gps-quality{
+  min-width:3rem;
+  text-align:center;
+}
+
+.gps-quality span,
+.gps-quality strong{
+  display:block;
+}
+
+.gps-quality span{
+  color:#65e496;
+  font-size:.65rem;
+  font-weight:900;
+}
+
+.gps-quality strong{
+  margin-top:.2rem;
+  color:#fff;
+  font-size:.78rem;
+}
+
+.trip-strip{
+  position:absolute;
+  z-index:820;
+  left:50%;
+  bottom:var(--safe-bottom);
+  translate:-50% 0;
+  width:min(58rem,calc(100vw - 7rem));
+  min-height:4.35rem;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  align-items:center;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:1rem;
+  background:var(--panel);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(16px);
+}
+
+.trip-strip div{
+  min-width:0;
+  padding:.66rem .9rem;
+  text-align:center;
+}
+
+.trip-strip div+div{
+  border-left:1px solid rgba(255,255,255,.14);
+}
+
+.trip-strip span{
+  display:block;
+  color:var(--muted);
+  font-size:.58rem;
+  font-weight:850;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+
+.trip-strip strong{
+  display:block;
+  margin-top:.16rem;
+  color:#fff;
+  font-size:1.08rem;
+  font-weight:920;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+#routeStatus.good{
+  color:var(--green);
+}
+
+#routeStatus.bad{
+  color:#ff7c86;
+}
+
+.driver-menu-toggle{
+  position:absolute;
+  z-index:1050;
+  right:.8rem;
+  bottom:calc(var(--safe-bottom) + .1rem);
+  width:4rem;
+  height:4rem;
+  display:grid;
+  place-items:center;
+  border:2px solid var(--gold);
+  border-radius:50%;
+  background:var(--panel);
+  color:#fff;
+  box-shadow:0 10px 28px rgba(0,0,0,.45),0 0 0 .3rem rgba(242,201,76,.12);
+  font-size:1.45rem;
+  font-weight:950;
+}
+
+.driver-menu{
+  position:absolute;
+  z-index:1040;
+  right:.8rem;
+  bottom:calc(var(--safe-bottom) + 4.8rem);
+  width:min(28rem,calc(100vw - 1.6rem));
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.45rem;
+  padding:.65rem;
+  border:1px solid var(--border);
+  border-radius:1rem;
+  background:rgba(5,10,16,.975);
+  box-shadow:0 24px 70px rgba(0,0,0,.58);
+  backdrop-filter:blur(18px);
+}
+
+.driver-menu[hidden]{
+  display:none;
+}
+
+.driver-menu button{
+  min-height:5rem;
+  display:grid;
+  place-items:center;
+  gap:.32rem;
+  padding:.5rem;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:.78rem;
+  background:rgba(255,255,255,.045);
+  color:#fff;
+}
+
+.driver-menu button.active{
+  border-color:var(--gold);
+  background:rgba(242,201,76,.16);
+}
+
+.driver-menu button.primary{
+  background:linear-gradient(145deg,var(--gold-bright),#d7aa2e);
+  color:#171005;
+}
+
+.driver-menu button.danger{
+  background:linear-gradient(145deg,#a9212d,#71121b);
+}
+
+.driver-menu svg{
+  width:1.65rem;
+  height:1.65rem;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.driver-menu button span{
+  font-size:.65rem;
+  font-weight:880;
+}
+
+.map-control,
+.zoom-controls button{
+  border:1px solid rgba(242,201,76,.35);
+  background:rgba(5,10,16,.94);
+  color:#fff;
+  box-shadow:0 10px 24px rgba(0,0,0,.32);
+}
+
+.compass-control{
+  position:absolute;
+  z-index:700;
+  left:.7rem;
+  top:calc(var(--safe-top) + 7.55rem);
+  width:3rem;
+  height:3rem;
+  border-radius:50%;
+}
+
+.compass-control svg{
+  width:1.4rem;
+  fill:#f44;
+  stroke:#fff;
+  stroke-width:.6;
+}
+
+.zoom-controls{
+  position:absolute;
+  z-index:700;
+  left:.7rem;
+  top:calc(var(--safe-top) + 10.9rem);
+  overflow:hidden;
+  border-radius:.75rem;
+  box-shadow:0 10px 24px rgba(0,0,0,.32);
+}
+
+.zoom-controls button{
+  width:3rem;
+  height:2.8rem;
+  display:block;
+  border-radius:0;
+  font-size:1.4rem;
+  font-weight:900;
+}
+
+.zoom-controls button+button{
+  border-top:1px solid rgba(255,255,255,.12);
+}
+
+.vehicle-arrow{
+  position:absolute;
+  z-index:640;
+  left:50%;
+  top:74%;
+  translate:-50% -50%;
+  width:3rem;
+  height:4rem;
+  pointer-events:none;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.58));
+}
+
+.vehicle-arrow::before{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:.1rem;
+  translate:-50% 0;
+  width:0;
+  height:0;
+  border-left:1.05rem solid transparent;
+  border-right:1.05rem solid transparent;
+  border-bottom:2.8rem solid var(--blue);
+  filter:drop-shadow(0 0 .16rem #fff);
+}
+
+.vehicle-arrow::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:1.45rem;
+  translate:-50% 0;
+  width:.9rem;
+  height:.9rem;
+  border:.22rem solid #fff;
+  border-radius:50%;
+  background:var(--blue);
+  box-shadow:0 0 0 .5rem rgba(9,109,243,.18);
+}
+
+.app[data-lifecycle="preview"] .vehicle-arrow,
+.app[data-mode="overview"] .vehicle-arrow{
+  display:none;
+}
+
+.current-road{
+  position:absolute;
+  z-index:700;
+  left:50%;
+  bottom:5.1rem;
+  translate:-50% 0;
+  min-width:13rem;
+  max-width:60vw;
+  padding:.55rem 1rem;
+  border-radius:.7rem;
+  background:rgba(5,10,16,.94);
+  color:#fff;
+  text-align:center;
+  font-size:.8rem;
+  font-weight:850;
+  box-shadow:0 8px 20px rgba(0,0,0,.28);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.view-menu{
+  position:absolute;
+  z-index:1100;
+  left:50%;
+  bottom:5.4rem;
+  translate:-50% 0;
+  width:min(31rem,calc(100vw - 1rem));
+  padding:.55rem;
+  border:1px solid var(--border);
+  border-radius:1rem;
+  background:rgba(5,10,16,.985);
+  box-shadow:0 26px 70px rgba(0,0,0,.62);
+}
+
+.view-menu[hidden]{
+  display:none;
+}
+
+.view-menu button{
+  width:100%;
+  display:block;
+  padding:.72rem .8rem;
+  border:1px solid transparent;
+  border-radius:.7rem;
+  background:transparent;
+  color:#fff;
+  text-align:left;
+}
+
+.view-menu button+button{
+  margin-top:.25rem;
+}
+
+.view-menu button.active,
+.view-menu button:hover{
+  border-color:rgba(242,201,76,.52);
+  background:rgba(242,201,76,.12);
+}
+
+.view-menu strong,
+.view-menu span{
+  display:block;
+}
+
+.view-menu strong{
+  color:#f8d978;
+  font-size:.82rem;
+}
+
+.view-menu span{
+  margin-top:.1rem;
+  color:#b5bec7;
+  font-size:.64rem;
+}
+
+.engine-state{
+  display:none;
+}
+
+.toast{
+  position:absolute;
+  z-index:1300;
+  left:50%;
+  bottom:6.3rem;
+  translate:-50% 1rem;
+  max-width:min(32rem,calc(100vw - 2rem));
+  padding:.7rem 1rem;
+  border:1px solid var(--border);
+  border-radius:.8rem;
+  background:rgba(5,10,16,.98);
+  color:#fff;
+  opacity:0;
+  pointer-events:none;
+  transition:.2s ease;
+}
+
+.toast.show{
+  opacity:1;
+  translate:-50% 0;
+}
+
+.loading{
+  position:absolute;
+  z-index:1400;
+  inset:0;
+  display:grid;
+  place-items:center;
+  background:#080d13;
+  color:#f5ca50;
+  font-size:1rem;
+  font-weight:850;
+}
+
+.loading.hidden{
+  display:none;
+}
+
+.here-copyright{
+  position:absolute;
+  z-index:20;
+  right:.2rem;
+  bottom:.1rem;
+  color:rgba(255,255,255,.7);
+  font-size:.48rem;
+}
+
+/* Active fullscreen + screen-on mode:
+   controls start hidden, but the chevron can always reopen them. */
+.app.minimal-driving .driver-menu:not([hidden]),
+.app.driver-menu-open .driver-menu:not([hidden]){
+  display:grid;
+}
+
+.app.minimal-driving:not(.driver-menu-open) .driver-menu{
+  display:none;
+}
+
+/* Portrait phones */
+@media(max-width:699px){
+  .hud-card{
+    top:var(--safe-top);
+    height:5.45rem;
+    min-height:5.45rem;
+    border-radius:.82rem;
+  }
+
+  .guidance-card{
+    left:.42rem;
+    width:calc(62vw - .62rem);
+    grid-template-columns:3rem minmax(0,1fr);
+    gap:.5rem;
+    padding:.48rem .55rem;
+  }
+
+  .turn-icon{
+    width:2.95rem;
+    height:2.95rem;
+    font-size:1.62rem;
+  }
+
+  #instruction{
+    max-height:2.02rem;
+    font-size:.83rem;
+    line-height:1.12;
+  }
+
+  .turn-distance{
+    margin-top:.16rem;
+    font-size:.98rem;
+  }
+
+  .lane-text{
+    display:none;
+  }
+
+  .speed-card{
+    right:.42rem;
+    width:calc(38vw - .62rem);
+    grid-template-columns:auto auto;
+    gap:.28rem .38rem;
+    padding:.4rem .42rem;
+  }
+
+  .speed-limit-sign{
+    width:2.65rem;
+    height:2.65rem;
+    border-width:.3rem;
+  }
+
+  .speed-limit-sign span{
+    font-size:.95rem;
+  }
+
+  .current-speed{
+    min-width:2.4rem;
+  }
+
+  .current-speed strong{
+    font-size:1.3rem;
+  }
+
+  .current-speed span{
+    margin-top:.08rem;
+    font-size:.46rem;
+  }
+
+  .gps-quality{
+    display:none;
+  }
+
+  .camera-alert{
+    grid-column:1/-1;
+    grid-template-columns:auto auto;
+    justify-content:center;
+    align-items:center;
+    min-width:0;
+    gap:.3rem;
+  }
+
+  .camera-icon{
+    width:1.35rem;
+    height:1rem;
+    font-size:.42rem;
+  }
+
+  .camera-alert strong{
+    font-size:.66rem;
+  }
+
+  .trip-strip{
+    left:.35rem;
+    right:.35rem;
+    bottom:var(--safe-bottom);
+    translate:0 0;
+    width:auto;
+    min-height:3.25rem;
+    border-radius:.7rem;
+  }
+
+  .trip-strip div{
+    padding:.38rem .18rem;
+  }
+
+  .trip-strip span{
+    font-size:.38rem;
+  }
+
+  .trip-strip strong{
+    font-size:.64rem;
+  }
+
+  .driver-menu-toggle{
+    right:.55rem;
+    bottom:calc(var(--safe-bottom) + 3.75rem);
+    width:3.2rem;
+    height:3.2rem;
+    font-size:1.08rem;
+  }
+
+  .driver-menu{
+    left:.45rem;
+    right:.45rem;
+    bottom:calc(var(--safe-bottom) + 3.75rem);
+    width:auto;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    padding:.48rem;
+  }
+
+  .driver-menu button{
+    min-height:4.25rem;
+  }
+
+  .driver-menu button span{
+    font-size:.55rem;
+  }
+
+  .driver-menu svg{
+    width:1.45rem;
+    height:1.45rem;
+  }
+
+  .compass-control{
+    top:calc(var(--safe-top) + 5.9rem);
+    left:.42rem;
+    width:2.65rem;
+    height:2.65rem;
+  }
+
+  .zoom-controls{
+    top:calc(var(--safe-top) + 8.8rem);
+    left:.42rem;
+  }
+
+  .zoom-controls button{
+    width:2.65rem;
+    height:2.45rem;
+  }
+
+  .vehicle-arrow{
+    top:72%;
+    width:2.65rem;
+  }
+
+  .current-road{
+    display:none;
+  }
+
+  .toast{
+    bottom:4.5rem;
+  }
+}
+
+/* Very narrow devices */
+@media(max-width:375px){
+  .guidance-card{
+    width:61vw;
+  }
+
+  .speed-card{
+    width:37vw;
+  }
+
+  .trip-strip strong{
+    font-size:.58rem;
+  }
+}
+
+/* Mobile landscape */
+@media(max-height:520px) and (orientation:landscape){
+  .hud-card{
+    top:.4rem;
+    height:4.75rem;
+    min-height:4.75rem;
+  }
+
+  .guidance-card{
+    width:min(24rem,45vw);
+    grid-template-columns:3.3rem minmax(0,1fr);
+    padding:.45rem .65rem;
+  }
+
+  .turn-icon{
+    width:3.15rem;
+    height:3.15rem;
+    font-size:1.8rem;
+  }
+
+  #instruction{
+    font-size:.92rem;
+  }
+
+  .turn-distance{
+    font-size:1rem;
+  }
+
+  .speed-card{
+    width:min(18rem,36vw);
+  }
+
+  .trip-strip{
+    bottom:.35rem;
+    width:min(44rem,calc(100vw - 6rem));
+    min-height:3rem;
+  }
+
+  .driver-menu-toggle{
+    bottom:.42rem;
+  }
+
+  .driver-menu{
+    bottom:4.05rem;
+  }
+
+  .current-road{
+    bottom:3.65rem;
+  }
+}
+
+
+/* V6.1 fullscreen menu reliability */
+.driver-menu-toggle{
+  pointer-events:auto;
+  touch-action:manipulation;
+  user-select:none;
+}
+
+.driver-menu{
+  pointer-events:auto;
+  overscroll-behavior:contain;
+}
+
+.app.driver-menu-open .driver-menu{
+  display:grid!important;
+}
+
+.app.driver-menu-open .driver-menu-toggle{
+  background:linear-gradient(145deg,#ffe184,#d7aa2e);
+  color:#171005;
+}
+
+/* Satellite imagery should retain natural colour and detail. */
+.app[data-map-style="aerial"] .map canvas{
+  filter:saturate(1.08) contrast(1.03) brightness(.96);
+}
+
+.app[data-map-style="vector"] .map canvas{
+  filter:saturate(1.22) contrast(1.07) brightness(.94);
+}
+
+
+/* ==========================================================
+   COACH SAFE DRIVER V6.2 — NIGHT MODE
+   ========================================================== */
+
+.app.night-mode .map{
+  background:#081019;
+}
+
+.app[data-map-theme="night"] .map canvas{
+  filter:saturate(.92) contrast(1.04) brightness(.98);
+}
+
+.app[data-map-theme="day"][data-map-style="aerial"] .map canvas{
+  filter:saturate(1.08) contrast(1.03) brightness(.97);
+}
+
+.app[data-map-theme="day"][data-map-style="vector"] .map canvas{
+  filter:saturate(1.2) contrast(1.06) brightness(.96);
+}
+
+.app.night-mode .hud-card,
+.app.night-mode .trip-strip,
+.app.night-mode .driver-menu,
+.app.night-mode .driver-menu-toggle,
+.app.night-mode .current-road{
+  background:rgba(2,6,11,.985);
+  border-color:rgba(242,201,76,.48);
+}
+
+.app.night-mode .vehicle-arrow{
+  filter:
+    drop-shadow(0 0 7px rgba(255,255,255,.72))
+    drop-shadow(0 12px 18px rgba(0,0,0,.9));
+}
+
+#nightBtn.active{
+  border-color:#8ec9ff;
+  background:rgba(41,104,166,.34);
+  color:#dcedff;
+}
+
+/* ==========================================================
+   COMPACT MOBILE DRIVER MENU — APPROXIMATELY 50% SMALLER
+   ========================================================== */
+
+@media(max-width:699px){
+  .driver-menu{
+    left:auto;
+    right:.45rem;
+    bottom:calc(var(--safe-bottom) + 3.65rem);
+    width:min(14.5rem,calc(100vw - .9rem));
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:.24rem;
+    padding:.28rem;
+    border-radius:.72rem;
+  }
+
+  .driver-menu button{
+    min-height:2.55rem;
+    gap:.12rem;
+    padding:.2rem .12rem;
+    border-radius:.52rem;
+  }
+
+  .driver-menu svg{
+    width:.95rem;
+    height:.95rem;
+    stroke-width:1.9;
+  }
+
+  .driver-menu button span{
+    font-size:.38rem;
+    line-height:1.05;
+  }
+
+  .driver-menu-toggle{
+    width:2.75rem;
+    height:2.75rem;
+    right:.5rem;
+    bottom:calc(var(--safe-bottom) + 3.55rem);
+    font-size:.9rem;
+    border-width:1.5px;
+  }
+}
+
+/* Extra compact layout for very narrow phones. */
+@media(max-width:375px){
+  .driver-menu{
+    width:min(13.2rem,calc(100vw - .8rem));
+    right:.4rem;
+  }
+
+  .driver-menu button{
+    min-height:2.35rem;
+  }
+
+  .driver-menu button span{
+    font-size:.34rem;
+  }
+}
+
+/* Compact landscape menu so it does not cover the road ahead. */
+@media(max-height:520px) and (orientation:landscape){
+  .driver-menu{
+    width:min(16rem,42vw);
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    bottom:3.5rem;
+  }
+
+  .driver-menu button{
+    min-height:2.45rem;
+  }
+
+  .driver-menu-toggle{
+    bottom:.45rem;
+  }
+}
+
+
+/* Real HERE night layer: subtle UI adaptation only. */
+.app[data-map-theme="night"]{
+  --panel:rgba(1,5,10,.975);
+  --panel-soft:rgba(2,7,12,.95);
+}
+
+.app[data-map-theme="night"] .hud-card,
+.app[data-map-theme="night"] .trip-strip,
+.app[data-map-theme="night"] .driver-menu,
+.app[data-map-theme="night"] .driver-menu-toggle{
+  box-shadow:
+    0 18px 44px rgba(0,0,0,.66),
+    0 0 0 1px rgba(242,201,76,.08);
+}

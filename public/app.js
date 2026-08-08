@@ -1,6 +1,7 @@
-﻿const form = document.getElementById('routeForm');
+const form = document.getElementById('routeForm');
 const presetSelect = document.getElementById('presetSelect');
 const vehicleSelect = document.getElementById('vehicleSelect');
+const fleetPresetSelect = document.getElementById('fleetPresetSelect');
 const driverSelect = document.getElementById('driverSelect');
 const providerStatus = document.getElementById('providerStatus');
 const warningsEl = document.getElementById('warnings');
@@ -131,6 +132,10 @@ let approvedRoutes = [];
 let reports = [];
 let latestJourneyEvents = [];
 let routeTrackingMap = {};
+let latestJourneyEventByRoute = new Map();
+let activeJourneyRouteIds = new Set();
+const COACH_SAFE_LIVE_EVENT_TTL_MS = 90000;
+const COACH_SAFE_STALE_EVENT_TTL_MS = 180000;
 let settings = {};
 let pendingLogoDataUrl = '';
 let authToken = localStorage.getItem('p2pCoachAuthToken') || '';
@@ -142,6 +147,7 @@ const map = L.map('map', {
   zoomControl: true,
   preferCanvas: true
 }).setView([51.5072, -0.1276], 10);
+window.coachSafePlannerMap = map;
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
@@ -873,6 +879,17 @@ function routeTrackingFromEvent(record = {}, event = null) {
     driver_route_pack_opened: ['Route pack opened', 'tracking-active', 'Driver opened the printable route pack.'],
     gps_started: ['GPS active', 'tracking-live', 'Driver started live GPS tracking.'],
     gps_stopped: ['GPS stopped', 'tracking-waiting', 'Driver stopped live GPS tracking.'],
+    live_position: ['On route', 'tracking-live', event.message || 'Live coach position received.'],
+    journey_status_on_route: ['On route', 'tracking-live', event.message || 'Coach is following the approved route.'],
+    journey_status_off_route: ['Off route', 'tracking-alert', event.message || 'Coach is away from the approved route.'],
+    journey_status_stopped: ['Stopped', 'tracking-alert', event.message || 'Coach has been stationary.'],
+    journey_status_delayed: ['Delayed', 'tracking-alert', event.message || 'Journey is behind planned progress.'],
+    journey_status_arrived: ['Arrived', 'tracking-arrived', event.message || 'Coach reached the destination. Awaiting completion confirmation.'],
+    traffic_check_completed: ['Traffic checked', 'tracking-live', event.message || 'Live traffic checked.'],
+    traffic_alternative_available: ['Traffic alternative', 'tracking-alert', event.message || 'A faster live route is available.'],
+    traffic_alternative_previewed: ['Alternative previewed', 'tracking-live', event.message || 'Driver previewed a live traffic alternative.'],
+    traffic_alternative_kept_current: ['Current route kept', 'tracking-live', event.message || 'Driver kept the current approved route.'],
+    traffic_alternative_accepted: ['Alternative accepted', 'tracking-rerouted', event.message || 'Driver accepted the faster live route.'],
     journey_started: ['Journey started', 'tracking-live', 'Driver tapped Start journey.'],
     off_route_warning: ['Off-route warning', 'tracking-alert', event.message || 'Driver is away from the approved route.'],
     reroute_calculated: ['Rerouted', 'tracking-rerouted', 'Coach-safe reroute calculated from driver GPS.'],
@@ -884,16 +901,101 @@ function routeTrackingFromEvent(record = {}, event = null) {
   return { label, className, detail: `${detail} ÔÇó ${when}` };
 }
 
+function isLiveJourneyEvent(event = {}, now = Date.now()) {
+  const eventType = String(event.eventType || '');
+  const at = new Date(event.createdAt || 0).getTime();
+  const age = Number.isFinite(at) ? now - at : Infinity;
+
+  const activeTypes = new Set([
+    'gps_started',
+    'journey_started',
+    'live_position',
+    'journey_status_on_route',
+    'journey_status_off_route',
+    'journey_status_stopped',
+    'journey_status_delayed',
+    'traffic_alternative_available',
+    'traffic_alternative_previewed',
+    'traffic_alternative_accepted'
+  ]);
+
+  const terminalTypes = new Set([
+    'gps_stopped',
+    'journey_status_arrived',
+    'route_completed'
+  ]);
+
+  if (terminalTypes.has(eventType)) return false;
+  return activeTypes.has(eventType) && age <= COACH_SAFE_LIVE_EVENT_TTL_MS;
+}
+
 function buildRouteTrackingMap(routes = [], events = []) {
   const latestByRoute = new Map();
+
   events.forEach((event) => {
     if (!event.routeId) return;
     const current = latestByRoute.get(event.routeId);
-    if (!current || new Date(event.createdAt) > new Date(current.createdAt)) latestByRoute.set(event.routeId, event);
+
+    if (
+      !current ||
+      new Date(event.createdAt) > new Date(current.createdAt)
+    ) {
+      latestByRoute.set(event.routeId, event);
+    }
   });
+
+  latestJourneyEventByRoute = latestByRoute;
+  activeJourneyRouteIds = new Set();
+
+  const now = Date.now();
+
+  latestByRoute.forEach((event, routeId) => {
+    if (isLiveJourneyEvent(event, now)) {
+      activeJourneyRouteIds.add(routeId);
+    }
+  });
+
   routeTrackingMap = {};
+
   routes.forEach((route) => {
-    routeTrackingMap[route.id] = routeTrackingFromEvent(route, latestByRoute.get(route.id) || null);
+    const event = latestByRoute.get(route.id) || null;
+    let tracking = routeTrackingFromEvent(route, event);
+
+    if (event) {
+      const eventTime = new Date(event.createdAt || 0).getTime();
+      const age = Number.isFinite(eventTime)
+        ? now - eventTime
+        : Infinity;
+
+      const wasLive =
+        [
+          'gps_started',
+          'journey_started',
+          'live_position',
+          'journey_status_on_route',
+          'journey_status_off_route',
+          'journey_status_stopped',
+          'journey_status_delayed',
+          'traffic_alternative_available',
+          'traffic_alternative_previewed',
+          'traffic_alternative_accepted'
+        ].includes(String(event.eventType || ''));
+
+      if (
+        wasLive &&
+        age > COACH_SAFE_LIVE_EVENT_TTL_MS &&
+        age <= COACH_SAFE_STALE_EVENT_TTL_MS
+      ) {
+        tracking = {
+          label: 'Signal stale',
+          className: 'tracking-alert',
+          detail:
+            `No fresh driver telemetry for ${Math.max(2, Math.round(age / 60000))} min.`
+        };
+      }
+    }
+
+    routeTrackingMap[route.id] = tracking;
   });
 }
 
@@ -1011,17 +1113,45 @@ function renderPlatformStatus(health = null) {
 }
 
 function renderModuleKpis() {
+  /*
+   * COACH_SAFE_STAGE182_RESOURCE_RELEASE
+   *
+   * A completed journey retains its historical driver and vehicle links, but
+   * those resources must immediately become available for another journey.
+   */
+  const resourceHoldingRoutes =
+    approvedRoutes.filter((route) => {
+      const status =
+        String(route.status || '')
+          .toLowerCase();
+
+      return (
+        status !== 'completed' &&
+        Boolean(
+          route.driverId ||
+          route.vehicleDatabaseId ||
+          route.driver?.id ||
+          route.vehicleRecord?.id
+        )
+      );
+    });
+
   const assignedVehicleIds = new Set(
-    approvedRoutes
-      .filter((route) => ['assigned', 'completed'].includes(String(route.status || '').toLowerCase()))
-      .map((route) => route.vehicleDatabaseId || route.route?.vehicle?.id)
+    resourceHoldingRoutes
+      .map((route) =>
+        route.vehicleDatabaseId ||
+        route.vehicleRecord?.id ||
+        route.route?.vehicle?.id
+      )
       .filter(Boolean)
   );
 
   const assignedDriverIds = new Set(
-    approvedRoutes
-      .filter((route) => ['assigned', 'completed'].includes(String(route.status || '').toLowerCase()))
-      .map((route) => route.driverId)
+    resourceHoldingRoutes
+      .map((route) =>
+        route.driverId ||
+        route.driver?.id
+      )
       .filter(Boolean)
   );
 
@@ -1069,21 +1199,44 @@ function renderModuleKpis() {
 
 function animateNumber(node,value,duration=420){if(!node)return;const target=Number(value)||0,start=Number(node.dataset.currentValue||node.textContent||0)||0,started=performance.now();function frame(now){const p=Math.min(1,(now-started)/duration),e=1-Math.pow(1-p,3);node.textContent=String(Math.round(start+(target-start)*e));if(p<1)requestAnimationFrame(frame);else node.dataset.currentValue=String(target)}requestAnimationFrame(frame)}
 function routeNeedsAction(route){return String(route.status||'').toLowerCase()==='draft'||!route.driverId||!route.vehicleDatabaseId}
-function missionRouteStatus(route){const t=missionTracking(route),s=String(route.status||'approved').toLowerCase();if(t.className==='tracking-alert')return'alert';if(['tracking-live','tracking-rerouted','tracking-active'].includes(t.className))return'active';if(s==='completed')return'completed';if(routeNeedsAction(route))return'needs-action';return'assigned'}
+function missionRouteStatus(route){const t=missionTracking(route),s=String(route.status||'approved').toLowerCase();if(s==='completed'||t.className==='tracking-completed')return'completed';if(t.className==='tracking-arrived')return'arrived';if(t.className==='tracking-alert')return'alert';if(['tracking-live','tracking-rerouted','tracking-active'].includes(t.className))return'active';if(routeNeedsAction(route))return'needs-action';return'assigned'}
 function renderOperationalSummary(){if(!operationalSummaryTitle||!operationalSummaryText)return;const routes=missionTodayRoutes(),needs=routes.filter(routeNeedsAction).length,active=routes.filter(r=>missionRouteStatus(r)==='active').length,critical=routes.filter(r=>missionTracking(r).className==='tracking-alert').length,available=Math.max(vehicles.length-new Set(routes.map(r=>r.vehicleDatabaseId).filter(Boolean)).size,0),company=currentCompany?.brandingName||currentCompany?.name||settings.companyName||'Your operation';operationalSummaryTitle.textContent=`${company}: ${routes.length} journey${routes.length===1?'':'s'} in view`;const parts=[`${active} active`,`${needs} requiring action`,`${available} vehicle${available===1?'':'s'} available`,critical?`${critical} critical alert${critical===1?'':'s'}`:'no critical journey alerts'];operationalSummaryText.textContent=parts.join(' · ')+'.'}
 function missionEmptyState(title,detail,actionLabel='',actionView=''){return `<div class="mission-empty-state"><span class="empty-state-icon">◇</span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small>${actionLabel&&actionView?`<button type="button" data-view-shortcut="${escapeHtml(actionView)}">${escapeHtml(actionLabel)}</button>`:''}</div>`}
 function missionTodayRoutes() {
   const today = new Date().toDateString();
+
   const todays = approvedRoutes.filter((route) => {
     const value =
       route.route?.departureAt ||
       route.route?.journeyDate ||
       route.departureAt ||
       route.createdAt;
-    return value && new Date(value).toDateString() === today;
+
+    return (
+      value &&
+      new Date(value).toDateString() === today
+    );
   });
 
-  return todays.length ? todays : approvedRoutes.slice(0, 12);
+  /*
+   * A live driver must never disappear from Mission Control simply because
+   * the saved route date is older than today's date.
+   */
+  const active = approvedRoutes.filter((route) =>
+    activeJourneyRouteIds.has(route.id)
+  );
+
+  const combined = new Map();
+
+  [...active, ...todays].forEach((route) => {
+    combined.set(route.id, route);
+  });
+
+  if (combined.size) {
+    return [...combined.values()];
+  }
+
+  return approvedRoutes.slice(0, 12);
 }
 
 function missionTracking(route) {
@@ -1281,31 +1434,123 @@ function renderMissionKpis() {
     'tracking-live',
     'tracking-alert',
     'tracking-rerouted',
-    'tracking-active'
+    'tracking-active',
+    'tracking-arrived'
   ].includes(missionTracking(route).className)).length;
 
+  const resourceHoldingRoutes =
+    routes.filter((route) =>
+      String(route.status || '').toLowerCase() !==
+        'completed'
+    );
+
   const assignedVehicleIds = new Set(
-    routes.map((route) => route.vehicleDatabaseId).filter(Boolean)
+    resourceHoldingRoutes
+      .map((route) =>
+        route.vehicleDatabaseId ||
+        route.vehicleRecord?.id ||
+        route.route?.vehicle?.id
+      )
+      .filter(Boolean)
   );
+
   const assignedDriverIds = new Set(
-    routes.map((route) => route.driverId).filter(Boolean)
+    resourceHoldingRoutes
+      .map((route) =>
+        route.driverId ||
+        route.driver?.id
+      )
+      .filter(Boolean)
   );
   const alerts = reports.length + routes.filter(
     (route) => missionTracking(route).className === 'tracking-alert'
   ).length;
   const unassigned = routes.filter((route) =>
-    String(route.status || '').toLowerCase() === 'approved' &&
-    (!route.driverId || !route.vehicleDatabaseId)
+    String(route.status || '').toLowerCase() !== 'completed' &&
+    !(route.driverId || route.driver?.id)
   ).length;
 
   const set = (id, value) => animateNumber(document.getElementById(id), value);
   const availableVehicles=Math.max(vehicles.length-assignedVehicleIds.size,0);
   const availableDrivers=Math.max(drivers.length-assignedDriverIds.size,0);
-  set('missionJourneys',routes.length); set('missionActive',active); set('missionVehicles',availableVehicles); set('missionDrivers',availableDrivers); set('missionAlerts',alerts); set('missionUnassigned',unassigned);
-  const jd=document.getElementById('missionJourneysDetail'),vd=document.getElementById('missionVehiclesDetail'),dd=document.getElementById('missionDriversDetail');
-  if(jd)jd.textContent=`${routes.filter(r=>r.status==='assigned').length} assigned · ${routes.filter(r=>r.status==='completed').length} completed`;
-  if(vd)vd.textContent=`${assignedVehicleIds.size} assigned · ${vehicles.length} total`;
-  if(dd)dd.textContent=`${assignedDriverIds.size} assigned · ${drivers.length} total`;
+  /*
+   * Use the SAME live-state test as the Active Routes KPI.
+   * Previously Active Routes used missionTracking(route), while Active Drivers
+   * used activeJourneyRouteIds.has(route.id). Those two paths could disagree,
+   * producing the exact UI state: Active Routes = 1, Active Drivers = 0.
+   */
+  const liveTrackingClasses = new Set([
+    'tracking-live',
+    'tracking-alert',
+    'tracking-rerouted',
+    'tracking-active',
+    'tracking-arrived'
+  ]);
+
+  const activeDriverKeys = new Set(
+    routes
+      .filter((route) =>
+        liveTrackingClasses.has(
+          missionTracking(route).className
+        )
+      )
+      .map((route) => {
+        const liveEvent =
+          latestJourneyEventByRoute.get(route.id);
+
+        const driverId =
+          route.driverId ||
+          route.driver?.id ||
+          liveEvent?.driverId ||
+          '';
+
+        const driverName =
+          route.driver?.name ||
+          liveEvent?.driverName ||
+          route.assignedDriverName ||
+          '';
+
+        if (driverId) {
+          return `id:${String(driverId)}`;
+        }
+
+        if (driverName) {
+          return `name:${String(driverName).trim().toLowerCase()}`;
+        }
+
+        return '';
+      })
+      .filter(Boolean)
+  );
+
+  const activeDrivers = activeDriverKeys.size;
+
+  set('missionJourneys',routes.length);
+  set('missionActive',active);
+  set('missionVehicles',availableVehicles);
+  set('missionDrivers',activeDrivers);
+  set('missionAlerts',alerts);
+  set('missionUnassigned',unassigned);
+
+  const jd=document.getElementById('missionJourneysDetail'),
+    vd=document.getElementById('missionVehiclesDetail'),
+    dd=document.getElementById('missionDriversDetail');
+
+  const completedCount =
+    routes.filter((route) =>
+      String(route.status || '').toLowerCase() ===
+        'completed'
+    ).length;
+
+  const currentAssignedCount =
+    resourceHoldingRoutes.filter((route) =>
+      route.driverId ||
+      route.driver?.id
+    ).length;
+
+  if(jd)jd.textContent=`${currentAssignedCount} currently assigned · ${completedCount} completed`;
+  if(vd)vd.textContent=`${assignedVehicleIds.size} in use · ${availableVehicles} available · ${vehicles.length} total`;
+  if(dd)dd.textContent=`${activeDrivers} active · ${availableDrivers} available · ${drivers.length} total`;
 
   const company =
     currentCompany?.brandingName ||
@@ -1331,40 +1576,243 @@ function renderMissionKpis() {
   }
 }
 
-function renderMissionDispatch(){if(!missionDispatchBoard)return;const filter=dispatchStatusFilter?.value||'all',routes=missionTodayRoutes().filter(r=>filter==='all'||missionRouteStatus(r)===filter);if(!routes.length){missionDispatchBoard.innerHTML=missionEmptyState(filter==='all'?'No journeys planned':'No journeys match this filter',filter==='all'?'Plan and approve a route to begin dispatching.':'Choose another status or open Saved Routes.',filter==='all'?'Plan a journey':'Open saved routes',filter==='all'?'planner':'routes');return}missionDispatchBoard.innerHTML=routes.map(route=>{const t=missionTracking(route),status=missionRouteStatus(route),tv=route.route?.departureAt||route.route?.journeyDate||route.createdAt,time=tv?new Date(tv).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—',driver=route.driver?.name||'Driver required',vehicle=route.vehicleRecord?.name||route.route?.vehicle?.name||'Vehicle required';return `<article class="dispatch-card ${escapeHtml(status)}"><div class="dispatch-card-time"><time>${escapeHtml(time)}</time><span>${escapeHtml(status.replaceAll('-',' '))}</span></div><div class="dispatch-card-route"><strong>${escapeHtml(route.origin||'Start')}</strong><span class="route-arrow">→</span><strong>${escapeHtml(route.destination||'Destination')}</strong></div><div class="dispatch-card-assignments"><div><small>Driver</small><strong>${escapeHtml(driver)}</strong></div><div><small>Vehicle</small><strong>${escapeHtml(vehicle)}</strong></div></div><div class="dispatch-card-status"><span class="tracking-badge ${escapeHtml(t.className)}">${escapeHtml(t.label)}</span><small>${escapeHtml(t.detail||route.status||'')}</small></div><div class="dispatch-card-actions"><button type="button" data-open-driver-route="${escapeHtml(route.id)}">Track</button><button type="button" data-copy-assignment="${escapeHtml(route.id)}">Message</button><button type="button" data-view-shortcut="routes">Manage</button></div></article>`}).join('')}
+function renderMissionDispatch() {
+  if (!missionDispatchBoard) return;
 
+  const filter = dispatchStatusFilter?.value || 'all';
+  const routes = missionTodayRoutes().filter(
+    (route) => filter === 'all' || missionRouteStatus(route) === filter
+  );
+
+  if (!routes.length) {
+    missionDispatchBoard.innerHTML = missionEmptyState(
+      filter === 'all' ? 'No journeys planned' : 'No journeys match this filter',
+      filter === 'all'
+        ? 'Plan and approve a route to begin dispatching.'
+        : 'Choose another status or open Saved Routes.',
+      filter === 'all' ? 'Plan a journey' : 'Open saved routes',
+      filter === 'all' ? 'planner' : 'routes'
+    );
+    return;
+  }
+
+  missionDispatchBoard.innerHTML = routes.map((route) => {
+    const tracking = missionTracking(route);
+    const status = missionRouteStatus(route);
+    const latestEvent = latestJourneyEventByRoute.get(route.id);
+    const metadata = latestEvent?.metadata || {};
+    const gps = eventGps(latestEvent || {});
+    const eventAgeMs = latestEvent?.createdAt
+      ? Date.now() - new Date(latestEvent.createdAt).getTime()
+      : Infinity;
+
+    const tv =
+      route.route?.departureAt ||
+      route.route?.journeyDate ||
+      route.createdAt;
+
+    const time = tv
+      ? new Date(tv).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '—';
+
+    const driver =
+      route.driver?.name ||
+      latestEvent?.driverName ||
+      'Driver required';
+
+    const vehicle =
+      route.vehicleRecord?.name ||
+      route.route?.vehicle?.name ||
+      'Vehicle required';
+
+    const registration =
+      route.vehicleRecord?.registration ||
+      route.route?.vehicle?.registration ||
+      '';
+
+    const remainingM = Number(metadata.remainingM);
+    const remainingSeconds = Number(metadata.remainingSeconds);
+
+    const liveBits = [];
+
+    if (Number.isFinite(remainingM)) {
+      liveBits.push(
+        remainingM < 1000
+          ? `${Math.max(0, Math.round(remainingM))}m remaining`
+          : `${(remainingM / 1609.344).toFixed(1)} mi remaining`
+      );
+    }
+
+    if (Number.isFinite(remainingSeconds) && remainingSeconds >= 0) {
+      liveBits.push(
+        `${Math.max(1, Math.round(remainingSeconds / 60))} min`
+      );
+    }
+
+    if (gps && Number.isFinite(eventAgeMs)) {
+      liveBits.push(
+        eventAgeMs < 60000
+          ? 'GPS now'
+          : `GPS ${Math.max(1, Math.round(eventAgeMs / 60000))} min ago`
+      );
+    }
+
+    const completeAllowed =
+      status === 'active' ||
+      status === 'arrived' ||
+      status === 'alert';
+
+    return `
+      <article class="dispatch-card ${escapeHtml(status)}" data-mission-route="${escapeHtml(route.id)}">
+        <div class="dispatch-card-time">
+          <time>${escapeHtml(time)}</time>
+          <span>${escapeHtml(status.replaceAll('-', ' '))}</span>
+        </div>
+
+        <div class="dispatch-card-route">
+          <strong>${escapeHtml(route.origin || 'Start')}</strong>
+          <span class="route-arrow">→</span>
+          <strong>${escapeHtml(route.destination || 'Destination')}</strong>
+        </div>
+
+        <div class="dispatch-card-assignments">
+          <div>
+            <small>Driver</small>
+            <strong>${escapeHtml(driver)}</strong>
+          </div>
+          <div>
+            <small>Vehicle</small>
+            <strong>${escapeHtml(vehicle)}${registration ? ` · ${escapeHtml(registration)}` : ''}</strong>
+          </div>
+        </div>
+
+        <div class="dispatch-card-status">
+          <span class="tracking-badge ${escapeHtml(tracking.className)}">${escapeHtml(tracking.label)}</span>
+          <small>${escapeHtml(liveBits.join(' · ') || tracking.detail || route.status || '')}</small>
+        </div>
+
+        <div class="dispatch-card-actions">
+          <button type="button" data-focus-mission-route="${escapeHtml(route.id)}">Track</button>
+          <button type="button" data-copy-assignment="${escapeHtml(route.id)}">Message</button>
+          ${completeAllowed
+            ? `<button type="button" class="dispatch-complete-button" data-complete-mission-route="${escapeHtml(route.id)}">Complete</button>`
+            : ''}
+          <button type="button" data-view-shortcut="routes">Manage</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+
+/* COACH_SAFE_STAGE181_MISSION_NOTIFICATIONS */
 function renderMissionNotifications() {
   if (!missionNotifications) return;
+
   const notifications = [];
 
   approvedRoutes.forEach((route) => {
     const tracking = missionTracking(route);
+
     if (tracking.className === 'tracking-alert') {
+      const latestEvent =
+        latestJourneyEventByRoute.get(route.id);
+
+      const trafficOffer =
+        latestEvent?.eventType ===
+        'traffic_alternative_available';
+
       notifications.push({
-        level: 'danger',
-        title: tracking.label,
-        detail: `${route.origin} → ${route.destination}`
+        level:
+          trafficOffer
+            ? 'warning'
+            : 'danger',
+
+        title:
+          tracking.label,
+
+        detail:
+          trafficOffer
+            ? `${
+                route.driver?.name ||
+                latestEvent?.driverName ||
+                'Driver'
+              } · ${
+                latestEvent?.message ||
+                `${route.origin} → ${route.destination}`
+              }`
+            : `${route.origin} → ${route.destination}`
       });
     }
-    if (String(route.status || '').toLowerCase() === 'approved' && !route.driverId) {
+
+    /*
+     * Use the real driver relationship rather than route.status alone.
+     * A route can remain Approved while already having a driver assigned.
+     */
+    if (
+      String(route.status || '').toLowerCase() !==
+        'completed' &&
+      !(
+        route.driverId ||
+        route.driver?.id ||
+        route.driver?.name
+      )
+    ) {
       notifications.push({
         level: 'warning',
         title: 'Driver assignment required',
-        detail: `${route.origin} → ${route.destination}`
+        detail:
+          `${route.origin} → ${route.destination}`
       });
     }
   });
 
-  reports.slice(0, 4).forEach((report) => {
-    notifications.push({
-      level: 'info',
-      title: report.issueType || 'Road report',
-      detail: report.roadName || report.location || 'Location not supplied'
+  reports
+    .slice(0, 4)
+    .forEach((report) => {
+      notifications.push({
+        level: 'info',
+        title:
+          report.issueType ||
+          'Road report',
+        detail:
+          report.roadName ||
+          report.location ||
+          'Location not supplied'
+      });
     });
-  });
 
-  if (!notifications.length) { missionNotifications.innerHTML=missionEmptyState('No operational alerts','Coach Safe has not recorded any journey or road warnings.'); return; }
-  missionNotifications.innerHTML=notifications.slice(0,7).map(item=>`<article class="notification-item ${item.level}" data-view-shortcut="${item.level==='info'?'reports':'routes'}"><span></span><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.detail)}</small></div><b>›</b></article>`).join('');
+  if (!notifications.length) {
+    missionNotifications.innerHTML =
+      missionEmptyState(
+        'No operational alerts',
+        'Coach Safe has not recorded any journey or road warnings.'
+      );
+
+    return;
+  }
+
+  missionNotifications.innerHTML =
+    notifications
+      .slice(0, 7)
+      .map((item) => `
+        <article
+          class="notification-item ${escapeHtml(item.level)}"
+          data-view-shortcut="${
+            item.level === 'info'
+              ? 'reports'
+              : 'routes'
+          }"
+        >
+          <span></span>
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <small>${escapeHtml(item.detail)}</small>
+          </div>
+          <b>›</b>
+        </article>
+      `)
+      .join('');
 }
 
 function renderMissionReadiness() {
@@ -1384,7 +1832,87 @@ function renderMissionReadiness() {
     const contactReady = drivers.filter((driver) => driver.phone || driver.email).length;
     const assigned = new Set(approvedRoutes.map((route) => route.driverId).filter(Boolean)).size;
 
-    missionDriverStatus.innerHTML=drivers.length?`<div class="readiness-item good"><strong>${drivers.length}</strong><span>Total drivers</span><i></i></div><div class="readiness-item ${assigned?'active':'good'}"><strong>${assigned}</strong><span>Currently assigned</span><i></i></div><div class="readiness-item ${contactReady<drivers.length?'warning':'good'}"><strong>${contactReady}</strong><span>Contact details ready</span><i></i></div>`:missionEmptyState('No drivers added','Add drivers before assigning journeys.','Add driver','drivers');
+    const activeRoutes = missionTodayRoutes().filter((route) => {
+      const liveClasses = new Set([
+        'tracking-live',
+        'tracking-alert',
+        'tracking-rerouted',
+        'tracking-active'
+      ]);
+
+      if (!liveClasses.has(missionTracking(route).className)) {
+        return false;
+      }
+
+      const latestEvent =
+        latestJourneyEventByRoute.get(route.id);
+
+      return Boolean(
+        route.driverId ||
+        route.driver?.id ||
+        route.driver?.name ||
+        latestEvent?.driverId ||
+        latestEvent?.driverName ||
+        route.assignedDriverName
+      );
+    });
+
+    const activeDriverCards = activeRoutes.map((route) => {
+      const tracking = missionTracking(route);
+      const latestEvent =
+        latestJourneyEventByRoute.get(route.id);
+
+      const resolvedDriverId =
+        route.driverId ||
+        route.driver?.id ||
+        latestEvent?.driverId ||
+        '';
+
+      const resolvedDriverName =
+        route.driver?.name ||
+        latestEvent?.driverName ||
+        route.assignedDriverName ||
+        '';
+
+      const resolvedDriver =
+        route.driver ||
+        drivers.find((driver) =>
+          driver.id === resolvedDriverId
+        ) ||
+        drivers.find((driver) =>
+          resolvedDriverName &&
+          String(driver.name || '').trim().toLowerCase() ===
+            String(resolvedDriverName).trim().toLowerCase()
+        ) ||
+        (
+          resolvedDriverName
+            ? { name: resolvedDriverName }
+            : null
+        );
+
+      const when = latestEvent?.createdAt
+        ? new Date(latestEvent.createdAt).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : '—';
+
+      return `<button type="button" class="mission-active-driver-card" data-open-driver-route="${escapeHtml(route.id)}">
+        <span class="live-dot"></span>
+        <span>
+          <strong>${escapeHtml(resolvedDriver?.name || latestEvent?.driverName || 'Active driver')}</strong>
+          <small>${escapeHtml(tracking.label)} · ${escapeHtml(route.origin || 'Start')} → ${escapeHtml(route.destination || 'Destination')}</small>
+        </span>
+        <time>${escapeHtml(when)}</time>
+      </button>`;
+    }).join('');
+
+    missionDriverStatus.innerHTML=drivers.length
+      ? `<div class="readiness-item good"><strong>${drivers.length}</strong><span>Total drivers</span><i></i></div>
+         <div class="readiness-item ${activeRoutes.length?'active':'good'}"><strong>${activeRoutes.length}</strong><span>Active now</span><i></i></div>
+         <div class="readiness-item ${contactReady<drivers.length?'warning':'good'}"><strong>${contactReady}</strong><span>Contact details ready</span><i></i></div>
+         ${activeDriverCards ? `<div class="mission-active-driver-list">${activeDriverCards}</div>` : '<p class="mission-no-active-drivers">No driver is currently transmitting live journey data.</p>'}`
+      : missionEmptyState('No drivers added','Add drivers before assigning journeys.','Add driver','drivers');
   }
 }
 
@@ -1476,7 +2004,18 @@ function humanEventLabel(event = {}) {
     off_route_warning: 'Off-route warning',
     reroute_calculated: 'Coach-safe reroute calculated',
     road_report_submitted: 'Road report submitted',
-    route_completed: 'Journey completed'
+    route_completed: 'Journey completed',
+    live_position: 'Live coach position',
+    journey_status_on_route: 'Coach on route',
+    journey_status_off_route: 'Coach off route',
+    journey_status_stopped: 'Coach stopped',
+    journey_status_delayed: 'Journey delayed',
+    journey_status_arrived: 'Coach arrived',
+    traffic_check_completed: 'Live traffic checked',
+    traffic_alternative_available: 'Faster route available',
+    traffic_alternative_previewed: 'Traffic alternative previewed',
+    traffic_alternative_kept_current: 'Current route kept',
+    traffic_alternative_accepted: 'Traffic alternative accepted'
   };
 
   return labels[event.eventType] || event.message || 'Journey activity';
@@ -1747,24 +2286,98 @@ async function loadHealth() {
     : `<strong>Live routing not enabled</strong><br>Add TOMTOM_API_KEY to the .env file in this exact folder, restart the app, then recalculate. Mock routes are disabled by default.`;
 }
 
-async function loadPresets() {
-  presets = await api('/api/presets');
-  const current = presetSelect.value || 'standard';
+function coachPresetOptionsHtml() {
   const groups = {};
+
   Object.entries(presets).forEach(([key, preset]) => {
-    const group = preset.category || 'Coach / bus';
-    if (!groups[group]) groups[group] = [];
+    const group =
+      preset.category || 'Coach / bus';
+
+    if (!groups[group]) {
+      groups[group] = [];
+    }
+
     groups[group].push([key, preset]);
   });
 
-  presetSelect.innerHTML = Object.entries(groups).map(([group, entries]) => `
-    <optgroup label="${escapeHtml(group)}">
-      ${entries.map(([key, preset]) => `<option value="${escapeHtml(key)}">${escapeHtml(preset.name || key)}${preset.seats ? ` ÔÇó ${escapeHtml(preset.seats)} seats` : ''}</option>`).join('')}
-    </optgroup>
-  `).join('');
+  return Object.entries(groups)
+    .map(([group, entries]) => `
+      <optgroup label="${escapeHtml(group)}">
+        ${entries.map(([key, preset]) => `
+          <option value="${escapeHtml(key)}">
+            ${escapeHtml(preset.name || key)}
+            ${preset.seats ? ` · ${escapeHtml(preset.seats)} seats` : ''}
+          </option>
+        `).join('')}
+      </optgroup>
+    `)
+    .join('');
+}
 
-  presetSelect.value = presets[current] ? current : 'standard';
-  setPresetFields(presetSelect.value);
+function setFleetPresetFields(presetKey) {
+  const preset = presets[presetKey];
+
+  if (!preset || !vehicleForm) return;
+
+  vehicleForm.heightM.value =
+    preset.heightM;
+
+  vehicleForm.widthM.value =
+    preset.widthM;
+
+  vehicleForm.lengthM.value =
+    preset.lengthM;
+
+  vehicleForm.weightKg.value =
+    preset.weightKg;
+}
+
+async function loadPresets() {
+  presets = await api('/api/presets');
+
+  const plannerCurrent =
+    presetSelect.value || 'standard';
+
+  const fleetCurrent =
+    fleetPresetSelect?.value ||
+    'standard';
+
+  const catalogueHtml =
+    coachPresetOptionsHtml();
+
+  /*
+   * Planner and Fleet Management intentionally use the exact same catalogue.
+   * This prevents different vehicle definitions in different parts of Coach Safe.
+   */
+  presetSelect.innerHTML =
+    catalogueHtml;
+
+  if (fleetPresetSelect) {
+    fleetPresetSelect.innerHTML =
+      catalogueHtml;
+  }
+
+  presetSelect.value =
+    presets[plannerCurrent]
+      ? plannerCurrent
+      : 'standard';
+
+  if (fleetPresetSelect) {
+    fleetPresetSelect.value =
+      presets[fleetCurrent]
+        ? fleetCurrent
+        : 'standard';
+  }
+
+  setPresetFields(
+    presetSelect.value
+  );
+
+  if (fleetPresetSelect) {
+    setFleetPresetFields(
+      fleetPresetSelect.value
+    );
+  }
 }
 
 async function loadVehicles() {
@@ -1794,7 +2407,7 @@ async function loadVehicles() {
   vehicleList.innerHTML = vehicles.map((v) => `
     <div class="db-item">
       <strong>${escapeHtml(v.name)}</strong>
-      <span>${escapeHtml(v.registration || 'No registration')} ÔÇó ${escapeHtml(v.heightM)}m H ÔÇó ${escapeHtml(v.widthM)}m W ÔÇó ${escapeHtml(v.lengthM)}m L ÔÇó ${Number(v.weightKg || 0).toLocaleString()}kg</span>
+      <span>${escapeHtml(v.registration || 'No registration')} · ${escapeHtml(v.heightM)}m H · ${escapeHtml(v.widthM)}m W · ${escapeHtml(v.lengthM)}m L · ${Number(v.weightKg || 0).toLocaleString()}kg</span>
       <div class="card-actions">
         <button class="secondary" data-action="use-vehicle" data-id="${escapeHtml(v.id)}">Use</button>
         <button class="secondary danger" data-action="delete-vehicle" data-id="${escapeHtml(v.id)}">Delete</button>
@@ -2120,10 +2733,79 @@ presetSelect.addEventListener('change', (e) => {
   setPresetFields(e.target.value);
 });
 
+fleetPresetSelect?.addEventListener(
+  'change',
+  (event) => {
+    setFleetPresetFields(
+      event.target.value
+    );
+  }
+);
+
 vehicleSelect.addEventListener('change', () => {
   const vehicle = selectedVehicleRecord();
   if (vehicle) setVehicleFields(vehicle);
 });
+
+
+/* COACH_SAFE_OPERATOR_ROUTE_FRONTEND_STAGE15 */
+window.coachSafeSelectOperatorRoute = function(
+  selectedRoute,
+  option,
+  allOptions
+) {
+  if (!selectedRoute || !option) return;
+
+  const selectedAt = new Date().toISOString();
+
+  currentRoute = {
+    ...selectedRoute,
+    routeOptions: allOptions || [],
+    operatorSelection: {
+      ...(selectedRoute.operatorSelection || {}),
+      candidateId: option.id,
+      candidateLabel: option.label,
+      recommendedCandidateId:
+        (allOptions || []).find(
+          (candidate) => candidate.recommended
+        )?.id || '',
+      recommendationRank:
+        option.recommendationRank || null,
+      selectionSource:
+        option.recommended
+          ? 'coach-safe-ai'
+          : 'operator-override',
+      selectedAt
+    },
+    aiDecision: {
+      ...(selectedRoute.aiDecision || {}),
+      operatorSelectedCandidate: option.id,
+      selectionSource:
+        option.recommended
+          ? 'coach-safe-ai'
+          : 'operator-override',
+      operatorSelectedAt: selectedAt
+    }
+  };
+
+  renderSummary(currentRoute);
+  renderRisk(currentRoute.risk);
+  renderWarnings(currentRoute.warnings);
+  renderInstructions(currentRoute.instructions);
+  renderMap(currentRoute);
+  enableRouteActions(true);
+
+  window.CoachSafeRouteChoice?.render(currentRoute);
+  window.CoachSafeExplainability?.render(currentRoute);
+  window.dispatchEvent(new CustomEvent('coach-safe-route-selected',{detail:{route:currentRoute}}));
+
+  showToast(
+    option.recommended
+      ? 'Coach Safe recommended route selected.'
+      : option.label + ' selected by operator.',
+    'success'
+  );
+};
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -2145,8 +2827,11 @@ form.addEventListener('submit', async (event) => {
     renderInstructions(data.instructions);
     renderMap(data);
     enableRouteActions(true);
+    window.CoachSafeRouteChoice?.render(data);
+    window.CoachSafeExplainability?.render(data);
   } catch (error) {
     currentRoute = null;
+    window.CoachSafeRouteChoice?.clear();
     enableRouteActions(false);
     renderRisk(null);
     renderWarnings([{ level: 'high', title: 'Route calculation failed', message: error.message }]);
@@ -2187,7 +2872,7 @@ saveButton.addEventListener('click', async () => {
 
 printButton.addEventListener('click', () => {
   if (!currentRoute) return;
-  if (currentRoute.provider !== 'tomtom') {
+  if (!String(currentRoute.provider || '').startsWith('tomtom')) {
     alert('This is not a live TomTom road route. Recalculate after enabling TOMTOM_API_KEY before printing/exporting.');
     return;
   }
@@ -2204,7 +2889,7 @@ printButton.addEventListener('click', () => {
 
 exportButton.addEventListener('click', () => {
   if (!currentRoute) return;
-  if (currentRoute.provider !== 'tomtom') {
+  if (!String(currentRoute.provider || '').startsWith('tomtom')) {
     alert('This is not a live TomTom road route. Recalculate after enabling TOMTOM_API_KEY before exporting.');
     return;
   }
@@ -2265,10 +2950,7 @@ vehicleForm.addEventListener('submit', async (event) => {
     });
     vehicleForm.reset();
     vehicleForm.preset.value = 'standard';
-    vehicleForm.heightM.value = '3.65';
-    vehicleForm.widthM.value = '2.55';
-    vehicleForm.lengthM.value = '12.2';
-    vehicleForm.weightKg.value = '18000';
+    setFleetPresetFields('standard');
     await loadVehicles();
     showToast('Vehicle saved to the database.', 'success');
   } catch (error) {
@@ -2508,7 +3190,147 @@ settingsForm?.addEventListener('submit', async (event) => {
 
 
 
+
+async function completeJourneyFromMissionControl(routeId) {
+  const route =
+    approvedRoutes.find(
+      (item) => item.id === routeId
+    );
+
+  if (!route) {
+    showToast(
+      'Journey could not be found.',
+      'error'
+    );
+    return;
+  }
+
+  const driverName =
+    route.driver?.name ||
+    'the driver';
+
+  const confirmed = window.confirm(
+    `Complete this journey for ${driverName}?\n\nThis will end the active journey and mark the route as completed.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(
+      `/driver/route/${encodeURIComponent(routeId)}/complete`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({
+          actor: 'operator'
+        })
+      }
+    );
+
+    const payload =
+      await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(
+        payload.error ||
+        'Could not complete journey.'
+      );
+    }
+
+    showToast(
+      'Journey marked as completed.',
+      'success'
+    );
+
+    await loadApprovedRoutes();
+    await refreshJourneyTracking();
+
+    renderMissionControl();
+  } catch (error) {
+    showToast(
+      error.message ||
+      'Could not complete journey.',
+      'error'
+    );
+  }
+}
+
 document.addEventListener('click', (event) => {
+  const completeMissionButton =
+    event.target.closest(
+      '[data-complete-mission-route]'
+    );
+
+  if (completeMissionButton) {
+    completeJourneyFromMissionControl(
+      completeMissionButton.dataset
+        .completeMissionRoute
+    );
+    return;
+  }
+
+  const focusMissionButton =
+    event.target.closest('[data-focus-mission-route]');
+
+  if (focusMissionButton) {
+    const routeId =
+      focusMissionButton.dataset.focusMissionRoute;
+
+    const latestEvent =
+      latestJourneyEventByRoute.get(routeId);
+
+    const gps = eventGps(latestEvent || {});
+
+    if (gps && operationsMap) {
+      operationsMap.setView(
+        [gps.lat, gps.lng],
+        16,
+        { animate: true }
+      );
+
+      showToast(
+        'Tracking live coach position.',
+        'success'
+      );
+    } else {
+      const route =
+        approvedRoutes.find(
+          (item) => item.id === routeId
+        );
+
+      const points =
+        routePointsForMission(route || {});
+
+      if (points.length && operationsMap) {
+        operationsMap.fitBounds(
+          points,
+          {
+            padding: [40, 40],
+            maxZoom: 14
+          }
+        );
+      }
+
+      showToast(
+        'No recent GPS position yet. Showing the planned route.',
+        'info'
+      );
+    }
+
+    document
+      .getElementById('operationsMap')
+      ?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+
+    return;
+  }
+
   const driverButton = event.target.closest('[data-open-driver-route]');
   if (driverButton) {
     window.open(driverUrl(driverButton.dataset.openDriverRoute), '_blank');
@@ -2599,3 +3421,41 @@ async function boot() {
 boot().catch((error) => {
   providerStatus.innerHTML = `<strong>Startup error</strong><br>${escapeHtml(error.message)}`;
 });
+
+
+/* COACH_SAFE_EXPLAINABLE_AI_FRONTEND_STAGE16 */
+
+
+/* COACH_SAFE_STAGE17A_MISSION_LIVE_REFRESH */
+let coachSafeLiveRefreshBusy = false;
+window.setInterval(async () => {
+  if (coachSafeLiveRefreshBusy) return;
+  if (document.hidden) return;
+
+  coachSafeLiveRefreshBusy = true;
+  try {
+    await refreshJourneyTracking();
+  } catch (error) {
+    console.warn('Coach Safe live Mission Control refresh failed.', error);
+  } finally {
+    coachSafeLiveRefreshBusy = false;
+  }
+}, 15000);
+
+/* COACH_SAFE_STAGE17B_ACTIVE_DRIVER_TRAFFIC_VISIBILITY */
+
+/* COACH_SAFE_STAGE17B1_ACTIVE_DRIVER_RESOLUTION */
+
+/* COACH_SAFE_STAGE17B2_MISSION_ACTIVE_DRIVER_FIX */
+
+/* COACH_SAFE_STAGE17B3_UNIFIED_LIVE_STATE */
+
+/* COACH_SAFE_STAGE17B4_MISSION_COMPLETE_ROUTE */
+
+/* COACH_SAFE_STAGE17B5_SHARED_FLEET_CATALOGUE */
+
+/* COACH_SAFE_STAGE18_MISSION_LIVE_OPERATIONS */
+
+/* COACH_SAFE_STAGE181_MISSION_NOTIFICATION_FIX_INSTALLED */
+
+/* COACH_SAFE_STAGE182_RESOURCE_RELEASE_INSTALLED */

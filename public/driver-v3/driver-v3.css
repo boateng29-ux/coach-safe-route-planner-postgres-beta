@@ -1003,3 +1003,272 @@ button{
     0 18px 44px rgba(0,0,0,.66),
     0 0 0 1px rgba(242,201,76,.08);
 }
+
+
+/* COACH_SAFE_STAGE17A_LIVE_INTELLIGENCE */
+.journey-live-strip{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.8rem;
+  margin:.45rem .65rem 0;
+  padding:.55rem .7rem;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:.72rem;
+  background:rgba(4,9,14,.9);
+}
+.journey-live-strip span{
+  display:block;
+  color:#91a0ad;
+  font-size:.58rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.journey-live-strip strong{
+  display:block;
+  margin-top:.08rem;
+  color:#fff;
+  font-size:.76rem;
+}
+.journey-live-strip strong.good{color:#83efad}
+.journey-live-strip strong.warn{color:#ffd071}
+.journey-live-strip strong.bad{color:#ff9ba4}
+.journey-live-strip p{
+  margin:0;
+  color:#a8b3bd;
+  font-size:.62rem;
+  text-align:right;
+}
+@media(max-width:620px){
+  .journey-live-strip{
+    align-items:flex-start;
+  }
+  .journey-live-strip p{
+    max-width:58%;
+  }
+}
+
+
+/* COACH_SAFE_STAGE17B_LIVE_TRAFFIC */
+.traffic-alternative-panel{
+  margin:.5rem .65rem 0;
+  padding:.72rem;
+  border:1px solid rgba(255,193,70,.55);
+  border-radius:.78rem;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(116,76,9,.18),
+      rgba(8,13,18,.96)
+    );
+}
+.traffic-alt-head{
+  display:flex;
+  justify-content:space-between;
+  gap:.7rem;
+  align-items:flex-start;
+}
+.traffic-alt-head span{
+  display:block;
+  color:#d6a847;
+  font-size:.56rem;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.traffic-alt-head strong{
+  display:block;
+  margin-top:.1rem;
+  color:#fff;
+  font-size:.76rem;
+}
+.traffic-alt-head>b{
+  color:#ffd56f;
+  font-size:.67rem;
+  white-space:nowrap;
+}
+.traffic-alt-head>b span{
+  display:inline;
+  color:#ffd56f;
+  font-size:inherit;
+}
+.traffic-alt-metrics{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:.38rem;
+  margin-top:.58rem;
+}
+.traffic-alt-metrics div{
+  padding:.42rem;
+  border-radius:.52rem;
+  background:rgba(255,255,255,.035);
+}
+.traffic-alt-metrics small,
+.traffic-alt-metrics strong{
+  display:block;
+}
+.traffic-alt-metrics small{
+  color:#919da7;
+  font-size:.5rem;
+}
+.traffic-alt-metrics strong{
+  margin-top:.1rem;
+  color:#fff;
+  font-size:.65rem;
+}
+.traffic-alternative-panel p{
+  margin:.5rem 0 0;
+  color:#a8b4be;
+  font-size:.59rem;
+  line-height:1.4;
+}
+.traffic-alt-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr 1.35fr;
+  gap:.38rem;
+  margin-top:.58rem;
+}
+.traffic-alt-actions button{
+  min-height:2.3rem;
+  border-radius:.58rem!important;
+  font-size:.58rem!important;
+  font-weight:900!important;
+}
+.traffic-alt-actions .traffic-accept{
+  border-color:#d7ae40!important;
+  color:#f8d66c!important;
+}
+.traffic-check-button{
+  width:auto!important;
+  margin:.42rem .65rem 0!important;
+  padding:.48rem .65rem!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+  border-radius:.58rem!important;
+  background:rgba(255,255,255,.035)!important;
+  color:#b8c2cb!important;
+  font-size:.58rem!important;
+}
+@media(max-width:600px){
+  .traffic-alt-actions{
+    grid-template-columns:1fr;
+  }
+}
+
+
+/* COACH_SAFE_STAGE17B4_JOURNEY_COMPLETION */
+#controlDock .complete-route-control{
+  border-color:rgba(76,211,132,.48)!important;
+  color:#9bf0bb!important;
+}
+#controlDock .complete-route-control.completed{
+  background:rgba(47,143,85,.18)!important;
+  border-color:rgba(76,211,132,.65)!important;
+}
+.complete-route-dialog{
+  position:fixed;
+  inset:0;
+  z-index:999999;
+  display:grid;
+  place-items:center;
+  padding:1rem;
+  background:rgba(0,0,0,.68);
+  backdrop-filter:blur(5px);
+}
+.complete-route-dialog[hidden]{
+  display:none!important;
+}
+.complete-route-dialog-card{
+  width:min(28rem,100%);
+  padding:1rem;
+  border:1px solid rgba(77,215,135,.45);
+  border-radius:1rem;
+  background:#0b1218;
+  box-shadow:0 1.2rem 4rem rgba(0,0,0,.5);
+}
+.complete-route-kicker{
+  color:#73dd9d;
+  font-size:.6rem;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+}
+.complete-route-dialog-card h2{
+  margin:.3rem 0;
+  color:#fff;
+  font-size:1.05rem;
+}
+.complete-route-dialog-card p{
+  margin:0;
+  color:#aab5be;
+  font-size:.72rem;
+  line-height:1.45;
+}
+.complete-route-dialog-actions{
+  display:grid;
+  grid-template-columns:1fr 1.4fr;
+  gap:.5rem;
+  margin-top:.9rem;
+}
+.complete-route-dialog-actions button{
+  min-height:2.7rem;
+  border-radius:.65rem!important;
+  font-weight:900!important;
+}
+.complete-route-dialog-actions .confirm-complete{
+  border-color:#52d98a!important;
+  color:#8ff0b5!important;
+}
+
+/* COACH_SAFE_STAGE18_LIVE_OPERATIONS */
+.complete-route-distance-warning{
+  margin:.8rem 0 0;
+  padding:.8rem .9rem;
+  border:1px solid #f0b84b;
+  border-radius:.8rem;
+  background:rgba(240,184,75,.12);
+  color:#ffe4a1;
+  font-weight:800;
+}
+
+
+/* COACH_SAFE_STAGE191D_DRIVER_MAP_REFINEMENT */
+:root{
+  --coach-safe-driver-vh: 1vh;
+}
+
+html,
+body{
+  overscroll-behavior:none;
+}
+
+#app[data-lifecycle="navigation"] #map{
+  touch-action:pan-x pan-y pinch-zoom;
+}
+
+@supports (height:100dvh){
+  #app:fullscreen,
+  #app.fullscreen,
+  body:fullscreen{
+    height:100dvh;
+    min-height:100dvh;
+  }
+}
+
+@media(max-width:720px){
+  #app[data-lifecycle="navigation"] .map-shell,
+  #app[data-lifecycle="navigation"] #map{
+    min-height:52dvh;
+  }
+
+  #app[data-lifecycle="navigation"].minimal-driving .map-shell,
+  #app[data-lifecycle="navigation"].minimal-driving #map{
+    min-height:68dvh;
+  }
+
+  .lane-guidance:not([hidden]){
+    max-width:min(92vw,34rem);
+    white-space:normal;
+    line-height:1.25;
+  }
+}

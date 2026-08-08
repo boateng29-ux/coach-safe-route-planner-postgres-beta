@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#080d13">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Coach Safe">
+  <title>Coach Safe Navigation</title>
+
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet"
+        href="https://js.api.here.com/v3/3.2/mapsjs-ui.css">
+  <link rel="stylesheet"
+        href="/driver-v3/driver-v3.css?v=60">
+</head>
+<body>
+  <main id="app"
+        class="app"
+        data-mode="overview"
+        data-lifecycle="preview">
+
+    <div id="map"
+         class="map"
+         aria-label="Coach Safe navigation map"></div>
+
+    <!-- Equal-height navigation cards -->
+    <section class="guidance-card hud-card" aria-live="polite">
+      <div id="turnIcon" class="turn-icon">→</div>
+      <div class="guidance-copy">
+        <strong id="instruction">Loading approved route…</strong>
+        <span id="turnDistance" class="turn-distance">—</span>
+        <span id="laneText" class="lane-text" hidden></span>
+      </div>
+    </section>
+
+    <section class="speed-card hud-card"
+             aria-label="Speed, speed limit, camera and GPS">
+      <div class="speed-limit-sign">
+        <span id="speedLimitLarge">30</span>
+      </div>
+
+      <div class="current-speed">
+        <strong id="speedLarge">0</strong>
+        <span>mph</span>
+      </div>
+
+      <div id="cameraAlert" class="camera-alert" hidden>
+        <span class="camera-icon" aria-hidden="true">●</span>
+        <strong id="cameraDistance">—</strong>
+      </div>
+
+      <div class="gps-quality">
+        <span>GPS</span>
+        <strong id="gpsSignal">—</strong>
+      </div>
+    </section>
+
+    <!-- Map utilities -->
+    <button id="compassBtn"
+            class="map-control compass-control"
+            type="button"
+            aria-label="Toggle north-up view">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2l3 8-3 12-3-12 3-8z"/>
+        <path d="M12 2v8"/>
+      </svg>
+    </button>
+
+    <div class="zoom-controls">
+      <button id="zoomInBtn" type="button" aria-label="Zoom in">+</button>
+      <button id="zoomOutBtn" type="button" aria-label="Zoom out">−</button>
+    </div>
+
+    <div id="vehicleArrow"
+         class="vehicle-arrow"
+         aria-hidden="true"></div>
+
+    <div id="currentRoad" class="current-road">Route ready</div>
+
+    <!-- Essential trip information -->
+    <section class="trip-strip" aria-label="Journey information">
+      <div>
+        <span>ETA</span>
+        <strong id="eta">—</strong>
+      </div>
+      <div>
+        <span>Time left</span>
+        <strong id="timeLeft">—</strong>
+      </div>
+      <div>
+        <span>Distance</span>
+        <strong id="distanceLeft">—</strong>
+      </div>
+      <div>
+        <span>Status</span>
+        <strong id="routeStatus">Loading</strong>
+      </div>
+    </section>
+
+    <!-- Highlighted access button always remains available -->
+    <button id="driverMenuToggle"
+            class="driver-menu-toggle"
+            type="button"
+            aria-label="Show driver options"
+            aria-expanded="true">
+      <span>▼</span>
+    </button>
+
+    <!-- New clean driver menu -->
+    <nav id="driverMenu"
+         class="driver-menu"
+         aria-label="Driver options">
+
+      <button id="voiceBtn" type="button">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 10v4h4l5 4V6L8 10H4z"/>
+          <path d="M16 9c1 .8 1.5 1.8 1.5 3S17 14.2 16 15"/>
+          <path d="M18.5 6.5C20.2 8 21 9.8 21 12s-.8 4-2.5 5.5"/>
+        </svg>
+        <span>Voice</span>
+      </button>
+
+      <button id="centreBtn" type="button">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"/>
+          <path d="M9 3v15M15 6v15"/>
+        </svg>
+        <span>View</span>
+      </button>
+
+      <button id="rerouteBtn" type="button">
+        <svg viewBox="0 0 24 24">
+          <path d="M4 4v6h6M20 20v-6h-6"/>
+          <path d="M5.5 15A7 7 0 0 0 18 17M18.5 9A7 7 0 0 0 6 7"/>
+        </svg>
+        <span>Recalculate</span>
+      </button>
+
+      <button id="gpsBtn" class="primary" type="button">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 22s7-6 7-13a7 7 0 1 0-14 0c0 7 7 13 7 13z"/>
+          <circle cx="12" cy="9" r="2"/>
+        </svg>
+        <span>Start</span>
+      </button>
+
+      <button id="fullscreenBtn" type="button">
+        <svg viewBox="0 0 24 24">
+          <path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/>
+        </svg>
+        <span>Fullscreen</span>
+      </button>
+
+      <button id="wakeBtn" type="button">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+          <path d="M4.9 4.9L7 7M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>
+        </svg>
+        <span>Screen on</span>
+      </button>
+
+      <button id="reportBtn" class="danger" type="button">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 3L2 21h20L12 3z"/>
+          <path d="M12 9v5M12 18h.01"/>
+        </svg>
+        <span>Report issue</span>
+      </button>
+    </nav>
+
+    <!-- View selection -->
+    <section id="viewMenu"
+             class="view-menu"
+             hidden
+             aria-label="Map view options">
+      <button type="button" data-view="3d">
+        <strong>Navigation 3D</strong>
+        <span>Heading-up perspective</span>
+      </button>
+      <button type="button" data-view="2d">
+        <strong>Navigation 2D</strong>
+        <span>Heading-up flat map</span>
+      </button>
+      <button type="button" data-view="north">
+        <strong>North-up</strong>
+        <span>Traditional orientation</span>
+      </button>
+      <button type="button" data-view="overview">
+        <strong>Route overview</strong>
+        <span>Show the complete approved route</span>
+      </button>
+    </section>
+
+    <!-- Legacy state nodes required by the existing navigation engine.
+         They are intentionally not visually rendered. -->
+    <div class="engine-state" aria-hidden="true">
+      <span id="gpsStatus">GPS off</span>
+      <span id="speed">0 mph</span>
+      <span id="speedLimit">Limit —</span>
+      <span id="roadStatus">—</span>
+    </div>
+
+    <div id="toast" class="toast" role="status"></div>
+    <div id="loading" class="loading">Loading Coach Safe navigation…</div>
+    <div class="here-copyright">© HERE</div>
+  </main>
+
+  <script src="https://js.api.here.com/v3/3.2/mapsjs-core.js"></script>
+  <script src="https://js.api.here.com/v3/3.2/mapsjs-service.js"></script>
+  <script src="https://js.api.here.com/v3/3.2/mapsjs-mapevents.js"></script>
+  <script src="/driver-v3/gps-controller.js?v=60"></script>
+  <script src="/driver-v3/voice-controller.js?v=60"></script>
+  <script type="module" src="/driver-v3/app.js?v=60"></script>
+</body>
+</html>

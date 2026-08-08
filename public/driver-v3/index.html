@@ -101,6 +101,45 @@
       </div>
     </section>
 
+    <section class="journey-live-strip" aria-label="Coach Safe live journey intelligence">
+      <div>
+        <span>Live journey</span>
+        <strong id="journeyLiveStatus" class="journey-live-value">Waiting</strong>
+      </div>
+      <p id="journeyLiveDetail">Start navigation to begin live journey intelligence.</p>
+    </section>
+
+    <section id="trafficAlternativePanel" class="traffic-alternative-panel" hidden>
+      <div class="traffic-alt-head">
+        <div>
+          <span>Live traffic</span>
+          <strong>Faster Coach Safe route available</strong>
+        </div>
+        <b>Save <span id="trafficSaving">—</span></b>
+      </div>
+
+      <div class="traffic-alt-metrics">
+        <div><small>Current</small><strong id="trafficCurrentTime">—</strong></div>
+        <div><small>Alternative</small><strong id="trafficAlternativeTime">—</strong></div>
+        <div><small>Distance</small><strong id="trafficAlternativeDistance">—</strong></div>
+      </div>
+
+      <p>
+        Coach Safe has compared live traffic using the same coach/restriction
+        routing rules. The route will not change unless you accept it.
+      </p>
+
+      <div class="traffic-alt-actions">
+        <button type="button" id="trafficPreviewBtn">Preview</button>
+        <button type="button" id="trafficKeepBtn">Keep current</button>
+        <button type="button" id="trafficAcceptBtn" class="traffic-accept">Accept alternative</button>
+      </div>
+    </section>
+
+    <button type="button" id="trafficCheckBtn" class="traffic-check-button">
+      Check live traffic
+    </button>
+
     <!-- Highlighted access button always remains available -->
     <button id="driverMenuToggle"
             class="driver-menu-toggle"
@@ -179,7 +218,39 @@
         </svg>
         <span>Report issue</span>
       </button>
+
+      <button id="completeRouteBtn" class="complete-route-control" type="button">
+        <svg viewBox="0 0 24 24">
+          <path d="M20 6L9 17l-5-5"/>
+        </svg>
+        <span>Complete route</span>
+      </button>
     </nav>
+
+    <section id="completeRouteDialog"
+             class="complete-route-dialog"
+             hidden
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="completeRouteTitle">
+      <div class="complete-route-dialog-card">
+        <span class="complete-route-kicker">Journey completion</span>
+        <h2 id="completeRouteTitle">Complete this route?</h2>
+        <p>
+          This will end the active journey, stop live navigation and mark the
+          route as completed in Mission Control.
+        </p>
+        <p id="completeRouteDistanceWarning"
+           class="complete-route-distance-warning"
+           hidden></p>
+        <div class="complete-route-dialog-actions">
+          <button id="completeRouteCancelBtn" type="button">Cancel</button>
+          <button id="completeRouteConfirmBtn" class="confirm-complete" type="button">
+            Yes, complete route
+          </button>
+        </div>
+      </div>
+    </section>
 
     <!-- View selection -->
     <section id="viewMenu"

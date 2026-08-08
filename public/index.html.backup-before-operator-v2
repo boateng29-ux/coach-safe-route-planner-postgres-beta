@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f14">
+  <title>Coach Safe Operations</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/styles.css?v=operator2">
+</head>
+<body class="locked">
+  <section id="loginScreen" class="login-screen">
+    <form id="loginForm" class="login-card">
+      <div class="brand-lockup">
+        <div class="brand-mark">CS</div>
+        <div><strong>COACH SAFE</strong><span>Operations Platform</span></div>
+      </div>
+      <h1>Welcome back</h1>
+      <p>Sign in to manage routes, drivers, vehicles and safety reports.</p>
+      <label>Email<input id="loginEmail" type="email" autocomplete="username" required></label>
+      <label>Password<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <button class="primary wide" type="submit">Sign in</button>
+      <p id="loginMessage" class="message"></p>
+    </form>
+  </section>
+
+  <div id="appShell" class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">CS</div>
+        <div><strong>COACH SAFE</strong><span>Operations</span></div>
+      </div>
+
+      <nav id="sideNav" class="side-nav">
+        <button class="active" data-view="dashboard">Overview</button>
+        <button data-view="routes">Routes</button>
+        <button data-view="vehicles">Vehicles</button>
+        <button data-view="drivers">Drivers</button>
+        <button data-view="reports">Road reports</button>
+        <button data-view="settings">Settings</button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="system-mini"><span id="systemDot"></span><strong>System</strong><small id="systemText">Checking…</small></div>
+        <button id="logoutBtn" class="ghost">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Coach Safe platform</p>
+          <h1 id="pageTitle">Smart routes. Safe journeys.</h1>
+          <p id="pageSubtitle">A clear operational view of routes, fleet, drivers and road risk.</p>
+        </div>
+        <div class="top-actions">
+          <button id="refreshBtn" class="secondary">Refresh</button>
+          <button class="primary" data-open-view="routes">Plan new route</button>
+        </div>
+      </header>
+
+      <section id="dashboardView" class="view active">
+        <section class="hero">
+          <div class="hero-copy">
+            <span class="hero-kicker">Professional coach operations</span>
+            <h2>Plan, assign and monitor every journey from one workspace.</h2>
+            <p>Coach-aware routing, verified drivers, vehicle profiles and safety reporting without navigating through stacked pages.</p>
+            <div class="hero-actions">
+              <button class="primary" data-open-view="routes">Plan a route</button>
+              <button class="secondary" data-scroll-to="recentRoutes">View recent journeys</button>
+            </div>
+          </div>
+          <div id="heroMap" class="hero-map" aria-label="Operations map"></div>
+        </section>
+
+        <section class="metric-grid">
+          <article class="metric"><span>Saved routes</span><strong id="routeCount">0</strong><small id="routeSub">No routes loaded</small></article>
+          <article class="metric"><span>Vehicles</span><strong id="vehicleCount">0</strong><small>Fleet profiles</small></article>
+          <article class="metric"><span>Drivers</span><strong id="driverCount">0</strong><small>Available records</small></article>
+          <article class="metric alert"><span>Road reports</span><strong id="reportCount">0</strong><small>Safety issues</small></article>
+        </section>
+
+        <section class="dashboard-grid">
+          <article class="card recent-card" id="recentRoutes">
+            <div class="card-head"><div><p class="eyebrow">Operations</p><h2>Recent routes</h2></div><button class="text-button" data-open-view="routes">View all</button></div>
+            <div id="recentRouteList" class="route-list"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><div><p class="eyebrow">Quick access</p><h2>Daily tools</h2></div></div>
+            <div class="quick-grid">
+              <button data-open-view="routes"><b>Route planner</b><span>Create and approve coach-safe routes</span></button>
+              <button data-open-view="vehicles"><b>Fleet</b><span>Vehicle dimensions and registration</span></button>
+              <button data-open-view="drivers"><b>Drivers</b><span>Manage driver contact records</span></button>
+              <button data-open-view="reports"><b>Safety reports</b><span>Review unsuitable roads and incidents</span></button>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><div><p class="eyebrow">Status</p><h2>Platform health</h2></div></div>
+            <div class="health-list">
+              <div><span>Routing provider</span><strong id="healthRouting">Checking</strong></div>
+              <div><span>Database</span><strong id="healthDatabase">Checking</strong></div>
+              <div><span>Travel profile</span><strong id="healthTravelMode">—</strong></div>
+              <div><span>Country</span><strong id="healthCountry">—</strong></div>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-head"><div><p class="eyebrow">Safety</p><h2>Latest reports</h2></div><button class="text-button" data-open-view="reports">View all</button></div>
+            <div id="latestReports" class="activity-list"></div>
+          </article>
+        </section>
+      </section>
+
+      <section id="routesView" class="view">
+        <div class="module-grid">
+          <article class="card planner-card">
+            <div class="card-head"><div><p class="eyebrow">Route planning</p><h2>Create coach-safe route</h2></div></div>
+            <form id="routeForm" class="form-grid">
+              <label>Start location<input id="routeStart" required placeholder="Pickup address"></label>
+              <label>Destination<input id="routeDestination" required placeholder="Destination address"></label>
+              <label>Intermediate stops<textarea id="routeStops" rows="3" placeholder="One stop per line"></textarea></label>
+              <div class="two-col">
+                <label>Vehicle<select id="routeVehicle"></select></label>
+                <label>Driver<select id="routeDriver"></select></label>
+              </div>
+              <div class="two-col">
+                <label>Route status<select id="routeStatusSelect"><option value="approved">Approved</option><option value="assigned">Assigned</option><option value="draft">Draft</option></select></label>
+                <label>Notes<input id="routeNotes" placeholder="Operator notes"></label>
+              </div>
+              <fieldset class="option-grid">
+                <label><input id="avoidFerries" type="checkbox" checked> Avoid ferries</label>
+                <label><input id="avoidUnpaved" type="checkbox" checked> Avoid unpaved roads</label>
+                <label><input id="avoidTunnels" type="checkbox"> Avoid tunnels</label>
+              </fieldset>
+              <div class="form-actions">
+                <button class="primary" type="submit">Calculate route</button>
+                <button id="saveRouteBtn" class="secondary" type="button" disabled>Save approved route</button>
+              </div>
+            </form>
+            <div id="routeCalculationResult" class="calculation-result"></div>
+          </article>
+
+          <article class="card map-card"><div id="plannerMap" class="planner-map"></div></article>
+
+          <article class="card wide-card">
+            <div class="card-head"><div><p class="eyebrow">Saved routes</p><h2>Journey management</h2></div></div>
+            <div id="allRouteList" class="route-list"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="vehiclesView" class="view">
+        <div class="module-grid">
+          <article class="card">
+            <div class="card-head"><div><p class="eyebrow">Fleet</p><h2>Add vehicle</h2></div></div>
+            <form id="vehicleForm" class="form-grid">
+              <label>Vehicle name<input id="vehicleName" required placeholder="Executive Coach 1"></label>
+              <label>Registration<input id="vehicleRegistration" required placeholder="AB12 CDE"></label>
+              <label>Coach type<select id="vehiclePreset"><option value="standard">Standard coach</option><option value="doubleDecker">Double-decker coach</option><option value="minibus">Minibus</option></select></label>
+              <div class="two-col">
+                <label>Height (m)<input id="vehicleHeight" type="number" step=".01" value="3.65"></label>
+                <label>Width (m)<input id="vehicleWidth" type="number" step=".01" value="2.55"></label>
+              </div>
+              <div class="two-col">
+                <label>Length (m)<input id="vehicleLength" type="number" step=".01" value="12"></label>
+                <label>Weight (kg)<input id="vehicleWeight" type="number" step="100" value="18000"></label>
+              </div>
+              <button class="primary" type="submit">Save vehicle</button>
+            </form>
+          </article>
+          <article class="card wide-card"><div class="card-head"><div><p class="eyebrow">Fleet records</p><h2>Vehicles</h2></div></div><div id="vehicleList" class="record-grid"></div></article>
+        </div>
+      </section>
+
+      <section id="driversView" class="view">
+        <div class="module-grid">
+          <article class="card">
+            <div class="card-head"><div><p class="eyebrow">People</p><h2>Add driver</h2></div></div>
+            <form id="driverForm" class="form-grid">
+              <label>Name<input id="driverName" required></label>
+              <label>Phone<input id="driverPhone" type="tel"></label>
+              <label>Email<input id="driverEmail" type="email"></label>
+              <button class="primary" type="submit">Save driver</button>
+            </form>
+          </article>
+          <article class="card wide-card"><div class="card-head"><div><p class="eyebrow">Driver records</p><h2>Drivers</h2></div></div><div id="driverList" class="record-grid"></div></article>
+        </div>
+      </section>
+
+      <section id="reportsView" class="view">
+        <div class="module-grid">
+          <article class="card">
+            <div class="card-head"><div><p class="eyebrow">Safety</p><h2>Add road report</h2></div></div>
+            <form id="reportForm" class="form-grid">
+              <label>Road or location<input id="reportRoad" required></label>
+              <label>Issue type<select id="reportType"><option>Unsuitable road</option><option>Low bridge</option><option>Weight restriction</option><option>Road closure</option><option>Unsafe pickup point</option></select></label>
+              <label>Notes<textarea id="reportNotes" rows="4"></textarea></label>
+              <button class="primary" type="submit">Save report</button>
+            </form>
+          </article>
+          <article class="card wide-card"><div class="card-head"><div><p class="eyebrow">Safety reports</p><h2>Road reports</h2></div></div><div id="reportList" class="record-grid"></div></article>
+        </div>
+      </section>
+
+      <section id="settingsView" class="view">
+        <article class="card settings-card">
+          <p class="eyebrow">Settings</p><h2>Platform preferences</h2>
+          <p class="muted">Brand settings remain available through your existing API. This dashboard keeps the operational view clean and moves configuration into one dedicated area.</p>
+          <div id="settingsContent" class="health-list"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/app.js?v=operator2"></script>
+</body>
+</html>

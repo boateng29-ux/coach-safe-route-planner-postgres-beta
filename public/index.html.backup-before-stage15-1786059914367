@@ -1,0 +1,850 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coach Safe Route Planner | Point 2 Point</title>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQb7BCHj8EKpD1PpfO5GdK8LAzE+zAM=" crossorigin="" />
+  <link rel="stylesheet" href="/vendor/leaflet-local.css?v=11" />
+  <link rel="stylesheet" href="/styles.css?v=stage13" />
+<link rel="stylesheet" href="/coach-safe-ai-ui-142.css?v=142">
+<link rel="stylesheet" href="/verified-pins-142.css?v=142">
+</head>
+<body class="locked coach-safe-professional">
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="logo-mark login-logo">P2P</div>
+      <p class="eyebrow">Operator access</p>
+      <h1>Coach Safe Route Planner</h1>
+      <p class="subtitle">Secure beta login for route planners, transport managers and operations staff.</p>
+      <label>
+        Company workspace
+        <input id="loginCompanySlug" type="text" placeholder="e.g. abc-coaches" autocomplete="organization" />
+        <small class="field-help">Existing single-company accounts may leave this blank.</small>
+      </label>
+      <label>
+        Email
+        <input id="loginEmail" type="email" value="admin@point2point.site" placeholder="admin@point2point.site" autocomplete="username" />
+      </label>
+      <label>
+        Password
+        <input id="loginPassword" type="password" placeholder="Enter password" autocomplete="current-password" />
+      </label>
+      <button id="loginButton" class="primary" type="button">Sign in</button>
+      <p id="loginMessage" class="login-message">Default beta admin: <strong>admin@point2point.site</strong>. Set <strong>ADMIN_PASSWORD</strong> in Render.</p>
+    </div>
+  </div>
+
+  <div id="appShell" class="app-shell" aria-hidden="true">
+  <header class="topbar legacy-topbar">
+    <div class="brand-block">
+      <img id="brandLogo" class="brand-logo" alt="Company logo" hidden />
+      <div id="brandInitials" class="logo-mark">P2P</div>
+      <div>
+        <p class="eyebrow" id="brandCompany">Point 2 Point Operations MVP</p>
+        <h1 id="brandTitle">Coach Safe Route Planner</h1>
+        <p class="subtitle">Plan, approve, assign and share coach-safe routes with vehicle profiles, driver links, route status and issue reporting.</p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <div class="status-card" id="providerStatus">Checking providerÔÇª</div>
+      <div class="status-card auth-card">
+        <strong id="currentUserBadge">Not signed in</strong>
+        <button id="logoutButton" class="secondary small-button" type="button">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="workspace-tabs">
+    <button class="active" type="button" data-view="planner"><span class="nav-icon">◆</span><span>Route planner</span></button>
+    <button type="button" data-view="overview"><span class="nav-icon">▦</span><span>Overview</span></button>
+    <button type="button" data-view="routes" data-focus="approvedRoutesCard"><span class="nav-icon">↗</span><span>Saved routes</span></button>
+    <button type="button" data-view="vehicles" data-focus="vehicleCard"><span class="nav-icon">▣</span><span>Vehicles</span></button>
+    <button type="button" data-view="drivers" data-focus="driverCard"><span class="nav-icon">●</span><span>Drivers</span></button>
+    <button type="button" data-view="reports" data-focus="reportsCard"><span class="nav-icon">!</span><span>Road reports</span></button>
+    <button type="button" data-view="settings" data-focus="settingsCard"><span class="nav-icon">⚙</span><span>Company</span></button>
+  </nav>
+
+  <main class="layout view-panel active" data-panel="planner">
+    <section class="planner-intro workspace-banner planner-banner">
+      
+      <div class="hero-brand">
+        <div class="hero-logo-wrap">
+          <img class="hero-brand-logo" data-hero-brand-logo alt="Company logo" hidden />
+          <div class="hero-brand-initials" data-hero-brand-initials>P2P</div>
+        </div>
+        <div class="hero-brand-copy">
+          <span data-hero-brand-company>Point 2 Point Operations</span>
+          <strong data-hero-brand-title>Coach Safe Route Planner</strong>
+        </div>
+      </div>
+      <div class="hero-admin">
+        <div>
+          <span data-company-plan>Starter · Trial</span><small>Signed in as</small>
+          <strong data-hero-current-user>Point 2 Point Admin</strong>
+        </div>
+        <button class="secondary small-button hero-logout-button" data-hero-logout type="button">Logout</button>
+      </div>
+
+      <div class="workspace-banner-copy">
+      <div>
+        <p class="eyebrow">Coach-safe route workspace</p>
+        <h2>Plan, verify and approve the complete journey.</h2>
+        <p>Search addresses, confirm draggable map pins, add ordered stops and review coach restrictions before assignment.</p>
+      </div>
+      </div>
+      <div class="planner-intro-badges">
+        <span>Verified pins</span>
+        <span>Multiple stops</span>
+        <span>Coach profile</span>
+      </div>
+    </section>
+    <section class="platform-status-strip" aria-label="Platform status">
+      <div data-status="routing"><span class="status-dot"></span><strong>Routing</strong><small>Checking</small></div>
+      <div data-status="database"><span class="status-dot"></span><strong>Database</strong><small>Checking</small></div>
+      <div data-status="pins"><span class="status-dot ready"></span><strong>Verified pins</strong><small>Ready</small></div>
+      <div data-status="driver"><span class="status-dot ready"></span><strong>Driver V3</strong><small>Ready</small></div>
+    </section>
+
+    <section class="panel planner-panel">
+      <div class="section-title">
+        <span>01</span>
+        <div>
+          <h2>Route details</h2>
+          <p>Select a saved coach, assign a driver and calculate the route.</p>
+        </div>
+      </div>
+
+      
+        <ol class="planner-workflow" aria-label="Route planning workflow">
+          <li><span>1</span><strong>Start</strong><small>Search and verify</small></li>
+          <li><span>2</span><strong>Destination</strong><small>Confirm exact pin</small></li>
+          <li><span>3</span><strong>Stops</strong><small>Add in travel order</small></li>
+          <li><span>4</span><strong>Coach</strong><small>Apply dimensions</small></li>
+          <li><span>5</span><strong>Driver</strong><small>Select assignment</small></li>
+          <li><span>6</span><strong>Calculate</strong><small>Review restrictions</small></li>
+          <li><span>7</span><strong>Approve</strong><small>Save and share</small></li>
+        </ol>
+
+      <form id="routeForm" class="form-grid">
+        <label>
+          Start point
+          <input name="start" value="Hounslow, London" autocomplete="off" required />
+        </label>
+        <label>
+          Destination
+          <input name="destination" value="Wembley Stadium, London" autocomplete="off" required />
+        </label>
+
+        <label>
+          Saved vehicle database
+          <select name="vehicleDatabaseId" id="vehicleSelect">
+            <option value="">Use manual coach profile</option>
+          </select>
+        </label>
+
+        <label>
+          Assign driver
+          <select name="driverId" id="driverSelect">
+            <option value="">No driver assigned</option>
+          </select>
+        </label>
+
+        <label>
+          Coach type
+          <select name="preset" id="presetSelect">
+            <option value="midi">Midi Coach / 33 seat</option>
+            <option value="standard" selected>Standard Coach / 49ÔÇô57 seat</option>
+            <option value="triAxle">Tri-axle Coach</option>
+            <option value="doubleDecker">Double-decker Coach</option>
+          </select>
+        </label>
+
+        <div class="dimensions">
+          <label>Height m<input name="heightM" type="number" step="0.01" value="3.65" required /></label>
+          <label>Width m<input name="widthM" type="number" step="0.01" value="2.55" required /></label>
+          <label>Length m<input name="lengthM" type="number" step="0.01" value="12.2" required /></label>
+          <label>Weight kg<input name="weightKg" type="number" step="1" value="18000" required /></label>
+        </div>
+
+        <fieldset class="checks">
+          <legend>Route preferences</legend>
+          <label><input type="checkbox" name="avoidLowEmissionZones" /> Avoid low-emission zones where possible</label>
+          <label><input type="checkbox" name="avoidTolls" /> Avoid toll roads</label>
+          <label><input type="checkbox" name="avoidFerries" checked /> Avoid ferries</label>
+          <label><input type="checkbox" name="avoidUnpaved" checked /> Avoid unpaved roads</label>
+          <label><input type="checkbox" name="avoidTunnels" /> Avoid tunnels</label>
+        </fieldset>
+
+        <button class="primary" type="submit">Calculate coach-safe route</button>
+      </form>
+    </section>
+
+    <section class="map-shell">
+      <div id="map"></div>
+      <div class="summary-bar" id="summaryBar">
+        <strong>No route calculated yet</strong>
+        <span>Use the planner to generate the first route.</span>
+      </div>
+    </section>
+
+    <section class="panel results-panel">
+      <div class="section-title">
+        <span>02</span>
+        <div>
+          <h2>Safety review</h2>
+          <p>Warnings, risk score and approval actions.</p>
+        </div>
+      </div>
+
+      <div id="riskCard" class="risk-card empty">No risk score yet.</div>
+      <div id="warnings" class="warnings empty">No warnings yet.</div>
+
+      <label class="full-label">
+        Operator approval notes
+        <textarea id="operatorNotes" rows="3" placeholder="Example: Final hotel approach checked. Driver must avoid side street after 18:00."></textarea>
+      </label>
+
+      <div class="actions">
+        <button id="saveRoute" class="secondary" type="button" disabled>Save approved route</button>
+        <button id="printRoute" class="secondary" type="button" disabled>Print route pack</button>
+        <button id="exportInteractive" class="secondary" type="button" disabled>Export zoomable map</button>
+        <button id="openPdfReport" class="secondary" type="button" disabled>Open PDF route report</button>
+      </div>
+
+      <details id="reportDetails" class="report-details">
+        <summary>Report unsuitable road</summary>
+        <form id="reportForm" class="mini-form">
+          <label>Road / location name<input name="roadName" placeholder="Example: Narrow hotel approach road" /></label>
+          <label>Issue type
+            <select name="issueType">
+              <option>Unsuitable road</option>
+              <option>Low bridge concern</option>
+              <option>Narrow road</option>
+              <option>Weight restriction concern</option>
+              <option>Tight turn</option>
+              <option>Coach access restriction</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label>Notes<textarea name="notes" rows="3" placeholder="Describe what the driver/operator found."></textarea></label>
+          <button class="secondary" type="submit" disabled id="submitReport">Save road report</button>
+        </form>
+      </details>
+
+      <h3>Guidance preview</h3>
+      <ol id="instructions" class="instructions"></ol>
+    </section>
+  </main>
+
+  
+
+  
+  <section class="admin-shell view-panel" data-panel="overview">
+    <section class="workspace-hero overview-hero">
+      
+      <div class="hero-brand">
+        <div class="hero-logo-wrap">
+          <img class="hero-brand-logo" data-hero-brand-logo alt="Company logo" hidden />
+          <div class="hero-brand-initials" data-hero-brand-initials>P2P</div>
+        </div>
+        <div class="hero-brand-copy">
+          <span data-hero-brand-company>Point 2 Point Operations</span>
+          <strong data-hero-brand-title>Coach Safe Route Planner</strong>
+        </div>
+      </div>
+      <div class="hero-admin">
+        <div>
+          <span data-company-plan>Starter · Trial</span><small>Signed in as</small>
+          <strong data-hero-current-user>Point 2 Point Admin</strong>
+        </div>
+        <button class="secondary small-button hero-logout-button" data-hero-logout type="button">Logout</button>
+      </div>
+
+      <div class="workspace-banner-copy">
+      <div>
+        <p id="missionGreeting" class="eyebrow">Operations centre</p>
+        <h2 id="missionCompanyHeading">Mission Control</h2>
+        <p id="missionDateLine">Loading today’s operation…</p>
+      </div>
+      </div>
+      <button class="primary hero-action" type="button" data-view-shortcut="planner">Plan new route</button>
+    </section>
+
+    
+    <section class="platform-status-strip" aria-label="Platform status">
+      <div data-status="routing"><span class="status-dot"></span><strong>Routing</strong><small>Checking</small></div>
+      <div data-status="database"><span class="status-dot"></span><strong>Database</strong><small>Checking</small></div>
+      <div data-status="pins"><span class="status-dot ready"></span><strong>Verified pins</strong><small>Ready</small></div>
+      <div data-status="driver"><span class="status-dot ready"></span><strong>Driver V3</strong><small>Ready</small></div>
+    </section>
+
+    
+        <section class="panel operational-summary-card">
+      <div><p class="eyebrow">Operational summary</p><h3 id="operationalSummaryTitle">Preparing today’s summary…</h3><p id="operationalSummaryText" class="muted">Coach Safe is reviewing routes, assignments, fleet readiness and alerts.</p></div>
+      <button id="refreshMissionControlBtn" class="secondary" type="button">Refresh</button>
+    </section>
+
+<section class="mission-kpi-grid" aria-label="Today’s operation">
+      <article class="mission-kpi-card" data-kpi="journeys"><span>Journeys</span><strong id="missionJourneys">0</strong><small id="missionJourneysDetail">Saved routes</small><i></i></article>
+      <article class="mission-kpi-card" data-kpi="active"><span>Active routes</span><strong id="missionActive">0</strong><small>Driver activity detected</small><i></i></article>
+      <article class="mission-kpi-card" data-kpi="vehicles"><span>Available vehicles</span><strong id="missionVehicles">0</strong><small id="missionVehiclesDetail">Fleet ready</small><i></i></article>
+      <article class="mission-kpi-card" data-kpi="drivers"><span>Available drivers</span><strong id="missionDrivers">0</strong><small id="missionDriversDetail">Team ready</small><i></i></article>
+      <article class="mission-kpi-card" data-kpi="alerts"><span>Road alerts</span><strong id="missionAlerts">0</strong><small>Reports and live warnings</small><i></i></article>
+      <article class="mission-kpi-card" data-kpi="unassigned"><span>Unassigned</span><strong id="missionUnassigned">0</strong><small>Approved routes needing action</small><i></i></article>
+    </section>
+
+    <section class="mission-control-grid">
+      <article class="panel mission-map-card">
+        <div class="mission-section-head">
+          <div>
+            <p class="eyebrow">Live operations map</p>
+            <h3>Fleet and journey overview</h3>
+            <p class="muted">Routes are shown from approved journey geometry. Vehicle markers appear only where recent GPS event data exists.</p>
+          </div>
+          <div class="mission-map-legend">
+            <span><i class="planned"></i> Planned route</span>
+            <span><i class="active"></i> GPS activity</span>
+            <span><i class="alert"></i> Alert</span>
+          </div>
+          <div class="mission-map-toolbar" role="group" aria-label="Map layers"><button class="active" type="button" data-map-layer="routes">Routes</button><button class="active" type="button" data-map-layer="fleet">Fleet</button><button class="active" type="button" data-map-layer="reports">Reports</button><button type="button" data-map-fit>Fit operation</button></div>
+        </div>
+        <div id="operationsMap" class="operations-map" aria-label="Operations map"></div>
+        <div id="operationsMapEmpty" class="operations-map-empty" hidden>No route geometry or driver GPS positions are available yet.</div>
+      </article>
+
+      <aside class="mission-side-column">
+        <article class="panel mission-priorities-card">
+          <div class="mission-section-head">
+            <div><p class="eyebrow">Today’s priorities</p><h3>What needs attention</h3></div>
+            <span id="priorityCountBadge" class="count-badge">0</span>
+          </div>
+          <div id="operatorPriorities" class="priority-list"><p class="muted">Loading priorities…</p></div>
+        </article>
+
+        <article class="panel notification-centre-card">
+          <div class="mission-section-head">
+            <div><p class="eyebrow">Notification centre</p><h3>Operational alerts</h3></div>
+          </div>
+          <div id="missionNotifications" class="notification-list"></div>
+        </article>
+      </aside>
+
+      <article class="panel dispatch-board-card">
+        <div class="mission-section-head">
+          <div><p class="eyebrow">Today’s dispatch</p><h3>Journey board</h3></div>
+          <div class="dispatch-board-controls"><select id="dispatchStatusFilter" aria-label="Filter dispatch status"><option value="all">All journeys</option><option value="needs-action">Needs action</option><option value="assigned">Assigned</option><option value="active">Active</option><option value="completed">Completed</option></select><button class="text-button" type="button" data-view-shortcut="routes">Open all routes</button></div>
+        </div>
+        <div id="missionDispatchBoard" class="dispatch-board"></div>
+      </article>
+
+      <article class="panel activity-feed-card mission-activity-card">
+        <div class="mission-section-head">
+          <div><p class="eyebrow">Recent activity</p><h3>Journey timeline</h3></div>
+        </div>
+        <div id="overviewActivityFeed" class="overview-activity-feed"><p class="muted">Loading activity…</p></div>
+      </article>
+
+      <article class="panel fleet-status-card">
+        <div class="mission-section-head">
+          <div><p class="eyebrow">Fleet status</p><h3>Operational readiness</h3></div>
+        </div>
+        <div id="missionFleetStatus" class="readiness-grid"></div>
+      </article>
+
+      <article class="panel driver-status-card">
+        <div class="mission-section-head">
+          <div><p class="eyebrow">Driver status</p><h3>Assignment readiness</h3></div>
+        </div>
+        <div id="missionDriverStatus" class="readiness-grid"></div>
+      </article>
+    </section>
+  </section>
+
+  <section class="admin-shell view-panel" data-panel="routes">
+    <section class="workspace-hero routes-hero">
+      
+      <div class="hero-brand">
+        <div class="hero-logo-wrap">
+          <img class="hero-brand-logo" data-hero-brand-logo alt="Company logo" hidden />
+          <div class="hero-brand-initials" data-hero-brand-initials>P2P</div>
+        </div>
+        <div class="hero-brand-copy">
+          <span data-hero-brand-company>Point 2 Point Operations</span>
+          <strong data-hero-brand-title>Coach Safe Route Planner</strong>
+        </div>
+      </div>
+      <div class="hero-admin">
+        <div>
+          <span data-company-plan>Starter · Trial</span><small>Signed in as</small>
+          <strong data-hero-current-user>Point 2 Point Admin</strong>
+        </div>
+        <button class="secondary small-button hero-logout-button" data-hero-logout type="button">Logout</button>
+      </div>
+
+      <div class="workspace-banner-copy">
+      <div>
+        <p class="eyebrow">Route library</p>
+        <h2>Saved routes and journey management.</h2>
+        <p>Search, assign, track, share and open each approved route from one dedicated workspace.</p>
+      </div>
+      </div>
+      <button class="primary hero-action" type="button" data-view-shortcut="planner">Plan new route</button>
+    </section>
+    <section class="platform-status-strip" aria-label="Platform status">
+      <div data-status="routing"><span class="status-dot"></span><strong>Routing</strong><small>Checking</small></div>
+      <div data-status="database"><span class="status-dot"></span><strong>Database</strong><small>Checking</small></div>
+      <div data-status="pins"><span class="status-dot ready"></span><strong>Verified pins</strong><small>Ready</small></div>
+      <div data-status="driver"><span class="status-dot ready"></span><strong>Driver V3</strong><small>Ready</small></div>
+    </section>
+
+    <div class="single-workspace-grid">
+      
+
+      <article id="approvedRoutesCard" class="panel admin-card wide-card">
+        <h3>Saved route library</h3>
+        <p class="muted">Change route status, assign a driver, open the driver mobile view, or copy a share link.</p>
+        <div id="approvedRoutes" class="saved-routes empty">No approved routes yet.</div>
+      </article>
+    </div>
+  </section>
+
+  <section class="admin-shell view-panel" data-panel="vehicles">
+    <section class="workspace-hero vehicles-hero">
+      
+      <div class="hero-brand">
+        <div class="hero-logo-wrap">
+          <img class="hero-brand-logo" data-hero-brand-logo alt="Company logo" hidden />
+          <div class="hero-brand-initials" data-hero-brand-initials>P2P</div>
+        </div>
+        <div class="hero-brand-copy">
+          <span data-hero-brand-company>Point 2 Point Operations</span>
+          <strong data-hero-brand-title>Coach Safe Route Planner</strong>
+        </div>
+      </div>
+      <div class="hero-admin">
+        <div>
+          <span data-company-plan>Starter · Trial</span><small>Signed in as</small>
+          <strong data-hero-current-user>Point 2 Point Admin</strong>
+        </div>
+        <button class="secondary small-button hero-logout-button" data-hero-logout type="button">Logout</button>
+      </div>
+
+      <div class="workspace-banner-copy">
+      <div>
+        <p class="eyebrow">Fleet management</p>
+        <h2>Coach profiles and vehicle dimensions.</h2>
+        <p>Keep every registration, coach type and routing dimension accurate.</p>
+      </div>
+      </div>
+    </section>
+    <section class="platform-status-strip" aria-label="Platform status">
+      <div data-status="routing"><span class="status-dot"></span><strong>Routing</strong><small>Checking</small></div>
+      <div data-status="database"><span class="status-dot"></span><strong>Database</strong><small>Checking</small></div>
+      <div data-status="pins"><span class="status-dot ready"></span><strong>Verified pins</strong><small>Ready</small></div>
+      <div data-status="driver"><span class="status-dot ready"></span><strong>Driver V3</strong><small>Ready</small></div>
+    </section>
+
+    <div class="single-workspace-grid">
+      
+
+      <section class="module-kpi-strip" id="vehicleKpis">
+      <div><span>Total fleet</span><strong>0</strong></div>
+      <div><span>Assigned</span><strong>0</strong></div>
+      <div><span>Available</span><strong>0</strong></div>
+      <div><span>Profiles ready</span><strong>0</strong></div>
+    </section>
+      <article id="vehicleCard" class="panel admin-card feature-card vehicle-feature-card">
+        <form id="vehicleForm" class="mini-form">
+          <input name="name" placeholder="Vehicle name e.g. 57 Seat Coach 01" required />
+          <input name="registration" placeholder="Registration / fleet ID" />
+          <select name="preset">
+            <option value="standard">Standard Coach / 49ÔÇô57 seat</option>
+            <option value="midi">Midi Coach / 33 seat</option>
+            <option value="triAxle">Tri-axle Coach</option>
+            <option value="doubleDecker">Double-decker Coach</option>
+          </select>
+          <div class="dimensions">
+            <input name="heightM" type="number" step="0.01" placeholder="Height m" value="3.65" />
+            <input name="widthM" type="number" step="0.01" placeholder="Width m" value="2.55" />
+            <input name="lengthM" type="number" step="0.01" placeholder="Length m" value="12.2" />
+            <input name="weightKg" type="number" step="1" placeholder="Weight kg" value="18000" />
+          </div>
+          <textarea name="notes" rows="2" placeholder="Notes"></textarea>
+          <button class="secondary" type="submit">Add vehicle</button>
+        </form>
+        <div id="vehicleList" class="database-list"></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="admin-shell view-panel" data-panel="drivers">
+    <section class="workspace-hero drivers-hero">
+      
+      <div class="hero-brand">
+        <div class="hero-logo-wrap">
+          <img class="hero-brand-logo" data-hero-brand-logo alt="Company logo" hidden />
+          <div class="hero-brand-initials" data-hero-brand-initials>P2P</div>
+        </div>
+        <div class="hero-brand-copy">
+          <span data-hero-brand-company>Point 2 Point Operations</span>
+          <strong data-hero-brand-title>Coach Safe Route Planner</strong>
+        </div>
+      </div>
+      <div class="hero-admin">
+        <div>
+          <span data-company-plan>Starter · Trial</span><small>Signed in as</small>
+          <strong data-hero-current-user>Point 2 Point Admin</strong>
+        </div>
+        <button class="secondary small-button hero-logout-button" data-hero-logout type="button">Logout</button>
+      </div>
+
+      <div class="workspace-banner-copy">
+      <div>
+        <p class="eyebrow">Driver operations</p>
+        <h2>Professional drivers and assignments.</h2>
+        <p>Maintain contact records, depot information and driver communication.</p>
+      </div>
+      </div>
+    </section>
+    <section class="platform-status-strip" aria-label="Platform status">
+      <div data-status="routing"><span class="status-dot"></span><strong>Routing</strong><small>Checking</small></div>
+      <div data-status="database"><span class="status-dot"></span><strong>Database</strong><small>Checking</small></div>
+      <div data-status="pins"><span class="status-dot ready"></span><strong>Verified pins</strong><small>Ready</small></div>
+      <div data-status="driver"><span class="status-dot ready"></span><strong>Driver V3</strong><small>Ready</small></div>
+    </section>
+
+    <div class="single-workspace-grid">
+      
+
+      <section class="module-kpi-strip" id="driverKpis">
+      <div><span>Total drivers</span><strong>0</strong></div>
+      <div><span>Assigned</span><strong>0</strong></div>
+      <div><span>Available</span><strong>0</strong></div>
+      <div><span>Contact ready</span><strong>0</strong></div>
+    </section>
+      <article id="driverCard" class="panel admin-card feature-card driver-feature-card">
+        <form id="driverForm" class="mini-form">
+          <input name="name" placeholder="Driver name" required />
+          <input name="phone" placeholder="Phone" />
+          <input name="email" placeholder="Email" />
+          <input name="base" placeholder="Base / depot" />
+          <textarea name="notes" rows="2" placeholder="Notes"></textarea>
+          <button class="secondary" type="submit">Add driver</button>
+        </form>
+        <div id="driverList" class="database-list"></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="admin-shell view-panel" data-panel="reports">
+    <section class="workspace-hero reports-hero">
+      
+      <div class="hero-brand">
+        <div class="hero-logo-wrap">
+          <img class="hero-brand-logo" data-hero-brand-logo alt="Company logo" hidden />
+          <div class="hero-brand-initials" data-hero-brand-initials>P2P</div>
+        </div>
+        <div class="hero-brand-copy">
+          <span data-hero-brand-company>Point 2 Point Operations</span>
+          <strong data-hero-brand-title>Coach Safe Route Planner</strong>
+        </div>
+      </div>
+      <div class="hero-admin">
+        <div>
+          <span data-company-plan>Starter · Trial</span><small>Signed in as</small>
+          <strong data-hero-current-user>Point 2 Point Admin</strong>
+        </div>
+        <button class="secondary small-button hero-logout-button" data-hero-logout type="button">Logout</button>
+      </div>
+
+      <div class="workspace-banner-copy">
+      <div>
+        <p class="eyebrow">Road intelligence</p>
+        <h2>Route reports and unsuitable-road records.</h2>
+        <p>Review driver and operator concerns before they affect another journey.</p>
+      </div>
+      </div>
+    </section>
+    <section class="platform-status-strip" aria-label="Platform status">
+      <div data-status="routing"><span class="status-dot"></span><strong>Routing</strong><small>Checking</small></div>
+      <div data-status="database"><span class="status-dot"></span><strong>Database</strong><small>Checking</small></div>
+      <div data-status="pins"><span class="status-dot ready"></span><strong>Verified pins</strong><small>Ready</small></div>
+      <div data-status="driver"><span class="status-dot ready"></span><strong>Driver V3</strong><small>Ready</small></div>
+    </section>
+
+    <div class="single-workspace-grid">
+      
+
+      <section class="module-kpi-strip" id="reportKpis">
+      <div><span>Total reports</span><strong>0</strong></div>
+      <div><span>New today</span><strong>0</strong></div>
+      <div><span>Route-linked</span><strong>0</strong></div>
+      <div><span>Needs review</span><strong>0</strong></div>
+    </section>
+      <article id="reportsCard" class="panel admin-card feature-card reports-feature-card">
+        <div id="reportList" class="database-list empty">No road reports yet.</div>
+      </article>
+    </div>
+  </section>
+
+  <section class="admin-shell view-panel" data-panel="settings">
+    <section class="workspace-hero settings-hero">
+      
+      <div class="hero-brand">
+        <div class="hero-logo-wrap">
+          <img class="hero-brand-logo" data-hero-brand-logo alt="Company logo" hidden />
+          <div class="hero-brand-initials" data-hero-brand-initials>P2P</div>
+        </div>
+        <div class="hero-brand-copy">
+          <span data-hero-brand-company>Point 2 Point Operations</span>
+          <strong data-hero-brand-title>Coach Safe Route Planner</strong>
+        </div>
+      </div>
+      <div class="hero-admin">
+        <div>
+          <span data-company-plan>Starter · Trial</span><small>Signed in as</small>
+          <strong data-hero-current-user>Point 2 Point Admin</strong>
+        </div>
+        <button class="secondary small-button hero-logout-button" data-hero-logout type="button">Logout</button>
+      </div>
+
+      <div class="workspace-banner-copy">
+      <div>
+        <p class="eyebrow">Company workspace</p>
+        <h2>Company, branding, users and subscription.</h2>
+        <p>Configure the customer organisation and control who can use the platform.</p>
+      </div>
+      </div>
+    </section>
+    <section class="platform-status-strip" aria-label="Platform status">
+      <div data-status="routing"><span class="status-dot"></span><strong>Routing</strong><small>Checking</small></div>
+      <div data-status="database"><span class="status-dot"></span><strong>Database</strong><small>Checking</small></div>
+      <div data-status="pins"><span class="status-dot ready"></span><strong>Verified pins</strong><small>Ready</small></div>
+      <div data-status="driver"><span class="status-dot ready"></span><strong>Driver V3</strong><small>Ready</small></div>
+    </section>
+
+    <div class="single-workspace-grid">
+      
+
+
+      <section id="onboardingProgressCard" class="panel onboarding-progress-card">
+        <div>
+          <p class="eyebrow">Company onboarding</p>
+          <h3 id="onboardingProgressTitle">Complete your company setup</h3>
+          <p id="onboardingProgressText" class="muted">Loading company status…</p>
+        </div>
+        <button id="openOnboardingBtn" class="primary" type="button">Continue setup</button>
+      </section>
+
+      <nav class="company-tabs" aria-label="Company workspace">
+        <button class="active" type="button" data-company-tab="profile">Profile</button>
+        <button type="button" data-company-tab="branding">Branding</button>
+        <button type="button" data-company-tab="users">Users & roles</button>
+        <button type="button" data-company-tab="subscription">Subscription</button>
+        <button type="button" data-company-tab="audit">Audit log</button>
+        <button type="button" data-company-tab="system-health">System health</button>
+      </nav>
+
+      <article class="panel company-tab-panel active" data-company-panel="profile">
+        <p class="eyebrow">Company profile</p><h3>Organisation details</h3>
+        <form id="companyProfileForm" class="commercial-form">
+          <label>Trading name<input id="commercialCompanyName" required></label>
+          <label>Legal name<input id="commercialLegalName"></label>
+          <label>Workspace slug<input id="commercialCompanySlug" disabled></label>
+          <label>Country<select id="commercialCountry"><option value="GB">United Kingdom</option><option value="IE">Ireland</option><option value="GH">Ghana</option></select></label>
+          <label>Timezone<input id="commercialTimezone" value="Europe/London"></label>
+          <label>Support phone<input id="commercialSupportPhone"></label>
+          <label>Support email<input id="commercialSupportEmail" type="email"></label>
+          <label>Depot address<textarea id="commercialDepotAddress" rows="3"></textarea></label>
+          <button class="primary" type="submit">Save company profile</button>
+        </form>
+      </article>
+
+      <article class="panel company-tab-panel" data-company-panel="branding">
+        <p class="eyebrow">White-label branding</p><h3>Customer-facing appearance</h3>
+        <form id="commercialBrandingForm" class="commercial-form">
+          <label>Brand name<input id="commercialBrandName"></label>
+          <label>Primary colour<input id="commercialPrimaryColor" type="color" value="#edc553"></label>
+          <label>Secondary colour<input id="commercialSecondaryColor" type="color" value="#101821"></label>
+          <label>Driver app title<input id="commercialDriverTitle" value="Driver Navigation"></label>
+          <label>PDF footer<input id="commercialPdfFooter" value="Powered by Coach Safe"></label>
+          <label class="wide-field">Logo URL or data URL<textarea id="commercialLogoUrl" rows="4"></textarea></label>
+          <label class="switch-field"><input id="commercialPoweredBy" type="checkbox" checked> Show “Powered by Coach Safe”</label>
+          <button class="primary" type="submit">Apply branding</button>
+        </form>
+      </article>
+
+      <article class="panel company-tab-panel" data-company-panel="users">
+        <div class="card-head"><div><p class="eyebrow">Access control</p><h3>Company users</h3></div><button id="toggleNewUser" class="primary" type="button">Add user</button></div>
+        <form id="newCompanyUserForm" class="commercial-form" hidden>
+          <label>Name<input id="newCompanyUserName" required></label>
+          <label>Email<input id="newCompanyUserEmail" type="email" required></label>
+          <label>Temporary password<input id="newCompanyUserPassword" type="password" minlength="10" required></label>
+          <label>Role<select id="newCompanyUserRole"><option value="OWNER">Owner</option><option value="ADMIN">Admin</option><option value="OPERATIONS_MANAGER">Operations Manager</option><option value="DISPATCHER" selected>Dispatcher</option><option value="FLEET_MANAGER">Fleet Manager</option><option value="DRIVER">Driver</option><option value="READ_ONLY">Read Only</option></select></label>
+          <button class="primary" type="submit">Create user</button>
+        </form>
+        <div id="companyUserList" class="commercial-list"></div>
+      </article>
+
+      <article class="panel company-tab-panel" data-company-panel="subscription">
+        <p class="eyebrow">Subscription</p><h3>Commercial plan</h3>
+        <div id="commercialSubscriptionSummary" class="subscription-summary"></div>
+        <div class="plan-grid">
+          <article><strong>Starter</strong><span>Small operators</span><small>Planning, fleet, drivers and navigation.</small></article>
+          <article class="recommended"><strong>Professional</strong><span>Growing fleets</span><small>Tracking, dispatch, reports and white label.</small></article>
+          <article><strong>Enterprise</strong><span>Large operators</span><small>API, SSO, custom domains and enterprise support.</small></article>
+        </div>
+      </article>
+
+      <article class="panel company-tab-panel" data-company-panel="audit">
+        <p class="eyebrow">Audit log</p><h3>Recent account activity</h3>
+        <div id="commercialAuditList" class="commercial-list"></div>
+      </article>
+
+      <article id="systemHealthPanel" class="panel company-tab-panel system-health-panel" data-company-panel="system-health">
+        <div class="system-health-head">
+          <div>
+            <p class="eyebrow">Support & diagnostics</p>
+            <h3>System Health</h3>
+            <p class="muted">Run read-only checks across authentication, company context, APIs, PostgreSQL and operational datasets.</p>
+          </div>
+          <div class="system-health-actions">
+            <button id="runDiagnosticsBtn" class="primary" type="button">Run diagnostics</button>
+            <button id="downloadDiagnosticsBtn" class="secondary" type="button" disabled>Download report</button>
+          </div>
+        </div>
+
+        <section class="diagnostic-overall">
+          <div id="diagnosticOverallIcon" class="diagnostic-overall-icon pending">…</div>
+          <div>
+            <span>Overall status</span>
+            <strong id="diagnosticOverallStatus">Not checked</strong>
+            <small id="diagnosticCheckedAt">Run diagnostics to begin.</small>
+          </div>
+        </section>
+
+        <div id="diagnosticSummaryGrid" class="diagnostic-summary-grid">
+          <article><span>Database</span><strong>Not checked</strong><small>PostgreSQL</small></article>
+          <article><span>API</span><strong>Not checked</strong><small>Application endpoints</small></article>
+          <article><span>Company</span><strong>Not checked</strong><small>Tenant context</small></article>
+          <article><span>Operational data</span><strong>Not checked</strong><small>Routes, fleet and drivers</small></article>
+        </div>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Identity</p><h4>Current user and company</h4></div></div>
+          <div id="diagnosticIdentity" class="diagnostic-kv-grid"><p class="muted">No diagnostic result yet.</p></div>
+        </section>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Data visibility</p><h4>Company-scoped records</h4></div></div>
+          <div id="diagnosticDataCounts" class="diagnostic-count-grid"></div>
+          <div id="diagnosticTenantWarning" class="diagnostic-warning" hidden></div>
+        </section>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Endpoint tests</p><h4>API checks</h4></div><span id="diagnosticApiLatency">—</span></div>
+          <div id="diagnosticApiTests" class="diagnostic-test-list"></div>
+        </section>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Infrastructure</p><h4>Runtime and database</h4></div></div>
+          <div id="diagnosticInfrastructure" class="diagnostic-kv-grid"></div>
+        </section>
+
+        <section id="diagnosticCompanyDistributionSection" class="diagnostic-section" hidden>
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Support-only</p><h4>Company record distribution</h4></div></div>
+          <p class="muted">Visible only when protected global diagnostics are enabled on the server.</p>
+          <div id="diagnosticCompanyDistribution" class="diagnostic-table-wrap"></div>
+        </section>
+
+        <section id="diagnosticErrorSection" class="diagnostic-section" hidden>
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Technical detail</p><h4>Exact diagnostic failure</h4></div></div>
+          <div id="diagnosticErrorDetail" class="diagnostic-error-detail"></div>
+        </section>
+
+        <section class="diagnostic-section">
+          <div class="diagnostic-section-title"><div><p class="eyebrow">Suggested action</p><h4>Diagnostic findings</h4></div></div>
+          <div id="diagnosticFindings" class="diagnostic-findings"><p class="muted">No findings yet.</p></div>
+        </section>
+      </article>
+
+      <article id="settingsCard" class="panel admin-card wide-card">
+        <h3>Company branding</h3>
+        <p class="muted">Upload a logo and rename the platform for print reports, driver links and the operator dashboard.</p>
+        <form id="settingsForm" class="mini-form settings-form">
+          <input name="companyName" id="companyNameInput" placeholder="Company name" />
+          <input name="appName" id="appNameInput" placeholder="App name" />
+          <input name="accentName" id="accentNameInput" placeholder="Theme label e.g. Gold / Black" />
+          <label class="file-label">Company logo
+            <input id="logoUpload" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" />
+          </label>
+          <div class="logo-preview-box"><img id="logoPreview" alt="Logo preview" hidden /><span id="logoPreviewText">No logo uploaded</span></div>
+          <div class="card-actions">
+            <button class="secondary" type="submit">Save branding</button>
+            <button id="clearLogo" class="secondary danger" type="button">Remove logo</button>
+          </div>
+        </form>
+
+        <section class="operator-preferences">
+          <div class="settings-section-head">
+            <div>
+              <p class="eyebrow">Operator preferences</p>
+              <h3>Daily workflow defaults</h3>
+              <p class="muted">These preferences are stored securely in this browser and do not change server routing rules until a route is calculated.</p>
+            </div>
+          </div>
+
+          <form id="operatorPreferencesForm" class="mini-form settings-form">
+            <label>Default landing workspace
+              <select id="defaultLandingView">
+                <option value="planner">Route planner</option>
+                <option value="dashboard">Operations dashboard</option>
+              </select>
+            </label>
+
+            <fieldset class="checks preference-checks">
+              <legend>Default route preferences</legend>
+              <label><input id="prefAvoidTolls" type="checkbox" /> Avoid toll roads</label>
+              <label><input id="prefAvoidFerries" type="checkbox" /> Avoid ferries</label>
+              <label><input id="prefAvoidUnpaved" type="checkbox" /> Avoid unpaved roads</label>
+              <label><input id="prefAvoidTunnels" type="checkbox" /> Avoid tunnels</label>
+              <label><input id="prefAvoidLez" type="checkbox" /> Avoid low-emission zones where possible</label>
+            </fieldset>
+
+            <label class="compact-preference">
+              <input id="compactDashboard" type="checkbox" />
+              Use compact cards on smaller laptops
+            </label>
+
+            <button class="secondary" type="submit">Save operator preferences</button>
+          </form>
+        </section>
+      </article>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <strong>Important:</strong> This MVP supports safer route planning but does not replace road signs, temporary restrictions, driver judgement, legal compliance or operator route approval.
+  </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/coach-safe-ai-ui-142.js?v=142"></script>
+<script src="/app.js?v=stage142"></script>
+<dialog id="companyOnboardingDialog" class="onboarding-dialog">
+    <div class="onboarding-shell">
+      <div class="onboarding-head"><div><p class="eyebrow">Welcome to Coach Safe</p><h2>Set up the company workspace</h2></div><button id="closeOnboardingBtn" class="ghost" type="button">Close</button></div>
+      <div class="onboarding-steps"><button class="active" data-onboard-step="1">1 Company</button><button data-onboard-step="2">2 Branding</button><button data-onboard-step="3">3 Operations</button><button data-onboard-step="4">4 Launch</button></div>
+      <section class="onboard-panel active" data-onboard-panel="1"><label>Company name<input id="onboardCompanyName"></label><label>Legal name<input id="onboardLegalName"></label><label>Country<select id="onboardCountry"><option value="GB">United Kingdom</option><option value="IE">Ireland</option><option value="GH">Ghana</option></select></label></section>
+      <section class="onboard-panel" data-onboard-panel="2"><label>Brand name<input id="onboardBrandName"></label><label>Primary colour<input id="onboardPrimaryColour" type="color" value="#edc553"></label><label>Logo URL/data URL<textarea id="onboardLogoUrl" rows="4"></textarea></label></section>
+      <section class="onboard-panel" data-onboard-panel="3"><label><input id="onboardPins" type="checkbox" checked> Require verified pins</label><label><input id="onboardFerries" type="checkbox" checked> Avoid ferries by default</label><label><input id="onboardUnpaved" type="checkbox" checked> Avoid unpaved roads by default</label></section>
+      <section class="onboard-panel" data-onboard-panel="4"><div class="launch-checklist"><span>Company configured</span><span>Branding applied</span><span>Operational defaults saved</span><span>Ready to launch</span></div></section>
+      <div class="onboarding-actions"><button id="onboardBack" class="secondary" type="button">Back</button><button id="onboardNext" class="primary" type="button">Next</button><button id="onboardFinish" class="primary" type="button" hidden>Launch workspace</button></div>
+    </div>
+  </dialog>
+
+<script src="/verified-pins-142a.js?v=142a" defer></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQb7BCHj8EKpD1PpfO5GdK8LAzE+zAM=" crossorigin="" />
   <link rel="stylesheet" href="/vendor/leaflet-local.css?v=11" />
   <link rel="stylesheet" href="/styles.css?v=stage13" />
-<link rel="stylesheet" href="/verified-pins.css?v=2">
+<link rel="stylesheet" href="/coach-safe-ai-ui-142.css?v=142">
+<link rel="stylesheet" href="/verified-pins-142.css?v=142">
 </head>
 <body class="locked coach-safe-professional">
   <div id="loginScreen" class="login-screen">
@@ -289,7 +290,7 @@
       <article class="mission-kpi-card" data-kpi="journeys"><span>Journeys</span><strong id="missionJourneys">0</strong><small id="missionJourneysDetail">Saved routes</small><i></i></article>
       <article class="mission-kpi-card" data-kpi="active"><span>Active routes</span><strong id="missionActive">0</strong><small>Driver activity detected</small><i></i></article>
       <article class="mission-kpi-card" data-kpi="vehicles"><span>Available vehicles</span><strong id="missionVehicles">0</strong><small id="missionVehiclesDetail">Fleet ready</small><i></i></article>
-      <article class="mission-kpi-card" data-kpi="drivers"><span>Available drivers</span><strong id="missionDrivers">0</strong><small id="missionDriversDetail">Team ready</small><i></i></article>
+      <article class="mission-kpi-card" data-kpi="drivers"><span>Active drivers</span><strong id="missionDrivers">0</strong><small id="missionDriversDetail">0 active · team ready</small><i></i></article>
       <article class="mission-kpi-card" data-kpi="alerts"><span>Road alerts</span><strong id="missionAlerts">0</strong><small>Reports and live warnings</small><i></i></article>
       <article class="mission-kpi-card" data-kpi="unassigned"><span>Unassigned</span><strong id="missionUnassigned">0</strong><small>Approved routes needing action</small><i></i></article>
     </section>
@@ -458,11 +459,8 @@
         <form id="vehicleForm" class="mini-form">
           <input name="name" placeholder="Vehicle name e.g. 57 Seat Coach 01" required />
           <input name="registration" placeholder="Registration / fleet ID" />
-          <select name="preset">
-            <option value="standard">Standard Coach / 49ÔÇô57 seat</option>
-            <option value="midi">Midi Coach / 33 seat</option>
-            <option value="triAxle">Tri-axle Coach</option>
-            <option value="doubleDecker">Double-decker Coach</option>
+          <select name="preset" id="fleetPresetSelect" aria-label="Coach / bus profile">
+            <option value="standard">Loading coach and bus catalogue…</option>
           </select>
           <div class="dimensions">
             <input name="heightM" type="number" step="0.01" placeholder="Height m" value="3.65" />
@@ -830,10 +828,11 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="/app.js?v=stage13"></script>
-<script src="/verified-pins.js?v=2" defer></script>
-
-  <dialog id="companyOnboardingDialog" class="onboarding-dialog">
+  <script src="/coach-safe-ai-ui-142.js?v=142"></script>
+<script src="/coach-safe-route-choice.js?v=15"></script>
+<script src="/coach-safe-explainability.js?v=16"></script>
+<script src="/app.js?v=stage16"></script>
+<dialog id="companyOnboardingDialog" class="onboarding-dialog">
     <div class="onboarding-shell">
       <div class="onboarding-head"><div><p class="eyebrow">Welcome to Coach Safe</p><h2>Set up the company workspace</h2></div><button id="closeOnboardingBtn" class="ghost" type="button">Close</button></div>
       <div class="onboarding-steps"><button class="active" data-onboard-step="1">1 Company</button><button data-onboard-step="2">2 Branding</button><button data-onboard-step="3">3 Operations</button><button data-onboard-step="4">4 Launch</button></div>
@@ -845,5 +844,6 @@
     </div>
   </dialog>
 
+<script src="/verified-pins-142a.js?v=142a" defer></script>
 </body>
 </html>
